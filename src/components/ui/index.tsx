@@ -9,13 +9,14 @@ interface CardProps {
     hover?: boolean;
     gradient?: boolean;
     onClick?: () => void;
+    style?: React.CSSProperties;
 }
 
-export function Card({ children, className = '', hover = true, gradient = false, onClick }: CardProps) {
+export function Card({ children, className = '', hover = true, gradient = false, onClick, style }: CardProps) {
     return (
         <motion.div
             className={`glass-card p-6 ${className}`}
-            style={gradient ? { background: 'var(--gradient-primary)' } : {}}
+            style={{ ...(gradient ? { background: 'var(--gradient-primary)' } : {}), ...style }}
             whileHover={hover ? { y: -4, scale: 1.01 } : {}}
             transition={{ duration: 0.2 }}
             onClick={onClick}
