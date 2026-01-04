@@ -1,0 +1,210 @@
+// Prisma Schema for College Essay & Job Application Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Model
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  school       String   @default("UCR")
+  expectedGrad String?
+  isInternational Boolean @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  documents    Document[]
+  essays       Essay[]
+  jobs         JobApplication[]
+  activities   Activity[]
+  achievements Achievement[]
+  emails       EmailDraft[]
+}
+
+// Document Storage
+model Document {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  type      String   // resume, paper, transcript, certificate, other
+  mimeType  String
+  size      Int
+  s3Key     String
+  s3Url     String
+  status    String   @default("pending") // pending, processing, analyzed
+  analysis  Json?    // Parsed content, skills, education, etc.
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+// College Essay
+model Essay {
+  id           String   @id @default(cuid())
+  userId       String
+  collegeId    String
+  collegeName  String
+  prompt       String   @db.Text
+  wordLimit    Int
+  currentDraft String   @db.Text
+  status       String   @default("not-started") // not-started, draft, review, complete
+  confidence   Float    @default(0)
+  deadline     DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User           @relation(fields: [userId], references: [id])
+  versions     EssayVersion[]
+  feedback     EssayFeedback[]
+
+  @@index([userId])
+  @@index([collegeId])
+}
+
+// Essay Version History
+model EssayVersion {
+  id        String   @id @default(cuid())
+  essayId   String
+  content   String   @db.Text
+  confidence Float
+  version   Int
+  createdAt DateTime @default(now())
+
+  essay     Essay    @relation(fields: [essayId], references: [id])
+
+  @@index([essayId])
+}
+
+// AI Feedback on Essays
+model EssayFeedback {
+  id        String   @id @default(cuid())
+  essayId   String
+  type      String   // strength, improvement, suggestion
+  content   String   @db.Text
+  applied   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  essay     Essay    @relation(fields: [essayId], references: [id])
+
+  @@index([essayId])
+}
+
+// Job Application
+model JobApplication {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  company     String
+  location    String
+  type        String   // on-campus, internship, full-time
+  description String?  @db.Text
+  url         String?
+  source      String   @default("manual") // handshake, linkedin, manual
+  match       Float    @default(0)
+  status      String   @default("saved") // saved, applied, interview, offer, rejected
+  appliedAt   DateTime?
+  deadline    DateTime?
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+}
+
+// Extracurricular Activity
+model Activity {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  role         String
+  organization String
+  startDate    DateTime
+  endDate      DateTime?
+  isCurrent    Boolean  @default(false)
+  description  String   @db.Text
+  hoursPerWeek Int
+  weeksPerYear Int
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+// Achievement/Award
+model Achievement {
+  id           String   @id @default(cuid())
+  userId       String
+  title        String
+  organization String
+  date         DateTime
+  description  String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+// Email Draft
+model EmailDraft {
+  id          String   @id @default(cuid())
+  userId      String
+  to          String
+  subject     String
+  body        String   @db.Text
+  status      String   @default("draft") // draft, scheduled, sent
+  category    String   @default("other") // job, college, other
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  starred     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+}
+
+// Target College
+model TargetCollege {
+  id           String   @id @default(cuid())
+  name         String
+  fullName     String
+  deadline     DateTime?
+  essayCount   Int      @default(0)
+  prompts      Json?    // Array of prompt objects
+  requirements Json?    // Application requirements
+  lastScraped  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([name])
+}
+
+// Interview Question
+model InterviewQuestion {
+  id         String   @id @default(cuid())
+  question   String   @db.Text
+  category   String   // general, behavioral, college, job
+  difficulty String   // easy, medium, hard
+  sampleAnswer String? @db.Text
+  createdAt  DateTime @default(now())
+}

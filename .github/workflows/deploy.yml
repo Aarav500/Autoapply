@@ -1,0 +1,141 @@
+# GitHub Actions Workflow for AWS Deployment
+# Uses GitHub Secrets for all credentials (no SSH needed)
+
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-west-2
+  APP_NAME: college-essay-app
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Application
+        run: npm run build
+        env:
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          NEXT_PUBLIC_CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to S3 (Static Assets)
+        run: |
+          aws s3 sync .next/static s3://${{ secrets.S3_BUCKET_NAME }}/_next/static --delete
+          aws s3 sync public s3://${{ secrets.S3_BUCKET_NAME }}/public --delete
+
+      # Option 1: Deploy to AWS App Runner (Recommended for Next.js)
+      - name: Deploy to AWS App Runner
+        if: ${{ vars.DEPLOY_TARGET == 'apprunner' }}
+        run: |
+          aws apprunner create-service \
+            --service-name ${{ env.APP_NAME }} \
+            --source-configuration '{
+              "CodeRepository": {
+                "RepositoryUrl": "https://github.com/${{ github.repository }}",
+                "SourceCodeVersion": {
+                  "Type": "BRANCH",
+                  "Value": "main"
+                }
+              }
+            }' \
+            --instance-configuration '{
+              "Cpu": "1 vCPU",
+              "Memory": "2 GB"
+            }' || echo "Service already exists, updating..."
+
+      # Option 2: Deploy to EC2 via AWS Systems Manager
+      - name: Deploy to EC2 via SSM
+        if: ${{ vars.DEPLOY_TARGET == 'ec2' }}
+        run: |
+          aws ssm send-command \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd /home/ubuntu/app",
+              "git pull origin main",
+              "npm ci --production",
+              "npm run build",
+              "pm2 restart all || pm2 start npm --name app -- start"
+            ]' \
+            --timeout-seconds 300
+
+      # Option 3: Deploy Docker to ECR + ECS
+      - name: Build and Push Docker Image
+        if: ${{ vars.DEPLOY_TARGET == 'ecs' }}
+        run: |
+          # Login to ECR
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+            docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+          
+          # Build and push
+          docker build -t ${{ env.APP_NAME }} .
+          docker tag ${{ env.APP_NAME }}:latest ${{ secrets.ECR_REGISTRY }}/${{ env.APP_NAME }}:latest
+          docker push ${{ secrets.ECR_REGISTRY }}/${{ env.APP_NAME }}:latest
+          
+          # Update ECS service
+          aws ecs update-service \
+            --cluster ${{ secrets.ECS_CLUSTER }} \
+            --service ${{ env.APP_NAME }} \
+            --force-new-deployment
+
+  # Database Migrations (if using Prisma)
+  migrate:
+    runs-on: ubuntu-latest
+    needs: build-and-deploy
+    if: ${{ github.ref == 'refs/heads/main' }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install Dependencies
+        run: npm ci
+        
+      - name: Run Migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  # Notify on Success
+  notify:
+    runs-on: ubuntu-latest
+    needs: [build-and-deploy, migrate]
+    if: success()
+    
+    steps:
+      - name: Send Success Notification
+        run: |
+          echo "✅ Deployment successful!"
+          echo "App deployed to: ${{ vars.APP_URL || 'https://your-app.aws.com' }}"
