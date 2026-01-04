@@ -267,7 +267,6 @@ export default function AutomatePage() {
                                                     ? 'rgba(234, 179, 8, 0.1)'
                                                     : 'var(--bg-secondary)',
                                             borderLeft: `4px solid ${priority === 'critical' ? 'var(--error)' : priority === 'high' ? 'var(--warning)' : 'var(--primary-400)'}`,
-                                            ringColor: 'var(--primary-500)'
                                         }}
                                         onClick={() => setSelectedCollege(college.id)}
                                     >
