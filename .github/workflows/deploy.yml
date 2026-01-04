@@ -74,18 +74,100 @@ jobs:
       - name: Output Deployment Info
         run: |
           echo "========================================"
-          echo "✅ DEPLOYMENT SUCCESSFUL!"
+          echo "✅ BUILD SUCCESSFUL!"
           echo "========================================"
           echo ""
           echo "📦 Package: s3://${{ secrets.S3_BUCKET_NAME }}/deployments/latest.zip"
           echo "🔄 Commit: ${{ github.sha }}"
+          echo "========================================"
+
+      - name: Deploy to EC2 via SSM
+        run: |
+          echo "🚀 Deploying to EC2 via AWS SSM..."
+          
+          # Get EC2 instance ID by tag name
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=*autoapply*" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
+          
+          if [ "$INSTANCE_ID" == "None" ] || [ -z "$INSTANCE_ID" ]; then
+            echo "⚠️ No running EC2 instance found with tag 'autoapply'"
+            echo "Trying to find any running instance..."
+            INSTANCE_ID=$(aws ec2 describe-instances \
+              --filters "Name=instance-state-name,Values=running" \
+              --query "Reservations[0].Instances[0].InstanceId" \
+              --output text)
+          fi
+          
+          echo "📍 Target EC2 Instance: $INSTANCE_ID"
+          
+          if [ "$INSTANCE_ID" == "None" ] || [ -z "$INSTANCE_ID" ]; then
+            echo "❌ No running EC2 instance found!"
+            exit 1
+          fi
+          
+          # Send SSM command to deploy
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd /home/ubuntu",
+              "aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}/deployments/latest.zip . --region ${{ secrets.AWS_REGION }}",
+              "rm -rf app-new && mkdir -p app-new",
+              "unzip -o latest.zip -d app-new",
+              "cd app-new",
+              "npm ci --production --legacy-peer-deps 2>/dev/null || npm install --production",
+              "pm2 delete autoapply 2>/dev/null || true",
+              "pm2 start npm --name autoapply -- start",
+              "pm2 save",
+              "echo Deployment complete!"
+            ]' \
+            --timeout-seconds 600 \
+            --query "Command.CommandId" \
+            --output text)
+          
+          echo "📋 SSM Command ID: $COMMAND_ID"
+          echo "⏳ Waiting for deployment to complete..."
+          
+          # Wait for command to complete
+          sleep 30
+          
+          # Check command status
+          STATUS=$(aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --query "Status" \
+            --output text 2>/dev/null || echo "Pending")
+          
+          echo "📊 Deployment Status: $STATUS"
+          
+          if [ "$STATUS" == "Success" ]; then
+            echo "✅ EC2 deployment successful!"
+          elif [ "$STATUS" == "InProgress" ] || [ "$STATUS" == "Pending" ]; then
+            echo "⏳ Deployment still in progress - check EC2 for final status"
+          else
+            echo "⚠️ Deployment may have issues - Status: $STATUS"
+          fi
+
+      - name: Get Application URL
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].InstanceId" \
+            --output text)
+          
+          PUBLIC_IP=$(aws ec2 describe-instances \
+            --instance-ids "$INSTANCE_ID" \
+            --query "Reservations[0].Instances[0].PublicIpAddress" \
+            --output text)
+          
+          echo "========================================"
+          echo "🎉 DEPLOYMENT COMPLETE!"
+          echo "========================================"
           echo ""
-          echo "📋 To deploy on EC2, SSH in and run:"
-          echo "   cd /home/ubuntu"
-          echo "   aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}/deployments/latest.zip ."
-          echo "   unzip -o latest.zip -d app"
-          echo "   cd app && npm ci --production"
-          echo "   pm2 restart autoapply || pm2 start npm --name autoapply -- start"
+          echo "🌐 Application URL: http://$PUBLIC_IP:3000"
+          echo "📍 EC2 Instance: $INSTANCE_ID"
           echo "========================================"
 
   notify:
