@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Button, StatusBadge, Input, Tag } from '@/components/ui';
 import { useS3Storage } from '@/lib/useS3Storage';
+import { toast } from '@/lib/error-handling';
 import {
     FolderOpen,
     Upload,
@@ -23,7 +24,8 @@ import {
     X,
     Loader2,
     Save,
-    RefreshCw
+    RefreshCw,
+    AlertCircle
 } from 'lucide-react';
 
 interface Document {
@@ -74,6 +76,8 @@ export default function DocumentsPage() {
     const [showActivityModal, setShowActivityModal] = useState(false);
     const [editingActivity, setEditingActivity] = useState<ActivityItem | null>(null);
     const [newActivity, setNewActivity] = useState<Partial<ActivityItem>>(emptyActivity);
+    const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
     // S3 Storage hooks for persistent data
     const {
@@ -151,28 +155,41 @@ export default function DocumentsPage() {
         }
     };
 
-    // Activity CRUD operations
+    // Activity CRUD operations with validation
+    const validateActivity = () => {
+        const errors: Record<string, string> = {};
+        if (!newActivity.name?.trim()) errors.name = 'Activity name is required';
+        if (!newActivity.role?.trim()) errors.role = 'Your role is required';
+        if (newActivity.hoursPerWeek && (newActivity.hoursPerWeek < 0 || newActivity.hoursPerWeek > 168)) {
+            errors.hoursPerWeek = 'Hours must be between 0-168';
+        }
+        setFormErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
     const handleAddActivity = () => {
-        if (!newActivity.name || !newActivity.role) {
-            alert('Please fill in at least the activity name and role');
+        if (!validateActivity()) {
+            toast.error('Please fix the errors in the form');
             return;
         }
 
         const activity: ActivityItem = {
             id: Date.now().toString(),
-            name: newActivity.name || '',
-            role: newActivity.role || '',
-            organization: newActivity.organization || '',
+            name: newActivity.name?.trim() || '',
+            role: newActivity.role?.trim() || '',
+            organization: newActivity.organization?.trim() || '',
             startDate: newActivity.startDate || '',
             endDate: newActivity.endDate || 'Present',
-            description: newActivity.description || '',
+            description: newActivity.description?.trim() || '',
             hoursPerWeek: newActivity.hoursPerWeek || 0,
             weeksPerYear: newActivity.weeksPerYear || 0,
         };
 
         setActivities(prev => [...prev, activity]);
         setNewActivity(emptyActivity);
+        setFormErrors({});
         setShowActivityModal(false);
+        toast.success('Activity added successfully!');
     };
 
     const handleEditActivity = (activity: ActivityItem) => {
@@ -182,7 +199,11 @@ export default function DocumentsPage() {
     };
 
     const handleUpdateActivity = () => {
-        if (!editingActivity || !newActivity.name) return;
+        if (!editingActivity) return;
+        if (!validateActivity()) {
+            toast.error('Please fix the errors in the form');
+            return;
+        }
 
         setActivities(prev =>
             prev.map(a => a.id === editingActivity.id
@@ -192,13 +213,15 @@ export default function DocumentsPage() {
         );
         setEditingActivity(null);
         setNewActivity(emptyActivity);
+        setFormErrors({});
         setShowActivityModal(false);
+        toast.success('Activity updated successfully!');
     };
 
     const handleDeleteActivity = (id: string) => {
-        if (confirm('Are you sure you want to delete this activity?')) {
-            setActivities(prev => prev.filter(a => a.id !== id));
-        }
+        setActivities(prev => prev.filter(a => a.id !== id));
+        setShowDeleteConfirm(null);
+        toast.success('Activity deleted');
     };
 
     const handleAddAchievement = () => {
@@ -217,9 +240,9 @@ export default function DocumentsPage() {
     };
 
     const handleDeleteAchievement = (id: string) => {
-        if (confirm('Delete this achievement?')) {
-            setAchievements(prev => prev.filter(a => a.id !== id));
-        }
+        setAchievements(prev => prev.filter(a => a.id !== id));
+        setShowDeleteConfirm(null);
+        toast.success('Achievement deleted');
     };
 
     const filteredDocuments = documents.filter(doc =>
@@ -592,17 +615,39 @@ export default function DocumentsPage() {
                                 </Button>
                             </div>
                             <div className="space-y-4">
-                                <Input
-                                    placeholder="Activity Name *"
-                                    value={newActivity.name || ''}
-                                    onChange={(e) => setNewActivity(prev => ({ ...prev, name: e.target.value }))}
-                                />
-                                <div className="grid grid-cols-2 gap-4">
+                                <div>
                                     <Input
-                                        placeholder="Your Role *"
-                                        value={newActivity.role || ''}
-                                        onChange={(e) => setNewActivity(prev => ({ ...prev, role: e.target.value }))}
+                                        placeholder="Activity Name *"
+                                        value={newActivity.name || ''}
+                                        onChange={(e) => {
+                                            setNewActivity(prev => ({ ...prev, name: e.target.value }));
+                                            if (formErrors.name) setFormErrors(prev => ({ ...prev, name: '' }));
+                                        }}
+                                        className={formErrors.name ? 'border-red-500' : ''}
                                     />
+                                    {formErrors.name && (
+                                        <p className="text-xs mt-1 flex items-center gap-1" style={{ color: 'var(--error)' }}>
+                                            <AlertCircle className="w-3 h-3" /> {formErrors.name}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <Input
+                                            placeholder="Your Role *"
+                                            value={newActivity.role || ''}
+                                            onChange={(e) => {
+                                                setNewActivity(prev => ({ ...prev, role: e.target.value }));
+                                                if (formErrors.role) setFormErrors(prev => ({ ...prev, role: '' }));
+                                            }}
+                                            className={formErrors.role ? 'border-red-500' : ''}
+                                        />
+                                        {formErrors.role && (
+                                            <p className="text-xs mt-1 flex items-center gap-1" style={{ color: 'var(--error)' }}>
+                                                <AlertCircle className="w-3 h-3" /> {formErrors.role}
+                                            </p>
+                                        )}
+                                    </div>
                                     <Input
                                         placeholder="Organization"
                                         value={newActivity.organization || ''}

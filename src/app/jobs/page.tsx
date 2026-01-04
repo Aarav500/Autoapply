@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Card, Button, StatusBadge, Input, ProgressBar, Tag } from '@/components/ui';
+import { useS3Storage } from '@/lib/useS3Storage';
+import { toast } from '@/lib/error-handling';
 import {
     Briefcase,
     Search,
@@ -13,16 +15,49 @@ import {
     Building2,
     Star,
     BookmarkPlus,
+    Bookmark,
     ExternalLink,
     ChevronRight,
     AlertCircle,
     CheckCircle2,
     TrendingUp,
-    Calendar
+    Calendar,
+    Loader2,
+    Send
 } from 'lucide-react';
 
-// Mock job data - will be fetched from Handshake
-const onCampusJobs = [
+// Job type definitions
+interface Job {
+    id: number;
+    title: string;
+    company: string;
+    location: string;
+    type: string;
+    hours: string;
+    pay: string;
+    deadline: string;
+    match: number;
+    tags: string[];
+    description: string;
+    status: string;
+}
+
+interface SavedJob {
+    jobId: number;
+    savedAt: string;
+}
+
+interface JobApplication {
+    id: string;
+    jobId: number;
+    title: string;
+    company: string;
+    status: 'applied' | 'interview' | 'offer' | 'rejected';
+    appliedAt: string;
+}
+
+// Available jobs (mock data simulating Handshake API)
+const availableOnCampusJobs: Job[] = [
     {
         id: 1,
         title: 'Research Assistant',
@@ -95,7 +130,7 @@ const onCampusJobs = [
     },
 ];
 
-const internships = [
+const availableInternships: Job[] = [
     {
         id: 101,
         title: 'Software Engineering Intern',
@@ -140,18 +175,64 @@ const internships = [
     },
 ];
 
-const appliedJobs = [
-    { id: 201, title: 'Web Developer', company: 'UCR Housing', status: 'applied', date: '2025-12-15' },
-    { id: 202, title: 'Research Intern', company: 'UCR Chemistry', status: 'interview', date: '2025-12-20' },
-    { id: 203, title: 'Office Assistant', company: 'UCR Recreation', status: 'rejected', date: '2025-12-10' },
-];
-
 type TabType = 'on-campus' | 'internships' | 'applied';
 
 export default function JobsPage() {
     const [activeTab, setActiveTab] = useState<TabType>('on-campus');
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedJob, setSelectedJob] = useState<typeof onCampusJobs[0] | null>(null);
+    const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+
+    // S3 Storage for saved jobs and applications
+    const {
+        data: savedJobs,
+        setData: setSavedJobs,
+        isLoading: savedJobsLoading
+    } = useS3Storage<SavedJob[]>('savedJobs', { defaultValue: [] });
+
+    const {
+        data: applications,
+        setData: setApplications,
+        isLoading: applicationsLoading
+    } = useS3Storage<JobApplication[]>('jobApplications', { defaultValue: [] });
+
+    const isLoading = savedJobsLoading || applicationsLoading;
+
+    // Check if a job is saved
+    const isJobSaved = (jobId: number) => savedJobs.some(s => s.jobId === jobId);
+
+    // Check if user applied to a job
+    const getApplicationStatus = (jobId: number) => applications.find(a => a.jobId === jobId);
+
+    // Save/unsave a job
+    const toggleSaveJob = (job: Job) => {
+        if (isJobSaved(job.id)) {
+            setSavedJobs(prev => prev.filter(s => s.jobId !== job.id));
+            toast.info('Job removed from saved');
+        } else {
+            setSavedJobs(prev => [...prev, { jobId: job.id, savedAt: new Date().toISOString() }]);
+            toast.success('Job saved!');
+        }
+    };
+
+    // Apply to a job
+    const applyToJob = (job: Job) => {
+        if (getApplicationStatus(job.id)) {
+            toast.warning('You already applied to this job');
+            return;
+        }
+
+        const application: JobApplication = {
+            id: Date.now().toString(),
+            jobId: job.id,
+            title: job.title,
+            company: job.company,
+            status: 'applied',
+            appliedAt: new Date().toISOString(),
+        };
+
+        setApplications(prev => [...prev, application]);
+        toast.success(`Applied to ${job.title}!`);
+    };
 
     const containerVariants = {
         hidden: { opacity: 0 },
@@ -166,12 +247,21 @@ export default function JobsPage() {
         visible: { opacity: 1, y: 0 },
     };
 
-    const jobs = activeTab === 'on-campus' ? onCampusJobs : activeTab === 'internships' ? internships : [];
-    const filteredJobs = jobs.filter(job =>
+    const availableJobs = activeTab === 'on-campus' ? availableOnCampusJobs : activeTab === 'internships' ? availableInternships : [];
+    const filteredJobs = availableJobs.filter(job =>
         job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
         job.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
     );
+
+    // Stats
+    const stats = useMemo(() => ({
+        onCampus: availableOnCampusJobs.length,
+        internships: availableInternships.length,
+        applied: applications.length,
+        interviews: applications.filter(a => a.status === 'interview').length,
+        saved: savedJobs.length,
+    }), [applications, savedJobs]);
 
     return (
         <motion.div
@@ -205,7 +295,7 @@ export default function JobsPage() {
                         <Briefcase className="w-6 h-6" style={{ color: 'var(--accent-teal)' }} />
                     </div>
                     <div>
-                        <p className="text-2xl font-bold">{onCampusJobs.length}</p>
+                        <p className="text-2xl font-bold">{stats.onCampus}</p>
                         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>On-Campus Jobs</p>
                     </div>
                 </Card>
@@ -214,7 +304,7 @@ export default function JobsPage() {
                         <TrendingUp className="w-6 h-6" style={{ color: 'var(--accent-purple)' }} />
                     </div>
                     <div>
-                        <p className="text-2xl font-bold">{internships.length}</p>
+                        <p className="text-2xl font-bold">{stats.internships}</p>
                         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Summer Internships</p>
                     </div>
                 </Card>
@@ -223,7 +313,7 @@ export default function JobsPage() {
                         <CheckCircle2 className="w-6 h-6" style={{ color: 'var(--success)' }} />
                     </div>
                     <div>
-                        <p className="text-2xl font-bold">{appliedJobs.length}</p>
+                        <p className="text-2xl font-bold">{stats.applied}</p>
                         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Applications Sent</p>
                     </div>
                 </Card>
@@ -232,7 +322,7 @@ export default function JobsPage() {
                         <Calendar className="w-6 h-6" style={{ color: 'var(--accent-gold)' }} />
                     </div>
                     <div>
-                        <p className="text-2xl font-bold">1</p>
+                        <p className="text-2xl font-bold">{stats.interviews}</p>
                         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Interviews</p>
                     </div>
                 </Card>
@@ -268,38 +358,44 @@ export default function JobsPage() {
                 <motion.div variants={itemVariants}>
                     <Card>
                         <h3 className="font-semibold mb-4">Application Tracker</h3>
-                        <div className="table-container">
-                            <table className="table">
-                                <thead>
-                                    <tr>
-                                        <th>Position</th>
-                                        <th>Company</th>
-                                        <th>Applied Date</th>
-                                        <th>Status</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {appliedJobs.map((job) => (
-                                        <tr key={job.id}>
-                                            <td className="font-medium">{job.title}</td>
-                                            <td style={{ color: 'var(--text-secondary)' }}>{job.company}</td>
-                                            <td style={{ color: 'var(--text-muted)' }}>{job.date}</td>
-                                            <td>
-                                                <StatusBadge
-                                                    status={job.status === 'interview' ? 'success' : job.status === 'applied' ? 'info' : 'error'}
-                                                >
-                                                    {job.status}
-                                                </StatusBadge>
-                                            </td>
-                                            <td>
-                                                <Button size="sm" variant="ghost">View</Button>
-                                            </td>
+                        {applications.length === 0 ? (
+                            <div className="text-center py-12">
+                                <Send className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
+                                <p className="mb-2" style={{ color: 'var(--text-muted)' }}>No applications yet</p>
+                                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Apply to jobs to track them here</p>
+                            </div>
+                        ) : (
+                            <div className="table-container">
+                                <table className="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Position</th>
+                                            <th>Company</th>
+                                            <th>Applied Date</th>
+                                            <th>Status</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                    </thead>
+                                    <tbody>
+                                        {applications.map((app) => (
+                                            <tr key={app.id}>
+                                                <td className="font-medium">{app.title}</td>
+                                                <td style={{ color: 'var(--text-secondary)' }}>{app.company}</td>
+                                                <td style={{ color: 'var(--text-muted)' }}>
+                                                    {new Date(app.appliedAt).toLocaleDateString()}
+                                                </td>
+                                                <td>
+                                                    <StatusBadge
+                                                        status={app.status === 'interview' ? 'success' : app.status === 'applied' ? 'info' : app.status === 'offer' ? 'success' : 'error'}
+                                                    >
+                                                        {app.status}
+                                                    </StatusBadge>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </Card>
                 </motion.div>
             ) : (
@@ -406,11 +502,25 @@ export default function JobsPage() {
                                     </div>
 
                                     <div className="flex gap-3">
-                                        <Button className="flex-1" icon={<ExternalLink className="w-4 h-4" />}>
-                                            Apply Now
-                                        </Button>
-                                        <Button variant="secondary" icon={<BookmarkPlus className="w-4 h-4" />}>
-                                            Save
+                                        {getApplicationStatus(selectedJob.id) ? (
+                                            <Button className="flex-1" variant="secondary" disabled icon={<CheckCircle2 className="w-4 h-4" />}>
+                                                Applied ✓
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                className="flex-1"
+                                                icon={<Send className="w-4 h-4" />}
+                                                onClick={() => applyToJob(selectedJob)}
+                                            >
+                                                Apply Now
+                                            </Button>
+                                        )}
+                                        <Button
+                                            variant="secondary"
+                                            icon={isJobSaved(selectedJob.id) ? <Bookmark className="w-4 h-4" /> : <BookmarkPlus className="w-4 h-4" />}
+                                            onClick={() => toggleSaveJob(selectedJob)}
+                                        >
+                                            {isJobSaved(selectedJob.id) ? 'Saved' : 'Save'}
                                         </Button>
                                     </div>
                                 </Card>
