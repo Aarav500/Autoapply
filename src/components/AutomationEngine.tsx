@@ -81,13 +81,13 @@ export function useAutomationEngine() {
         );
 
         sortedColleges.forEach((college, index) => {
-            college.essayPrompts.forEach((prompt, promptIndex) => {
+            college.essays.forEach((essay, promptIndex) => {
                 newTasks.push({
                     id: `${college.id}-${promptIndex}`,
                     type: 'generate',
                     collegeId: college.id,
                     collegeName: college.name,
-                    essayPrompt: prompt.prompt,
+                    essayPrompt: essay.prompt,
                     status: 'pending',
                     progress: 0,
                     priority: index + 1,
@@ -132,10 +132,10 @@ export function useAutomationEngine() {
                 prompt: task.essayPrompt,
                 college: {
                     name: college.name,
-                    values: college.values,
-                    whatTheyLookFor: college.whatTheyLookFor,
-                    culture: college.culture,
-                    notablePrograms: college.notablePrograms,
+                    values: college.research.values,
+                    whatTheyLookFor: college.research.whatTheyLookFor,
+                    culture: college.research.culture,
+                    notablePrograms: college.research.notablePrograms,
                 },
                 activities: [
                     { name: 'Research Project', description: 'Led machine learning research', impact: 'Published paper' },
