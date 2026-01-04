@@ -54,6 +54,8 @@ jobs:
           S3_BUCKET: ${{ secrets.S3_BUCKET_NAME }}
           AWS_REGION_VAL: ${{ secrets.AWS_REGION }}
           CLAUDE_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           cat > deploy-script.sh << 'SCRIPT_EOF'
           #!/bin/bash
@@ -139,6 +141,8 @@ jobs:
             -e NEXT_PUBLIC_CLAUDE_API_KEY="${CLAUDE_KEY}" \
             -e AWS_REGION="${AWS_REGION_VAL}" \
             -e S3_BUCKET_NAME="${S3_BUCKET}" \
+            -e AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY}" \
+            -e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_KEY}" \
             college-essay-app:latest
 
           # Cleanup
