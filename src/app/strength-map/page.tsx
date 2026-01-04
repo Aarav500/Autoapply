@@ -198,8 +198,7 @@ export default function StrengthMapPage() {
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card
-                    className="cursor-pointer transition-all"
-                    style={filterCategory === 'safety' ? { ring: '2px solid var(--success)' } : {}}
+                    className={`cursor-pointer transition-all ${filterCategory === 'safety' ? 'ring-2 ring-green-500' : ''}`}
                     onClick={() => setFilterCategory(filterCategory === 'safety' ? 'all' : 'safety')}
                 >
                     <div className="flex items-center gap-4">
