@@ -55,7 +55,7 @@ jobs:
           AWS_REGION_VAL: ${{ secrets.AWS_REGION }}
           CLAUDE_KEY: ${{ secrets.CLAUDE_API_KEY }}
         run: |
-          cat > deploy-script.sh << SCRIPT_EOF
+          cat > deploy-script.sh << 'SCRIPT_EOF'
           #!/bin/bash
           set -e
           echo "=== Starting Docker Deployment ==="
@@ -66,7 +66,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
             curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-            echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \$(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
             sudo apt-get update
             sudo apt-get install -y docker-ce docker-ce-cli containerd.io
             sudo usermod -aG docker ubuntu
@@ -75,21 +75,19 @@ jobs:
             echo "Docker installed!"
           fi
 
-          # Download Docker image from S3
-          echo "Downloading Docker image from S3..."
-          aws s3 cp s3://${S3_BUCKET}/deployments/docker-image.tar.gz /home/ubuntu/docker-image.tar.gz --region ${AWS_REGION_VAL}
-
-          # Load Docker image
-          echo "Loading Docker image..."
-          gunzip -c /home/ubuntu/docker-image.tar.gz | sudo docker load
+          # Stop PM2 if it's running (from previous non-docker deployments)
+          echo "Stopping PM2 if running..."
+          pm2 kill 2>/dev/null || true
+          sudo pkill -f pm2 || true
+          sudo pkill -f "node.*autoapply" || true
 
           # Stop ALL containers using port 3000
           echo "Stopping any containers using port 3000..."
-          CONTAINERS_ON_PORT=\$(sudo docker ps -q --filter "publish=3000" 2>/dev/null || true)
-          if [ -n "\$CONTAINERS_ON_PORT" ]; then
-            echo "Found containers on port 3000: \$CONTAINERS_ON_PORT"
-            sudo docker stop \$CONTAINERS_ON_PORT || true
-            sudo docker rm \$CONTAINERS_ON_PORT || true
+          CONTAINERS_ON_PORT=$(sudo docker ps -q --filter "publish=3000" 2>/dev/null || true)
+          if [ -n "$CONTAINERS_ON_PORT" ]; then
+            echo "Found containers on port 3000: $CONTAINERS_ON_PORT"
+            sudo docker stop $CONTAINERS_ON_PORT || true
+            sudo docker rm $CONTAINERS_ON_PORT || true
           fi
 
           # Also stop container by name if it exists
@@ -97,16 +95,38 @@ jobs:
           sudo docker stop autoapply 2>/dev/null || true
           sudo docker rm autoapply 2>/dev/null || true
 
+          # Force stop all docker containers (nuclear option)
+          echo "Stopping all running docker containers..."
+          sudo docker stop $(sudo docker ps -q) 2>/dev/null || true
+
           # Kill any non-docker process on port 3000 (e.g. PM2/node)
           echo "Checking for any process on port 3000..."
-          PID_ON_PORT=\$(sudo lsof -t -i:3000 2>/dev/null || true)
-          if [ -n "\$PID_ON_PORT" ]; then
-            echo "Killing process \$PID_ON_PORT on port 3000"
-            sudo kill -9 \$PID_ON_PORT || true
-          fi
+          sudo fuser -k 3000/tcp 2>/dev/null || true
 
           # Wait a moment for port to be released
-          sleep 2
+          sleep 3
+
+          # Verify port is free
+          echo "Verifying port 3000 is free..."
+          if sudo lsof -i:3000 2>/dev/null; then
+            echo "WARNING: Port 3000 is still in use!"
+            sudo lsof -i:3000
+          else
+            echo "Port 3000 is free"
+          fi
+
+          SCRIPT_EOF
+
+          # Now append the docker run command with substituted environment variables
+          cat >> deploy-script.sh << DOCKER_EOF
+
+          # Download Docker image from S3
+          echo "Downloading Docker image from S3..."
+          aws s3 cp s3://${S3_BUCKET}/deployments/docker-image.tar.gz /home/ubuntu/docker-image.tar.gz --region ${AWS_REGION_VAL}
+
+          # Load Docker image
+          echo "Loading Docker image..."
+          gunzip -c /home/ubuntu/docker-image.tar.gz | sudo docker load
 
           # Run new container
           echo "Starting new container..."
@@ -129,9 +149,10 @@ jobs:
           sleep 10
           sudo docker ps
           echo "=== Deployment Complete ==="
-          SCRIPT_EOF
+          DOCKER_EOF
 
           echo "Deploy script created"
+          cat deploy-script.sh
 
       - name: Upload Deploy Script to S3
         run: |
