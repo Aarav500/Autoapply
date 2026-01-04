@@ -72,7 +72,7 @@ export function StatusBadge({ status, children, className = '' }: StatusBadgePro
 }
 
 interface ButtonProps {
-    children: ReactNode;
+    children?: ReactNode;
     variant?: 'primary' | 'secondary' | 'ghost';
     size?: 'sm' | 'md' | 'lg';
     className?: string;
