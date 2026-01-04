@@ -268,7 +268,7 @@ function ScholarshipCard({ scholarship, index, isSaved, isApplied, onSave, onApp
             exit={{ opacity: 0, y: -20 }}
             transition={{ delay: index * 0.03 }}
         >
-            <Card className={isUrgent ? 'ring-2' : ''} style={{ ringColor: 'var(--error)' }}>
+            <Card className={isUrgent ? 'ring-2' : ''}>
                 <div className="flex items-start justify-between mb-3">
                     <div>
                         <div className="flex items-center gap-2 mb-1">

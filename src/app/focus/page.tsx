@@ -207,7 +207,6 @@ export default function FocusModePage() {
                                         className={`p-3 rounded-lg cursor-pointer transition-all ${collegeId === c.id ? 'ring-2' : ''}`}
                                         style={{
                                             background: 'var(--bg-secondary)',
-                                            ringColor: 'var(--primary-500)'
                                         }}
                                         onClick={() => setCollegeId(c.id)}
                                     >
@@ -379,7 +378,6 @@ export default function FocusModePage() {
                                     className={`p-3 rounded-xl text-center transition-all ${selectedSound === sound.id ? 'ring-2' : ''}`}
                                     style={{
                                         background: selectedSound === sound.id ? 'var(--primary-500)/20' : 'var(--bg-secondary)',
-                                        ringColor: 'var(--primary-500)'
                                     }}
                                     onClick={() => {
                                         setSelectedSound(selectedSound === sound.id ? null : sound.id);

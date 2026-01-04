@@ -310,7 +310,6 @@ export default function JobsPage() {
                             <motion.div key={job.id} variants={itemVariants}>
                                 <Card
                                     className={`cursor-pointer ${selectedJob?.id === job.id ? 'ring-2' : ''}`}
-                                    style={{ ringColor: 'var(--primary-500)' }}
                                     onClick={() => setSelectedJob(job)}
                                 >
                                     <div className="flex items-start gap-4">

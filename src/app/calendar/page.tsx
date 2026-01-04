@@ -223,7 +223,6 @@ export default function CalendarPage() {
                                         background: hasDeadlines
                                             ? 'rgba(91, 111, 242, 0.1)'
                                             : 'var(--bg-secondary)',
-                                        ringColor: isToday ? 'var(--primary-500)' : undefined
                                     }}
                                     whileHover={{ scale: 1.02 }}
                                     onClick={() => setSelectedDate(new Date(year, month, day))}

@@ -209,7 +209,6 @@ export default function GradesPage() {
                             style={{
                                 background: 'var(--glass-bg)',
                                 border: '1px solid var(--glass-border)',
-                                ringColor: 'var(--primary-400)',
                             }}
                         >
                             <div className="flex items-start justify-between">
@@ -219,8 +218,8 @@ export default function GradesPage() {
                                             {course.code}
                                         </span>
                                         <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${course.grade.startsWith('A') ? 'bg-green-500/20 text-green-500' :
-                                                course.grade.startsWith('B') ? 'bg-yellow-500/20 text-yellow-500' :
-                                                    'bg-gray-500/20 text-gray-500'
+                                            course.grade.startsWith('B') ? 'bg-yellow-500/20 text-yellow-500' :
+                                                'bg-gray-500/20 text-gray-500'
                                             }`}>
                                             {course.grade}
                                         </span>

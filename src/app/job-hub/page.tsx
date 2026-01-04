@@ -216,7 +216,6 @@ export default function JobHubPage() {
                                                 background: config.enabled
                                                     ? `${info.color}15`
                                                     : 'var(--bg-secondary)',
-                                                ringColor: info.color,
                                             }}
                                         >
                                             <div className="flex items-center gap-2">
@@ -446,7 +445,6 @@ function JobCard({ match, index, isSelected, isSaved, isApplied, onSelect, onSav
             style={{
                 background: 'var(--glass-bg)',
                 border: '1px solid var(--glass-border)',
-                ringColor: 'var(--primary-400)',
             }}
             onClick={onSelect}
         >

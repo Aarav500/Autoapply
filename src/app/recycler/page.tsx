@@ -167,7 +167,6 @@ ${sourceEssay?.content || 'Essay content would be adapted here...'}
                             className={`p-4 rounded-xl cursor-pointer transition-all ${selectedGroup === group.theme ? 'ring-2' : ''}`}
                             style={{
                                 background: 'var(--bg-secondary)',
-                                ringColor: 'var(--primary-500)'
                             }}
                             onClick={() => setSelectedGroup(group.theme)}
                         >
@@ -223,7 +222,6 @@ ${sourceEssay?.content || 'Essay content would be adapted here...'}
                                                 className={`p-3 rounded-lg cursor-pointer transition-all ${selectedSourceEssay === essay.id ? 'ring-2' : ''}`}
                                                 style={{
                                                     background: selectedSourceEssay === essay.id ? 'rgba(20, 184, 166, 0.1)' : 'var(--bg-secondary)',
-                                                    ringColor: 'var(--accent-teal)'
                                                 }}
                                                 onClick={() => setSelectedSourceEssay(essay.id)}
                                             >
@@ -264,7 +262,6 @@ ${sourceEssay?.content || 'Essay content would be adapted here...'}
                                                 className={`p-3 rounded-lg cursor-pointer transition-all ${selectedTargetPrompt === essay.id ? 'ring-2' : ''} ${selectedSourceEssay === essay.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                 style={{
                                                     background: selectedTargetPrompt === essay.id ? 'rgba(91, 111, 242, 0.1)' : 'var(--bg-secondary)',
-                                                    ringColor: 'var(--primary-500)'
                                                 }}
                                                 onClick={() => {
                                                     if (selectedSourceEssay !== essay.id) {
@@ -371,7 +368,6 @@ ${sourceEssay?.content || 'Essay content would be adapted here...'}
                                                 className={`p-3 rounded-xl cursor-pointer transition-all ${selectedTone === preset.id ? 'ring-2' : ''}`}
                                                 style={{
                                                     background: selectedTone === preset.id ? 'rgba(91, 111, 242, 0.1)' : 'var(--bg-secondary)',
-                                                    ringColor: 'var(--primary-500)'
                                                 }}
                                                 onClick={() => setSelectedTone(preset.id)}
                                             >

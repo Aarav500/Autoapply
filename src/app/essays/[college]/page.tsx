@@ -335,7 +335,6 @@ export default function CollegeEssayPage() {
                             key={essay.id}
                             className={`cursor-pointer transition-all ${selectedPromptId === essay.id ? 'ring-2' : ''}`}
                             style={{
-                                ringColor: 'var(--primary-500)',
                                 background: selectedPromptId === essay.id ? 'rgba(91, 111, 242, 0.1)' : undefined
                             }}
                             onClick={() => setSelectedPromptId(essay.id)}

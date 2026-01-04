@@ -253,7 +253,6 @@ export default function ChecklistPage() {
                                     style={{
                                         background: daysLeft <= 14 ? 'rgba(239, 68, 68, 0.1)' : 'var(--glass-bg)',
                                         border: '1px solid var(--glass-border)',
-                                        ringColor: 'var(--primary-400)',
                                     }}
                                 >
                                     <div className="flex items-center justify-between mb-2">
