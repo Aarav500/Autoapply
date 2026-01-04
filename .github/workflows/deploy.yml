@@ -83,10 +83,30 @@ jobs:
           echo "Loading Docker image..."
           gunzip -c /home/ubuntu/docker-image.tar.gz | sudo docker load
 
-          # Stop existing container
-          echo "Stopping existing container..."
+          # Stop ALL containers using port 3000
+          echo "Stopping any containers using port 3000..."
+          CONTAINERS_ON_PORT=\$(sudo docker ps -q --filter "publish=3000" 2>/dev/null || true)
+          if [ -n "\$CONTAINERS_ON_PORT" ]; then
+            echo "Found containers on port 3000: \$CONTAINERS_ON_PORT"
+            sudo docker stop \$CONTAINERS_ON_PORT || true
+            sudo docker rm \$CONTAINERS_ON_PORT || true
+          fi
+
+          # Also stop container by name if it exists
+          echo "Stopping autoapply container if exists..."
           sudo docker stop autoapply 2>/dev/null || true
           sudo docker rm autoapply 2>/dev/null || true
+
+          # Kill any non-docker process on port 3000 (e.g. PM2/node)
+          echo "Checking for any process on port 3000..."
+          PID_ON_PORT=\$(sudo lsof -t -i:3000 2>/dev/null || true)
+          if [ -n "\$PID_ON_PORT" ]; then
+            echo "Killing process \$PID_ON_PORT on port 3000"
+            sudo kill -9 \$PID_ON_PORT || true
+          fi
+
+          # Wait a moment for port to be released
+          sleep 2
 
           # Run new container
           echo "Starting new container..."
