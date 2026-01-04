@@ -10,9 +10,12 @@ interface CardProps {
     gradient?: boolean;
     onClick?: () => void;
     style?: React.CSSProperties;
+    onDragOver?: (e: React.DragEvent) => void;
+    onDragLeave?: () => void;
+    onDrop?: (e: React.DragEvent) => void;
 }
 
-export function Card({ children, className = '', hover = true, gradient = false, onClick, style }: CardProps) {
+export function Card({ children, className = '', hover = true, gradient = false, onClick, style, onDragOver, onDragLeave, onDrop }: CardProps) {
     return (
         <motion.div
             className={`glass-card p-6 ${className}`}
@@ -20,6 +23,9 @@ export function Card({ children, className = '', hover = true, gradient = false,
             whileHover={hover ? { y: -4, scale: 1.01 } : {}}
             transition={{ duration: 0.2 }}
             onClick={onClick}
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
         >
             {children}
         </motion.div>
