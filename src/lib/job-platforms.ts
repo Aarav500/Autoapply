@@ -57,7 +57,7 @@ export interface SearchFilters {
     query: string;
     location?: string;
     remote?: boolean;
-    jobType?: ('internship' | 'full-time' | 'part-time')[];
+    jobType?: ('internship' | 'full-time' | 'part-time' | 'contract')[];
     salaryMin?: number;
     salaryMax?: number;
     sponsorsVisa?: boolean;

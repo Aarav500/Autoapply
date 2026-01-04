@@ -23,7 +23,7 @@ export interface UserProfile {
         locations: string[];
         remote: boolean;
         salaryMin?: number;
-        jobTypes: ('internship' | 'full-time' | 'part-time')[];
+        jobTypes: ('internship' | 'full-time' | 'part-time' | 'contract')[];
         industries: string[];
         needsVisaSponsorship: boolean;
     };
