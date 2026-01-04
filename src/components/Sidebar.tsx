@@ -21,21 +21,27 @@ import {
   Recycle,
   Brain,
   ChevronDown,
-  Search
+  Search,
+  Award,
+  ClipboardList,
+  Linkedin,
+  BookOpen
 } from 'lucide-react';
 
 const mainNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
   { icon: FileText, label: 'Essays', href: '/essays' },
   { icon: Briefcase, label: 'Jobs', href: '/jobs' },
-  { icon: FolderOpen, label: 'Documents', href: '/documents' },
-  { icon: Mail, label: 'Emails', href: '/emails' },
+  { icon: Award, label: 'Scholarships', href: '/scholarships', badge: 'NEW' },
+  { icon: ClipboardList, label: 'Checklist', href: '/checklist', badge: 'NEW' },
   { icon: GraduationCap, label: 'Interview Prep', href: '/prepare' },
 ];
 
 const aiToolsItems = [
   { icon: Brain, label: 'AI Automate', href: '/automate', badge: 'NEW' },
   { icon: Search, label: 'Job Hub', href: '/job-hub', badge: 'NEW' },
+  { icon: Linkedin, label: 'LinkedIn', href: '/linkedin', badge: 'NEW' },
+  { icon: BookOpen, label: 'My Grades', href: '/grades' },
   { icon: Calendar, label: 'Calendar', href: '/calendar' },
   { icon: Map, label: 'Strength Map', href: '/strength-map' },
   { icon: Recycle, label: 'Recycler', href: '/recycler' },
