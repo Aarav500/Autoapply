@@ -1,78 +1,91 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { uploadFile, getFileUrl, deleteFile, getUploadUrl } from '@/lib/s3-storage';
+
+// Document API - stores document metadata in S3 storage
+// Actual file uploads would go directly to S3 via presigned URLs
+
+interface DocumentMetadata {
+    id: string;
+    name: string;
+    type: string;
+    size: number;
+    uploadedAt: string;
+    userId: string;
+}
+
+// In-memory store for demo (would use s3Storage in production)
+const documents: Map<string, DocumentMetadata> = new Map();
 
 export async function POST(request: NextRequest) {
     try {
-        const formData = await request.formData();
-        const file = formData.get('file') as File;
-        const userId = formData.get('userId') as string || 'default-user';
+        const data = await request.json();
+        const { name, type, size, userId = 'default-user' } = data;
 
-        if (!file) {
-            return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+        if (!name) {
+            return NextResponse.json({ error: 'No file name provided' }, { status: 400 });
         }
 
-        const buffer = Buffer.from(await file.arrayBuffer());
-        const result = await uploadFile(buffer, file.name, file.type, userId);
+        const id = `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const doc: DocumentMetadata = {
+            id,
+            name,
+            type: type || 'application/octet-stream',
+            size: size || 0,
+            uploadedAt: new Date().toISOString(),
+            userId,
+        };
+
+        documents.set(id, doc);
 
         return NextResponse.json({
             success: true,
-            key: result.key,
-            url: result.url,
-            name: file.name,
-            size: file.size,
-            type: file.type,
+            document: doc,
         });
     } catch (error) {
-        console.error('Upload error:', error);
-        return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
+        console.error('Document upload error:', error);
+        return NextResponse.json({ error: 'Failed to save document' }, { status: 500 });
     }
 }
 
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
-        const key = searchParams.get('key');
-        const action = searchParams.get('action');
+        const id = searchParams.get('id');
+        const userId = searchParams.get('userId') || 'default-user';
 
-        if (!key) {
-            return NextResponse.json({ error: 'No key provided' }, { status: 400 });
+        if (id) {
+            const doc = documents.get(id);
+            if (!doc) {
+                return NextResponse.json({ error: 'Document not found' }, { status: 404 });
+            }
+            return NextResponse.json({ document: doc });
         }
 
-        if (action === 'presigned') {
-            const url = await getFileUrl(key);
-            return NextResponse.json({ url });
-        }
-
-        // For upload presigned URL
-        if (action === 'upload-url') {
-            const fileName = searchParams.get('fileName') || 'file';
-            const contentType = searchParams.get('contentType') || 'application/octet-stream';
-            const userId = searchParams.get('userId') || 'default-user';
-
-            const result = await getUploadUrl(fileName, contentType, userId);
-            return NextResponse.json(result);
-        }
-
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+        // List all documents for user
+        const userDocs = Array.from(documents.values()).filter(d => d.userId === userId);
+        return NextResponse.json({ documents: userDocs });
     } catch (error) {
         console.error('Document API error:', error);
-        return NextResponse.json({ error: 'Failed to process request' }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to fetch documents' }, { status: 500 });
     }
 }
 
 export async function DELETE(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
-        const key = searchParams.get('key');
+        const id = searchParams.get('id');
 
-        if (!key) {
-            return NextResponse.json({ error: 'No key provided' }, { status: 400 });
+        if (!id) {
+            return NextResponse.json({ error: 'No document ID provided' }, { status: 400 });
         }
 
-        await deleteFile(key);
+        if (!documents.has(id)) {
+            return NextResponse.json({ error: 'Document not found' }, { status: 404 });
+        }
+
+        documents.delete(id);
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('Delete error:', error);
-        return NextResponse.json({ error: 'Failed to delete file' }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to delete document' }, { status: 500 });
     }
 }
