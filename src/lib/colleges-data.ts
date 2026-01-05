@@ -266,9 +266,16 @@ export const targetColleges: CollegeInfo[] = [
         essays: [
             {
                 id: 'cornell-1',
-                title: 'Why Cornell',
-                prompt: 'Students in [your college] are often driven by their desire to [college-specific trait]. How do you see yourself contributing to that community?',
+                title: 'Community Essay',
+                prompt: 'We all contribute to communities in a variety of ways. Thinking about your time in high school, how have you contributed to your community and how have those communities shaped your perspective?',
                 wordLimit: 350,
+                required: true,
+            },
+            {
+                id: 'cornell-2',
+                title: 'College-Specific Essay',
+                prompt: 'Tell us about the unique qualities that attract you to your chosen undergraduate college or school (e.g., CALS, Arts & Sciences, Engineering, Hotel Administration) and how that curriculum would support your interests.',
+                wordLimit: 650,
                 required: true,
             },
         ],
@@ -349,9 +356,16 @@ export const targetColleges: CollegeInfo[] = [
         essays: [
             {
                 id: 'uiuc-1',
-                title: 'Why Major',
-                prompt: 'Explain your interest in the major you selected and describe how you have recently explored or developed this interest inside and/or outside the classroom.',
-                wordLimit: 250,
+                title: 'Why Major & Career Goals',
+                prompt: 'Describe your personal and/or career goals after graduating from UIUC and how your selected first-choice major will help you achieve them.',
+                wordLimit: 150,
+                required: true,
+            },
+            {
+                id: 'uiuc-2',
+                title: 'Related Experience',
+                prompt: 'Explain, in detail, an experience you\'ve had in the past 3 to 4 years related to your first-choice major. This can be from an extracurricular activity, a class you\'ve taken, or something else.',
+                wordLimit: 150,
                 required: true,
             },
         ],
@@ -388,7 +402,14 @@ export const targetColleges: CollegeInfo[] = [
             {
                 id: 'gatech-1',
                 title: 'Why Georgia Tech',
-                prompt: 'Why do you want to study your chosen major at Georgia Tech, and how will it help you achieve your goals?',
+                prompt: 'Why do you want to study your chosen major specifically at Georgia Tech?',
+                wordLimit: 300,
+                required: true,
+            },
+            {
+                id: 'gatech-2',
+                title: 'Institute Values',
+                prompt: 'Georgia Tech\'s Strategic Plan outlines nine distinct Institute values. Select one and discuss how your past experiences have prepared you to contribute to our community.',
                 wordLimit: 300,
                 required: true,
             },
@@ -463,9 +484,9 @@ export const targetColleges: CollegeInfo[] = [
         essays: [
             {
                 id: 'ut-1',
-                title: 'Why UT',
-                prompt: 'Tell us why you chose to apply to UT Austin and what you would like to major in at our university.',
-                wordLimit: 500,
+                title: 'Statement of Purpose',
+                prompt: 'Please share your interest in and preparation for your first-choice major. Use this opportunity to discuss any extenuating circumstances, unique aspects of your academic background, or valuable experiences related to your chosen academic discipline.',
+                wordLimit: 650,
                 required: true,
             },
         ],
@@ -501,8 +522,15 @@ export const targetColleges: CollegeInfo[] = [
         essays: [
             {
                 id: 'neu-1',
-                title: 'Why Northeastern',
-                prompt: 'Northeastern is a university that thrives on experiential learning. Please share an experience where learning happened outside of the classroom.',
+                title: 'Reasons for Transferring',
+                prompt: 'Please explain your reasons for transferring and the goals you hope to achieve.',
+                wordLimit: 600,
+                required: true,
+            },
+            {
+                id: 'neu-2',
+                title: 'Northeastern Journey',
+                prompt: 'What types of experiences inside and outside of the classroom do you want to engage in during your Northeastern journey?',
                 wordLimit: 250,
                 required: true,
             },
@@ -577,16 +605,23 @@ export const targetColleges: CollegeInfo[] = [
         essays: [
             {
                 id: 'umich-1',
-                title: 'Community Essay',
-                prompt: 'Describe the unique qualities that attract you to the specific undergraduate College or School to which you are applying.',
+                title: 'Community and Contribution',
+                prompt: 'Everyone belongs to many different communities and/or groups. Share how you are prepared to contribute to the University of Michigan\'s focus on developing "leaders and citizens who will challenge the present and enrich the future."',
                 wordLimit: 300,
                 required: true,
             },
             {
                 id: 'umich-2',
-                title: 'Personal Essay',
-                prompt: 'Describe how you have taken advantage of a significant educational opportunity or overcome an educational barrier.',
-                wordLimit: 200,
+                title: 'Why This College/School',
+                prompt: 'Describe the unique qualities that attract you to the specific undergraduate College or School (including preferred admission and dual degree programs) to which you are applying.',
+                wordLimit: 550,
+                required: true,
+            },
+            {
+                id: 'umich-3',
+                title: 'Transfer Statement',
+                prompt: 'Please provide a statement that addresses your specific reasons for transferring to the University of Michigan and the objectives you hope to achieve.',
+                wordLimit: 500,
                 required: true,
             },
         ],
@@ -622,8 +657,15 @@ export const targetColleges: CollegeInfo[] = [
         essays: [
             {
                 id: 'purdue-1',
-                title: 'Why Purdue',
-                prompt: 'Briefly discuss your reasons for pursuing the major you have chosen.',
+                title: 'Opportunities at Purdue',
+                prompt: 'How will opportunities at Purdue support your interests, both in and out of the classroom?',
+                wordLimit: 250,
+                required: true,
+            },
+            {
+                id: 'purdue-2',
+                title: 'Reasons for Major',
+                prompt: 'Briefly discuss your reasons for choosing your major and your interest in studying at this campus location (Indianapolis or West Lafayette).',
                 wordLimit: 250,
                 required: true,
             },
@@ -660,9 +702,9 @@ export const targetColleges: CollegeInfo[] = [
         essays: [
             {
                 id: 'umd-1',
-                title: 'Why UMD',
-                prompt: 'Describe how you have taken advantage of a significant educational opportunity or worked to overcome an educational barrier.',
-                wordLimit: 350,
+                title: 'Transfer Essay',
+                prompt: 'Please describe your past academic experiences and your reasons for wishing to enroll at UMD at this point in your academic career.',
+                wordLimit: 300,
                 required: true,
             },
         ],
