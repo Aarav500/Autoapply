@@ -52,7 +52,7 @@ export const targetColleges: CollegeInfo[] = [
         name: 'MIT',
         fullName: 'Massachusetts Institute of Technology',
         location: 'Cambridge, MA',
-        deadline: new Date('2026-03-15T23:59:00-05:00'),
+        deadline: new Date('2026-03-01T23:59:00-05:00'),
         deadlineType: 'regular',
         timezone: 'America/New_York',
         essays: [
@@ -149,7 +149,7 @@ export const targetColleges: CollegeInfo[] = [
         name: 'Carnegie Mellon',
         fullName: 'Carnegie Mellon University',
         location: 'Pittsburgh, PA',
-        deadline: new Date('2026-03-01T23:59:00-05:00'),
+        deadline: new Date('2026-02-16T23:59:00-05:00'),
         deadlineType: 'regular',
         timezone: 'America/New_York',
         essays: [
@@ -194,7 +194,7 @@ export const targetColleges: CollegeInfo[] = [
         name: 'NYU',
         fullName: 'New York University',
         location: 'New York, NY',
-        deadline: new Date('2026-04-01T23:59:00-04:00'),
+        deadline: new Date('2026-03-15T23:59:00-04:00'),
         deadlineType: 'regular',
         timezone: 'America/New_York',
         essays: [
@@ -315,8 +315,8 @@ export const targetColleges: CollegeInfo[] = [
         name: 'UIUC',
         fullName: 'University of Illinois Urbana-Champaign',
         location: 'Champaign, IL',
-        deadline: new Date('2026-03-01T23:59:00-06:00'),
-        deadlineType: 'regular',
+        deadline: new Date('2026-02-01T23:59:00-06:00'),
+        deadlineType: 'priority',
         timezone: 'America/Chicago',
         essays: [
             {
@@ -353,7 +353,7 @@ export const targetColleges: CollegeInfo[] = [
         name: 'Georgia Tech',
         fullName: 'Georgia Institute of Technology',
         location: 'Atlanta, GA',
-        deadline: new Date('2026-03-01T23:59:00-05:00'),
+        deadline: new Date('2026-03-31T23:59:00-05:00'),
         deadlineType: 'regular',
         timezone: 'America/New_York',
         essays: [
@@ -391,7 +391,7 @@ export const targetColleges: CollegeInfo[] = [
         name: 'USC',
         fullName: 'University of Southern California',
         location: 'Los Angeles, CA',
-        deadline: new Date('2026-02-01T23:59:00-08:00'),
+        deadline: new Date('2026-02-15T23:59:00-08:00'),
         deadlineType: 'regular',
         timezone: 'America/Los_Angeles',
         essays: [
@@ -505,7 +505,7 @@ export const targetColleges: CollegeInfo[] = [
         name: 'NUS',
         fullName: 'National University of Singapore',
         location: 'Singapore',
-        deadline: new Date('2026-02-28T23:59:00+08:00'),
+        deadline: new Date('2026-02-15T23:59:00+08:00'),
         deadlineType: 'regular',
         timezone: 'Asia/Singapore',
         essays: [
