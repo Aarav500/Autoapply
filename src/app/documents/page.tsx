@@ -28,7 +28,9 @@ import {
     RefreshCw,
     AlertCircle,
     Sparkles,
-    Brain
+    Brain,
+    Link,
+    ExternalLink
 } from 'lucide-react';
 
 interface Document {
@@ -108,6 +110,24 @@ export default function DocumentsPage() {
         isLoading: achievementsLoading,
         isSaving: achievementsSaving,
     } = useS3Storage<Achievement[]>('achievements', { defaultValue: [] });
+
+    // Research and Application Links
+    interface LinksData {
+        researchPaperUrl: string;
+        applicationUrl: string;
+        portfolioUrl: string;
+        otherLinks: string[];
+    }
+    const defaultLinks: LinksData = {
+        researchPaperUrl: '',
+        applicationUrl: '',
+        portfolioUrl: '',
+        otherLinks: [],
+    };
+    const {
+        data: links,
+        setData: setLinks,
+    } = useS3Storage<LinksData>('user-links', { defaultValue: defaultLinks });
 
     const containerVariants = {
         hidden: { opacity: 0 },
@@ -522,6 +542,7 @@ export default function DocumentsPage() {
                                 <Card
                                     className={`border-2 border-dashed transition-colors cursor-pointer ${isDragging ? 'border-primary-500' : ''}`}
                                     style={{ borderColor: isDragging ? 'var(--primary-500)' : 'var(--glass-border)' }}
+                                    onClick={() => !isUploading && fileInputRef.current?.click()}
                                     onDragOver={handleDragOver}
                                     onDragLeave={handleDragLeave}
                                     onDrop={handleDrop}
@@ -544,11 +565,88 @@ export default function DocumentsPage() {
                                         />
                                         <Button
                                             icon={<Plus className="w-4 h-4" />}
-                                            onClick={() => fileInputRef.current?.click()}
+                                            onClick={() => { fileInputRef.current?.click(); }}
                                             disabled={isUploading}
                                         >
                                             Choose Files
                                         </Button>
+                                    </div>
+                                </Card>
+                            </motion.div>
+
+                            {/* Important Links Section */}
+                            <motion.div variants={itemVariants}>
+                                <Card>
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(139, 92, 246, 0.15)' }}>
+                                            <Link className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-semibold">Important Links</h3>
+                                            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Share your research papers, applications, and portfolio</p>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Research Paper / Preprint</label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    placeholder="https://arxiv.org/your-paper"
+                                                    value={links.researchPaperUrl}
+                                                    onChange={(e) => setLinks(prev => ({ ...prev, researchPaperUrl: e.target.value }))}
+                                                    icon={<BookOpen className="w-4 h-4" />}
+                                                    className="flex-1"
+                                                />
+                                                {links.researchPaperUrl && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => window.open(links.researchPaperUrl, '_blank')}
+                                                        icon={<ExternalLink className="w-4 h-4" />}
+                                                    />
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Application Link</label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    placeholder="https://commonapp.org/your-application"
+                                                    value={links.applicationUrl}
+                                                    onChange={(e) => setLinks(prev => ({ ...prev, applicationUrl: e.target.value }))}
+                                                    icon={<GraduationCap className="w-4 h-4" />}
+                                                    className="flex-1"
+                                                />
+                                                {links.applicationUrl && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => window.open(links.applicationUrl, '_blank')}
+                                                        icon={<ExternalLink className="w-4 h-4" />}
+                                                    />
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Portfolio</label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    placeholder="https://your-portfolio.com"
+                                                    value={links.portfolioUrl}
+                                                    onChange={(e) => setLinks(prev => ({ ...prev, portfolioUrl: e.target.value }))}
+                                                    icon={<Briefcase className="w-4 h-4" />}
+                                                    className="flex-1"
+                                                />
+                                                {links.portfolioUrl && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => window.open(links.portfolioUrl, '_blank')}
+                                                        icon={<ExternalLink className="w-4 h-4" />}
+                                                    />
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
                                 </Card>
                             </motion.div>
