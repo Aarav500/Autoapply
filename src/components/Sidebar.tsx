@@ -25,12 +25,14 @@ import {
   Award,
   ClipboardList,
   Linkedin,
-  BookOpen
+  BookOpen,
+  ScrollText
 } from 'lucide-react';
 
 const mainNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
   { icon: FileText, label: 'Essays', href: '/essays' },
+  { icon: ScrollText, label: 'CV Builder', href: '/cv-builder', badge: 'NEW' },
   { icon: Briefcase, label: 'Jobs', href: '/jobs' },
   { icon: Award, label: 'Scholarships', href: '/scholarships', badge: 'NEW' },
   { icon: ClipboardList, label: 'Checklist', href: '/checklist', badge: 'NEW' },
