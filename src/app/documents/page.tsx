@@ -564,6 +564,16 @@ export default function DocumentsPage() {
                         <>
                             {/* Upload Area */}
                             <motion.div variants={itemVariants}>
+                                {/* Hidden file input - outside Card to prevent double-trigger */}
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    multiple
+                                    accept=".pdf,.doc,.docx,.txt"
+                                    onChange={handleFileInputChange}
+                                    className="hidden"
+                                    style={{ display: 'none' }}
+                                />
                                 <Card
                                     className={`border-2 border-dashed transition-colors cursor-pointer ${isDragging ? 'border-primary-500' : ''}`}
                                     style={{ borderColor: isDragging ? 'var(--primary-500)' : 'var(--glass-border)' }}
@@ -580,20 +590,18 @@ export default function DocumentsPage() {
                                         <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
                                             Supports PDF, DOC, DOCX, TXT (Max 10MB)
                                         </p>
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            multiple
-                                            accept=".pdf,.doc,.docx,.txt"
-                                            onChange={handleFileInputChange}
-                                            className="hidden"
-                                        />
-                                        <Button
-                                            icon={<Plus className="w-4 h-4" />}
-                                            disabled={isUploading}
+                                        <div
+                                            className="inline-block"
+                                            onClick={(e) => e.stopPropagation()}
                                         >
-                                            Choose Files
-                                        </Button>
+                                            <Button
+                                                icon={<Plus className="w-4 h-4" />}
+                                                disabled={isUploading}
+                                                onClick={() => fileInputRef.current?.click()}
+                                            >
+                                                Choose Files
+                                            </Button>
+                                        </div>
                                     </div>
                                 </Card>
                             </motion.div>

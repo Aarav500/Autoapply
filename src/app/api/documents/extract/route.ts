@@ -57,29 +57,69 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // Call Claude API for extraction
-        const prompt = `You are an expert at extracting structured information from documents. 
-Analyze this ${documentType || 'document'} and extract:
+        // Build document-type specific prompt
+        const getExtractionPrompt = (docType: string, documentText: string) => {
+            const baseInstructions = `You are an expert at extracting structured information from documents for college/job applications.
+Extract ALL relevant information - be thorough and don't miss anything important.`;
 
-1. ACTIVITIES: Any activities, experiences, jobs, internships, clubs, volunteering, etc.
-   For each, extract: name, role/position, organization, start date, end date, description, hours per week (estimate), weeks per year (estimate)
+            const typeSpecificInstructions: Record<string, string> = {
+                'paper': `This is a RESEARCH PAPER. Extract:
+- The research project as an ACTIVITY (name: paper title, role: "Researcher/Author", organization: institution/lab, description: abstract/key findings)
+- Any publications, presentations, or conferences as ACHIEVEMENTS
+- Co-authors and their affiliations if mentioned
+- Funding sources or grants as achievements
+- Key methodologies or skills demonstrated`,
 
-2. ACHIEVEMENTS: Awards, honors, certifications, publications, competitions won, etc.
-   For each, extract: title, description, date
+                'resume': `This is a RESUME/CV. Extract ALL:
+- Work experiences, internships, part-time jobs
+- Extracurricular activities, clubs, volunteering
+- Leadership positions
+- Projects (personal, academic, professional)
+- Skills and certifications
+- Awards, honors, scholarships`,
+
+                'transcript': `This is an ACADEMIC TRANSCRIPT. Extract:
+- Academic achievements (Dean's List, honors)
+- Notable courses as activities if relevant
+- GPA milestones as achievements
+- Academic awards or recognitions`,
+
+                'certificate': `This is a CERTIFICATE/AWARD. Extract:
+- The certification/award as an ACHIEVEMENT
+- Any training or coursework as an ACTIVITY
+- Issuing organization and date
+- Skills or competencies certified`,
+
+                'other': `Extract any activities, experiences, achievements, awards, or notable accomplishments.`
+            };
+
+            return `${baseInstructions}
+
+${typeSpecificInstructions[docType] || typeSpecificInstructions['other']}
+
+EXTRACTION RULES:
+1. Extract EVERY activity, experience, or achievement you can find
+2. For dates, use "Month Year" format or estimate if unclear
+3. For hours/weeks, estimate based on typical commitment levels
+4. Descriptions should be detailed (2-3 sentences) highlighting impact and responsibilities
+5. Don't skip anything - err on the side of including more rather than less
 
 Return a JSON object with this exact structure:
 {
   "activities": [
-    {"name": "...", "role": "...", "organization": "...", "startDate": "...", "endDate": "...", "description": "...", "hoursPerWeek": 10, "weeksPerYear": 40}
+    {"name": "Activity/Experience Name", "role": "Your Role/Position", "organization": "Org/Company/School", "startDate": "Month Year", "endDate": "Month Year or Present", "description": "Detailed description of what you did and achieved", "hoursPerWeek": 10, "weeksPerYear": 40}
   ],
   "achievements": [
-    {"title": "...", "description": "...", "date": "..."}
+    {"title": "Achievement Title", "description": "What this achievement represents and its significance", "date": "Month Year"}
   ],
-  "summary": "Brief summary of what was extracted"
+  "summary": "Brief summary: Found X activities and Y achievements including [key highlights]"
 }
 
 Document text:
-${text.substring(0, 8000)}`;
+${documentText.substring(0, 10000)}`;
+        };
+
+        const prompt = getExtractionPrompt(documentType || 'other', text);
 
         const response = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
