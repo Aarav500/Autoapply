@@ -1,11 +1,22 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useParams, useRouter } from 'next/navigation';
-import { Card, Button, StatusBadge, ProgressBar } from '@/components/ui';
+import { Card, Button, StatusBadge, ProgressBar, Input } from '@/components/ui';
 import { CountdownTimer } from '@/components/CountdownTimer';
 import { targetColleges } from '@/lib/colleges-data';
+import { useS3Storage } from '@/lib/useS3Storage';
+import {
+    generateEssay,
+    reviewEssay,
+    getAIConfig,
+    setAPIKey,
+    AIConfig,
+    AIProvider,
+    ReviewFeedback
+} from '@/lib/ai-providers';
+import { toast } from '@/lib/error-handling';
 import {
     ArrowLeft,
     Sparkles,
@@ -28,7 +39,9 @@ import {
     MapPin,
     ExternalLink,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    Key,
+    X
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -43,6 +56,24 @@ interface EssayVersion {
     content: string;
     confidence: number;
     timestamp: Date;
+}
+
+// Activity interface from documents page
+interface ActivityItem {
+    id: string;
+    name: string;
+    role: string;
+    organization: string;
+    startDate: string;
+    endDate: string;
+    description: string;
+    hoursPerWeek: number;
+    weeksPerYear: number;
+}
+
+// Essay progress type
+interface EssayProgressData {
+    [collegeId: string]: { completed: number };
 }
 
 export default function CollegeEssayPage() {
@@ -68,6 +99,28 @@ export default function CollegeEssayPage() {
     const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
     const [chatInput, setChatInput] = useState('');
     const [versions, setVersions] = useState<EssayVersion[]>([]);
+    const [showAPIKeyModal, setShowAPIKeyModal] = useState(false);
+    const [apiKeyInput, setApiKeyInput] = useState('');
+    const [selectedProvider, setSelectedProvider] = useState<AIProvider>('gemini');
+    const [aiConfig, setAiConfig] = useState<AIConfig | null>(null);
+
+    // Load activities from storage (to pass to AI)
+    const { data: activities } = useS3Storage<ActivityItem[]>('activities', { defaultValue: [] });
+
+    // Load and save essay progress
+    const { data: essayProgress, setData: setEssayProgress } = useS3Storage<EssayProgressData>(
+        'essay-progress',
+        { defaultValue: {} }
+    );
+
+    // Initialize AI config on mount
+    useEffect(() => {
+        const config = getAIConfig();
+        setAiConfig(config);
+        if (!config) {
+            // No API key configured - show modal on first generate
+        }
+    }, []);
 
     const selectedPrompt = useMemo(() =>
         college?.essays.find(e => e.id === selectedPromptId),
@@ -94,63 +147,124 @@ export default function CollegeEssayPage() {
     const isOverLimit = wordCount > wordLimit;
 
     const handleGenerateEssay = async () => {
-        if (!selectedPrompt) return;
+        if (!selectedPrompt || !college) return;
+
+        // Check for AI config
+        const config = aiConfig || getAIConfig();
+        if (!config) {
+            setShowAPIKeyModal(true);
+            toast.error('Please set up an AI API key to generate essays');
+            return;
+        }
 
         setIsGenerating(true);
+        toast.info('🚀 Generating personalized essay with AI...');
 
-        // Simulate AI generation with college research context
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        try {
+            // Prepare activities for AI
+            const formattedActivities = activities.slice(0, 5).map(a => ({
+                name: a.name,
+                description: `${a.role} at ${a.organization}. ${a.description}`,
+                impact: `${a.hoursPerWeek * a.weeksPerYear} total hours committed`,
+            }));
 
-        // This would call the AI API with college research context
-        const generatedEssay = generatePersonalizedEssay(selectedPrompt.prompt, college);
+            // Call real AI API with COMPLETE college research data
+            const generatedEssay = await generateEssay(config, {
+                prompt: selectedPrompt.prompt,
+                college: {
+                    name: college.name,
+                    fullName: college.fullName,
+                    values: college.research.values,
+                    whatTheyLookFor: college.research.whatTheyLookFor,
+                    culture: college.research.culture,
+                    notablePrograms: college.research.notablePrograms,
+                    // Enhanced research data for state-of-the-art essays
+                    motto: college.research.motto,
+                    famousAlumni: college.research.famousAlumni,
+                    uniqueFeatures: college.research.uniqueFeatures,
+                    campusVibe: college.research.campusVibe,
+                    recentNews: college.research.recentNews,
+                    studentLife: college.research.studentLife,
+                },
+                activities: formattedActivities.length > 0 ? formattedActivities : [
+                    { name: 'Your Activity', description: 'Add activities in Documents page', impact: 'AI will personalize based on your experiences' }
+                ],
+                wordLimit: selectedPrompt.wordLimit,
+                tone: 'confident',
+                previousDraft: essayContent || undefined,
+            });
 
-        setEssayContent(generatedEssay);
-        setIsGenerating(false);
+            setEssayContent(generatedEssay);
+            toast.success('✨ Essay generated! Review and personalize it.');
 
-        // Auto-review
-        await handleReviewEssay(generatedEssay);
+            // Auto-review
+            await handleReviewEssay(generatedEssay);
+        } catch (error) {
+            console.error('AI generation error:', error);
+            toast.error('Failed to generate essay. Check your API key and try again.');
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
     const handleReviewEssay = async (content?: string) => {
+        if (!college || !selectedPrompt) return;
+
+        const config = aiConfig || getAIConfig();
+        if (!config) {
+            // Fall back to simulated review if no API key
+            setConfidence(70);
+            setFeedback([{
+                type: 'suggestion',
+                text: 'Set up an AI API key for detailed feedback and scoring.',
+            }]);
+            return;
+        }
+
         setIsReviewing(true);
         const textToReview = content || essayContent;
 
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        try {
+            const reviewResult = await reviewEssay(config, {
+                essay: textToReview,
+                prompt: selectedPrompt.prompt,
+                college: {
+                    name: college.name,
+                    values: college.research.values,
+                    whatTheyLookFor: college.research.whatTheyLookFor,
+                },
+                wordLimit: selectedPrompt.wordLimit,
+            });
 
-        // Simulate AI review with college-specific feedback
-        const aiConfidence = Math.floor(Math.random() * 30) + 65;
-        setConfidence(aiConfidence);
+            setConfidence(reviewResult.overallScore);
 
-        const aiFeedback: Feedback[] = [
-            {
-                type: 'strength',
-                text: `Strong connection to ${college.name}'s core values of ${college.research.values.slice(0, 2).join(' and ')}.`,
-            },
-            {
-                type: 'strength',
-                text: 'Authentic voice with specific, personal examples that demonstrate genuine reflection.',
-            },
-            {
-                type: 'improvement',
-                text: `Consider referencing specific ${college.name} programs like ${college.research.notablePrograms[0]} that align with your interests.`,
-            },
-            {
+            const aiFeedback: Feedback[] = [
+                ...reviewResult.strengths.map(s => ({ type: 'strength' as const, text: s })),
+                ...reviewResult.improvements.map(i => ({ type: 'improvement' as const, text: i })),
+                ...reviewResult.suggestions.map(s => ({ type: 'suggestion' as const, text: s })),
+            ];
+
+            setFeedback(aiFeedback.slice(0, 6)); // Limit to 6 items
+            toast.success(`📊 Essay scored ${reviewResult.overallScore}% confidence`);
+
+            // Save version
+            setVersions(prev => [...prev, {
+                id: prev.length + 1,
+                content: textToReview,
+                confidence: reviewResult.overallScore,
+                timestamp: new Date(),
+            }]);
+        } catch (error) {
+            console.error('AI review error:', error);
+            toast.error('Failed to review essay. Using basic feedback.');
+            setConfidence(70);
+            setFeedback([{
                 type: 'suggestion',
-                text: `Add a concrete example that shows "${college.research.whatTheyLookFor[0]}" - something ${college.name} specifically values.`,
-            },
-        ];
-
-        setFeedback(aiFeedback);
-
-        // Save version
-        setVersions(prev => [...prev, {
-            id: prev.length + 1,
-            content: textToReview,
-            confidence: aiConfidence,
-            timestamp: new Date(),
-        }]);
-
-        setIsReviewing(false);
+                text: 'AI review failed. Check your API key connection.',
+            }]);
+        } finally {
+            setIsReviewing(false);
+        }
     };
 
     const handleApplyAllSuggestions = async () => {
@@ -608,6 +722,98 @@ export default function CollegeEssayPage() {
                     </div>
                 </div>
             )}
+
+            {/* API Key Setup Modal */}
+            <AnimatePresence>
+                {showAPIKeyModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center"
+                        style={{ background: 'rgba(0, 0, 0, 0.7)' }}
+                        onClick={() => setShowAPIKeyModal(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.95, y: 20 }}
+                            className="w-full max-w-md mx-4"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <Card className="p-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-xl font-bold flex items-center gap-2">
+                                        <Key className="w-5 h-5" style={{ color: 'var(--accent-gold)' }} />
+                                        AI API Key Setup
+                                    </h2>
+                                    <Button variant="ghost" size="sm" onClick={() => setShowAPIKeyModal(false)}>
+                                        <X className="w-5 h-5" />
+                                    </Button>
+                                </div>
+                                <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+                                    Enter an API key to enable AI essay generation. Gemini has a free tier.
+                                </p>
+
+                                <div className="space-y-4">
+                                    {/* Provider Selection */}
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">Provider</label>
+                                        <div className="flex gap-2">
+                                            {(['gemini', 'claude', 'openai'] as AIProvider[]).map(provider => (
+                                                <button
+                                                    key={provider}
+                                                    onClick={() => setSelectedProvider(provider)}
+                                                    className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                                                    style={{
+                                                        background: selectedProvider === provider ? 'var(--gradient-primary)' : 'var(--bg-secondary)',
+                                                        color: selectedProvider === provider ? 'white' : 'inherit'
+                                                    }}
+                                                >
+                                                    {provider === 'gemini' ? '⚡ Gemini (Free)' : provider === 'claude' ? '🎯 Claude' : '🤖 OpenAI'}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* API Key Input */}
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">API Key</label>
+                                        <Input
+                                            type="password"
+                                            placeholder={selectedProvider === 'gemini' ? 'AIza...' : selectedProvider === 'claude' ? 'sk-ant-...' : 'sk-...'}
+                                            value={apiKeyInput}
+                                            onChange={e => setApiKeyInput(e.target.value)}
+                                        />
+                                    </div>
+
+                                    {/* Save Button */}
+                                    <Button
+                                        className="w-full"
+                                        onClick={() => {
+                                            if (!apiKeyInput.trim()) {
+                                                toast.error('Please enter an API key');
+                                                return;
+                                            }
+                                            setAPIKey(selectedProvider, apiKeyInput);
+                                            setAiConfig({ provider: selectedProvider, apiKey: apiKeyInput });
+                                            setShowAPIKeyModal(false);
+                                            setApiKeyInput('');
+                                            toast.success(`✅ ${selectedProvider} API key saved!`);
+                                        }}
+                                    >
+                                        Save API Key
+                                    </Button>
+
+                                    <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
+                                        Your key is stored locally and never sent to our servers.
+                                    </p>
+                                </div>
+                            </Card>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </motion.div>
     );
 }

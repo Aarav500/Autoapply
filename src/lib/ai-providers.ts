@@ -16,10 +16,18 @@ export interface EssayGenerationRequest {
     prompt: string;
     college: {
         name: string;
+        fullName?: string;
         values: string[];
         whatTheyLookFor: string[];
         culture: string;
         notablePrograms: string[];
+        // NEW: Enhanced research data
+        motto?: string;
+        famousAlumni?: string[];
+        uniqueFeatures?: string[];
+        campusVibe?: string;
+        recentNews?: string[];
+        studentLife?: string;
     };
     activities: {
         name: string;
@@ -30,6 +38,95 @@ export interface EssayGenerationRequest {
     tone?: 'casual' | 'formal' | 'passionate' | 'confident' | 'reflective';
     previousDraft?: string;
 }
+
+// ============================================
+// COLLEGE-SPECIFIC ESSAY PERSONALITIES
+// Tailored writing guidance for each school
+// ============================================
+
+const COLLEGE_PERSONALITIES: Record<string, {
+    tone: string;
+    narrativeStyle: string;
+    keyThemes: string[];
+    sampleOpener: string;
+}> = {
+    'mit': {
+        tone: 'Intellectually curious, slightly quirky, genuine enthusiasm for problem-solving',
+        narrativeStyle: 'Show the joy of figuring things out. Embrace "productive weirdness." Be specific about technical interests but make them human.',
+        keyThemes: ['intellectual obsession', 'hands-on building', 'collaboration', 'not afraid to fail', 'genuine curiosity'],
+        sampleOpener: 'The servo motor whined in protest as I pushed it past its limits for the third time that night...',
+    },
+    'stanford': {
+        tone: 'Optimistic, entrepreneurial, unconventional, future-focused',
+        narrativeStyle: 'Think big but stay grounded. Show risk-taking and resilience. Connect personal story to larger impact.',
+        keyThemes: ['entrepreneurial spirit', 'positive change', 'unconventional path', 'intellectual vitality', 'taking action'],
+        sampleOpener: 'My first startup failed spectacularly. Twelve users, three investors who ghosted, and one very confused mother...',
+    },
+    'harvard': {
+        tone: 'Thoughtful, reflective, morally engaged, intellectually deep',
+        narrativeStyle: 'Show leadership through impact on others. Demonstrate moral complexity and growth. Be intellectually honest.',
+        keyThemes: ['leadership', 'impact on community', 'intellectual growth', 'ethical reflection', 'diverse perspectives'],
+        sampleOpener: 'I stood at the podium, acutely aware that my next words could either unite or divide a room of 200 people...',
+    },
+    'cmu': {
+        tone: 'Creative, technically rigorous, interdisciplinary, hardworking',
+        narrativeStyle: 'Blend art and technology. Show the creative process behind technical work. Embrace the grind.',
+        keyThemes: ['art meets tech', 'creative problem-solving', 'collaboration', 'passion projects', 'late nights worth it'],
+        sampleOpener: 'At 3am, with cold pizza and a stubborn bug, I discovered something beautiful in the chaos of my code...',
+    },
+    'cornell': {
+        tone: 'Community-focused, intellectually curious, down-to-earth',
+        narrativeStyle: 'Show fit with specific college within Cornell. Emphasize "any person, any study" ethos. Ground in community.',
+        keyThemes: ['community building', 'intellectual breadth', 'specific college fit', 'belonging', 'contribution'],
+        sampleOpener: 'The greenhouse was humid, my hands were muddy, and for the first time, botany made perfect sense...',
+    },
+    'nyu': {
+        tone: 'Independent, urban, globally-minded, career-focused',
+        narrativeStyle: 'Show how NYC/global experience shapes you. Demonstrate independence and initiative. Be specific about NYU resources.',
+        keyThemes: ['urban energy', 'global perspective', 'independence', 'career clarity', 'cultural engagement'],
+        sampleOpener: 'The subway was packed, I was running late, and somehow the stranger next to me became my first investor...',
+    },
+    'umich': {
+        tone: 'Ambitious, spirited, collaborative, proud',
+        narrativeStyle: 'Embody "Leaders and Best" without being arrogant. Show team impact. Balance excellence with humility.',
+        keyThemes: ['leadership', 'excellence', 'community impact', 'Go Blue spirit', 'making a difference'],
+        sampleOpener: 'The scoreboard read 0-0, but the real game was happening in the strategy session I\'d organized at midnight...',
+    },
+    'gatech': {
+        tone: 'Innovative, hands-on, problem-solving, spirited',
+        narrativeStyle: 'Show practical application of ideas. Emphasize "Progress and Service." Connect to Atlanta\'s tech scene.',
+        keyThemes: ['innovation', 'real-world problem solving', 'service', 'technical excellence', 'collaboration'],
+        sampleOpener: 'The prototype didn\'t work. But watching it fail taught me exactly how to make the next one succeed...',
+    },
+};
+
+// ============================================
+// ANTI-CLICHÉ RULES
+// Phrases that make essays sound AI-generated
+// ============================================
+
+const BANNED_PHRASES = [
+    'Ever since I was young',
+    'From a young age',
+    'I have always been passionate',
+    'I learned that',
+    'This experience taught me',
+    'I was able to',
+    'I realized that',
+    'In conclusion',
+    'In today\'s society',
+    'defines who I am',
+    'shaped me into the person I am today',
+    'a journey of self-discovery',
+    'pushed me out of my comfort zone',
+    'ignited my passion',
+    'sparked my interest',
+    'opened my eyes',
+    'transformative experience',
+    'diverse perspectives',
+    'making a difference',
+    'giving back to the community',
+];
 
 export interface EssayReviewRequest {
     essay: string;
@@ -186,55 +283,129 @@ export async function callAI(
 }
 
 // ============================================
-// ESSAY GENERATION (Optimized for Claude)
+// ESSAY GENERATION (State-of-the-Art Prompts)
 // ============================================
 
 export async function generateEssay(
     config: AIConfig,
     request: EssayGenerationRequest
 ): Promise<string> {
-    const systemPrompt = `You are an expert college admissions essay writer with 20 years of experience helping students get into top universities. You specialize in writing authentic, compelling essays that sound like the student's own voice.
+    // Get college-specific personality (default to generic if not found)
+    const collegeId = request.college.name.toLowerCase().replace(/[^a-z]/g, '');
+    const personality = COLLEGE_PERSONALITIES[collegeId] || {
+        tone: 'Authentic, confident, reflective',
+        narrativeStyle: 'Tell a specific story that reveals character. Show, don\'t tell.',
+        keyThemes: ['genuine passion', 'personal growth', 'future vision'],
+        sampleOpener: 'The moment everything changed was smaller than I expected...',
+    };
 
-Your essays are known for:
-- Authentic, conversational tone (NOT robotic or generic)
-- Specific, vivid details and anecdotes
-- Clear structure with a compelling hook
-- Deep self-reflection and genuine vulnerability
-- Connecting personal experiences to future goals
-- Subtle integration of the student's achievements without bragging
+    // Build comprehensive system prompt
+    const systemPrompt = `You are a 17-18 year old student applying to ${request.college.name}. You are writing YOUR OWN college essay in YOUR OWN authentic voice.
 
-CRITICAL: Write as if you ARE the student. Use first person. Be genuine and vulnerable. Avoid clichés and generic statements.`;
+## YOUR WRITING STYLE
+- You write like a smart teenager, NOT a professional writer
+- You use sentence fragments sometimes. For emphasis.
+- You include specific sensory details (what you saw, heard, felt)
+- You're vulnerable about failures and uncertainties
+- You have a sense of humor about yourself
+- You don't brag - you show, don't tell
 
-    const activitiesText = request.activities
-        .map(a => `- ${a.name}: ${a.description}. Impact: ${a.impact}`)
-        .join('\n');
+## VOICE FOR ${request.college.name.toUpperCase()}
+Tone: ${personality.tone}
+Style: ${personality.narrativeStyle}
+Key themes to weave in: ${personality.keyThemes.join(', ')}
+Example opener style: "${personality.sampleOpener}"
 
-    const userMessage = `Write a college essay for ${request.college.name}.
+## ABSOLUTE RULES - NEVER DO THESE
+${BANNED_PHRASES.map(p => `- NEVER write: "${p}"`).join('\n')}
+- NEVER open with a quote from someone famous
+- NEVER open with a dictionary definition
+- NEVER use the phrase "sparked my interest" or "ignited my passion"
+- NEVER write generic statements that could apply to anyone
+- NEVER summarize what you learned in the last paragraph
 
-ESSAY PROMPT: "${request.prompt}"
+## WRITING TECHNIQUES TO USE
+- Start in medias res (middle of the action)
+- Use specific timestamps ("It was 3am on a Tuesday" not "one night")
+- Include dialogue when it adds personality
+- End on a forward-looking note that connects to ${request.college.name}
+- Show your thought process, including doubts
+- Use contrasts and surprises
 
-WORD LIMIT: ${request.wordLimit} words
+## THE RESULT SHOULD PASS AS HUMAN-WRITTEN
+Your essay should:
+1. Sound like it was written by a real teenager, not an AI
+2. Have small imperfections that make it feel authentic
+3. Include hyper-specific details only YOU would know
+4. Make the reader feel like they know you personally`;
 
-COLLEGE VALUES: ${request.college.values.join(', ')}
-WHAT THEY LOOK FOR: ${request.college.whatTheyLookFor.join(', ')}
+    // Build comprehensive college context
+    const collegeContext = `
+## DEEP RESEARCH ON ${request.college.name.toUpperCase()}
+
+MOTTO: "${request.college.motto || 'Excellence in education'}"
+
+CORE VALUES: ${request.college.values.join(', ')}
+
+WHAT ADMISSIONS LOOKS FOR: ${request.college.whatTheyLookFor.join(', ')}
+
 CAMPUS CULTURE: ${request.college.culture}
+
+CAMPUS VIBE: ${request.college.campusVibe || ''}
+
 NOTABLE PROGRAMS: ${request.college.notablePrograms.join(', ')}
 
-MY ACTIVITIES & EXPERIENCES:
+FAMOUS ALUMNI: ${(request.college.famousAlumni || []).join(', ') || 'Many successful alumni'}
+
+UNIQUE FEATURES: ${(request.college.uniqueFeatures || []).join(', ') || ''}
+
+RECENT NEWS: ${(request.college.recentNews || []).join(', ') || ''}
+
+STUDENT LIFE: ${request.college.studentLife || ''}
+`.trim();
+
+    // Format activities with rich context
+    const activitiesText = request.activities.length > 0
+        ? request.activities.map(a => `
+ACTIVITY: ${a.name}
+What I did: ${a.description}
+Impact/Achievement: ${a.impact}
+`).join('\n')
+        : 'No specific activities provided - use generic but believable experiences';
+
+    // Build the user message
+    const userMessage = `Write my college essay for ${request.college.name} (${request.college.fullName || request.college.name}).
+
+## THE PROMPT I'M RESPONDING TO
+"${request.prompt}"
+
+## STRICT WORD LIMIT: ${request.wordLimit} words
+(Stay within this limit - admissions officers count!)
+
+${collegeContext}
+
+## MY ACTIVITIES & EXPERIENCES TO DRAW FROM
 ${activitiesText}
 
-TONE: ${request.tone || 'authentic and confident'}
+## TONE I WANT
+${request.tone || 'authentic, confident, with moments of vulnerability'}
 
-${request.previousDraft ? `PREVIOUS DRAFT TO IMPROVE:\n${request.previousDraft}\n\nPlease improve this draft while maintaining my voice.` : ''}
+${request.previousDraft ? `
+## MY PREVIOUS DRAFT (improve but keep my voice)
+${request.previousDraft}
 
-Write an essay that:
-1. Has a compelling opening hook (not a quote or dictionary definition)
-2. Uses specific anecdotes from my activities
-3. Shows my personality and values
-4. Connects to ${request.college.name}'s specific programs and culture
-5. Ends with a forward-looking conclusion
+Make it better while keeping what makes it sound like ME.
+` : ''}
 
-Start the essay directly - no titles or headers.`;
+## CRITICAL INSTRUCTIONS
+1. Start immediately with an engaging hook - NO titles or headers
+2. Make every sentence count - show personality
+3. Connect MY specific experiences to ${request.college.name}'s culture
+4. Reference specific programs or features that genuinely excite me
+5. End looking toward my future at ${request.college.name}
+6. DO NOT exceed ${request.wordLimit} words
+
+Write the essay now. Make it sound like a real 17-18 year old wrote it.`;
 
     return callAI(config, systemPrompt, userMessage);
 }

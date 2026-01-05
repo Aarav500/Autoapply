@@ -1,28 +1,39 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card, Button, StatusBadge, ProgressBar } from '@/components/ui';
+import { Card, Button, StatusBadge, ProgressBar, Input } from '@/components/ui';
 import {
     GraduationCap, DollarSign, Calendar, ExternalLink, Check, Clock,
     Filter, Search, Star, Sparkles, Globe, Bookmark, Send, AlertTriangle,
-    ChevronRight, Building2, BookOpen, Award, Target, Zap, IndianRupee
+    ChevronRight, Building2, BookOpen, Award, Target, Zap, IndianRupee, Settings, X
 } from 'lucide-react';
 import {
     SCHOLARSHIPS, Scholarship, getScholarshipsForProfile,
     getAutoApplyScholarships, getIndianScholarships,
     TOTAL_SCHOLARSHIPS, INDIA_SPECIFIC_COUNT, AUTO_APPLY_COUNT
 } from '@/lib/scholarships';
+import { useS3Storage } from '@/lib/useS3Storage';
 import { toast } from '@/lib/error-handling';
 
-// User profile for filtering
-const userProfile = {
-    isInternational: true,
-    isIndian: true,
-    isTransfer: true,
-    gpa: 3.75,
-    major: 'Computer Science',
-    colleges: ['usc', 'umich', 'mit', 'stanford', 'cmu', 'cornell'],
+// User profile interface
+interface UserProfile {
+    isInternational: boolean;
+    isIndian: boolean;
+    isTransfer: boolean;
+    gpa: number;
+    major: string;
+    colleges: string[];
+}
+
+// Default empty profile (shows 0 eligible scholarships until user sets up)
+const emptyProfile: UserProfile = {
+    isInternational: false,
+    isIndian: false,
+    isTransfer: false,
+    gpa: 0,
+    major: '',
+    colleges: [],
 };
 
 type FilterType = 'all' | 'indian' | 'college' | 'autoapply' | 'stem';
@@ -33,9 +44,47 @@ export default function ScholarshipsPage() {
     const [savedScholarships, setSavedScholarships] = useState<Set<string>>(new Set());
     const [appliedScholarships, setAppliedScholarships] = useState<Set<string>>(new Set());
     const [isAutoApplying, setIsAutoApplying] = useState(false);
+    const [showProfileSetup, setShowProfileSetup] = useState(false);
 
-    // Get eligible scholarships
+    // Load user profile from persistent storage (replaces hardcoded mock data)
+    const { data: userProfile, setData: setUserProfile, isLoading: profileLoading } = useS3Storage<UserProfile | null>(
+        'user-profile',
+        { defaultValue: null }
+    );
+
+    // Profile form state for the setup modal
+    const [profileForm, setProfileForm] = useState<UserProfile>(emptyProfile);
+
+    // Initialize profile form when userProfile loads
+    useEffect(() => {
+        if (userProfile) {
+            setProfileForm(userProfile);
+        }
+    }, [userProfile]);
+
+    // Show setup prompt if no profile exists
+    const hasProfile = userProfile && userProfile.gpa > 0;
+
+    // Handle profile save
+    const handleSaveProfile = () => {
+        if (!profileForm.major.trim()) {
+            toast.error('Please enter your major');
+            return;
+        }
+        if (profileForm.gpa <= 0 || profileForm.gpa > 4.0) {
+            toast.error('Please enter a valid GPA (0.1 - 4.0)');
+            return;
+        }
+        setUserProfile(profileForm);
+        setShowProfileSetup(false);
+        toast.success('✅ Profile saved! Scholarships updated.');
+    };
+
+    // Get eligible scholarships based on profile
     const eligibleScholarships = useMemo(() => {
+        // If no profile, return empty array (shows 0 eligible)
+        if (!hasProfile) return [];
+
         let scholarships = getScholarshipsForProfile(userProfile);
 
         // Apply filter
@@ -67,7 +116,7 @@ export default function ScholarshipsPage() {
         }
 
         return scholarships;
-    }, [filter, searchQuery]);
+    }, [filter, searchQuery, hasProfile, userProfile]);
 
     // Stats
     const stats = useMemo(() => ({
@@ -138,15 +187,38 @@ export default function ScholarshipsPage() {
                     </p>
                 </div>
 
-                <Button
-                    size="lg"
-                    icon={isAutoApplying ? <Sparkles className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-                    onClick={handleAutoApplyAll}
-                    disabled={isAutoApplying}
-                >
-                    {isAutoApplying ? 'Auto-Applying...' : `Auto-Apply All (${getAutoApplyScholarships().length})`}
-                </Button>
+                <div className="flex items-center gap-3">
+                    <Button
+                        variant="secondary"
+                        icon={<Settings className="w-4 h-4" />}
+                        onClick={() => setShowProfileSetup(true)}
+                    >
+                        {hasProfile ? 'Edit Profile' : 'Setup Profile'}
+                    </Button>
+                    <Button
+                        size="lg"
+                        icon={isAutoApplying ? <Sparkles className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                        onClick={handleAutoApplyAll}
+                        disabled={isAutoApplying || !hasProfile}
+                    >
+                        {isAutoApplying ? 'Auto-Applying...' : `Auto-Apply All (${hasProfile ? eligibleScholarships.filter(s => s.autoApplySupported).length : 0})`}
+                    </Button>
+                </div>
             </div>
+
+            {/* No Profile Banner */}
+            {!hasProfile && (
+                <Card className="text-center py-8" style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)' }}>
+                    <Settings className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--warning)' }} />
+                    <h3 className="text-xl font-bold mb-2">Set Up Your Profile</h3>
+                    <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+                        Enter your GPA, major, and preferences to see scholarships you're eligible for
+                    </p>
+                    <Button onClick={() => setShowProfileSetup(true)} icon={<Settings className="w-4 h-4" />}>
+                        Setup Profile Now
+                    </Button>
+                </Card>
+            )}
 
             {/* Stats */}
             <div className="grid grid-cols-5 gap-4">
@@ -234,12 +306,113 @@ export default function ScholarshipsPage() {
                 </AnimatePresence>
             </div>
 
-            {eligibleScholarships.length === 0 && (
+            {eligibleScholarships.length === 0 && hasProfile && (
                 <Card className="text-center py-12">
                     <Award className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     <p style={{ color: 'var(--text-muted)' }}>No scholarships found matching your criteria</p>
                 </Card>
             )}
+
+            {/* Profile Setup Modal */}
+            <AnimatePresence>
+                {showProfileSetup && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center"
+                        style={{ background: 'rgba(0, 0, 0, 0.7)' }}
+                        onClick={() => setShowProfileSetup(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.95, y: 20 }}
+                            className="w-full max-w-lg mx-4"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <Card className="p-6">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h2 className="text-xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
+                                        Your Profile
+                                    </h2>
+                                    <Button variant="ghost" size="sm" onClick={() => setShowProfileSetup(false)}>
+                                        <X className="w-5 h-5" />
+                                    </Button>
+                                </div>
+
+                                <div className="space-y-4">
+                                    {/* GPA */}
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">GPA (0.0 - 4.0) *</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            max="4.0"
+                                            placeholder="3.75"
+                                            className="input-field w-full"
+                                            value={profileForm.gpa > 0 ? profileForm.gpa.toString() : ''}
+                                            onChange={e => setProfileForm(prev => ({ ...prev, gpa: parseFloat(e.target.value) || 0 }))}
+                                        />
+                                    </div>
+
+                                    {/* Major */}
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">Major *</label>
+                                        <Input
+                                            placeholder="Computer Science"
+                                            value={profileForm.major}
+                                            onChange={e => setProfileForm(prev => ({ ...prev, major: e.target.value }))}
+                                        />
+                                    </div>
+
+                                    {/* Checkboxes */}
+                                    <div className="space-y-3">
+                                        <label className="flex items-center gap-3 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={profileForm.isInternational}
+                                                onChange={e => setProfileForm(prev => ({ ...prev, isInternational: e.target.checked }))}
+                                                className="w-5 h-5 rounded"
+                                            />
+                                            <span>International Student</span>
+                                        </label>
+                                        <label className="flex items-center gap-3 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={profileForm.isIndian}
+                                                onChange={e => setProfileForm(prev => ({ ...prev, isIndian: e.target.checked }))}
+                                                className="w-5 h-5 rounded"
+                                            />
+                                            <span>🇮🇳 Indian Citizen</span>
+                                        </label>
+                                        <label className="flex items-center gap-3 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={profileForm.isTransfer}
+                                                onChange={e => setProfileForm(prev => ({ ...prev, isTransfer: e.target.checked }))}
+                                                className="w-5 h-5 rounded"
+                                            />
+                                            <span>Transfer Student</span>
+                                        </label>
+                                    </div>
+
+                                    {/* Save Button */}
+                                    <div className="flex gap-3 pt-4">
+                                        <Button className="flex-1" onClick={handleSaveProfile}>
+                                            Save Profile
+                                        </Button>
+                                        <Button variant="secondary" onClick={() => setShowProfileSetup(false)}>
+                                            Cancel
+                                        </Button>
+                                    </div>
+                                </div>
+                            </Card>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </motion.div>
     );
 }

@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Card, Button, StatusBadge, Input, ProgressBar } from '@/components/ui';
 import { CountdownTimer } from '@/components/CountdownTimer';
 import { targetColleges, getTimeUntilDeadline } from '@/lib/colleges-data';
+import { useS3Storage } from '@/lib/useS3Storage';
 import {
     FileText,
     Plus,
@@ -24,29 +25,21 @@ import Link from 'next/link';
 type FilterType = 'all' | 'completed' | 'in-progress' | 'not-started';
 type SortType = 'deadline' | 'name' | 'progress';
 
-// Mock progress data - will be replaced with real data
-const essayProgress: Record<string, { completed: number }> = {
-    'mit': { completed: 0 },
-    'stanford': { completed: 1 },
-    'cmu': { completed: 2 },
-    'nyu': { completed: 0 },
-    'cornell': { completed: 0 },
-    'uwash': { completed: 1 },
-    'uiuc': { completed: 1 },
-    'gatech': { completed: 0 },
-    'usc': { completed: 1 },
-    'utaustin': { completed: 0 },
-    'northeastern': { completed: 1 },
-    'nus': { completed: 0 },
-    'umich': { completed: 0 },
-    'purdue': { completed: 1 },
-    'umd': { completed: 0 },
-};
+// Type for essay progress data stored in S3
+interface EssayProgressData {
+    [collegeId: string]: { completed: number };
+}
 
 export default function EssaysPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [filter, setFilter] = useState<FilterType>('all');
     const [sortBy, setSortBy] = useState<SortType>('deadline');
+
+    // Load essay progress from persistent storage (replaces hardcoded mock data)
+    const { data: essayProgress, isLoading: progressLoading } = useS3Storage<EssayProgressData>(
+        'essay-progress',
+        { defaultValue: {} }
+    );
 
     const containerVariants = {
         hidden: { opacity: 0 },
