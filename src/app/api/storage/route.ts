@@ -6,23 +6,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // AWS SDK v3 lite - using fetch instead of full SDK to reduce bundle size
-const S3_BUCKET = process.env.S3_BUCKET_NAME!;
-const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
-const AWS_ACCESS_KEY = process.env.AWS_ACCESS_KEY_ID!;
-const AWS_SECRET_KEY = process.env.AWS_SECRET_ACCESS_KEY!;
+// These are read at runtime from process.env
+const getS3Config = () => ({
+    bucket: process.env.S3_BUCKET_NAME || '',
+    region: process.env.AWS_REGION || 'us-east-1',
+    accessKey: process.env.AWS_ACCESS_KEY_ID || '',
+    secretKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+});
 
 // Simple AWS Signature V4 implementation
 async function signRequest(
     method: string,
     path: string,
+    config: ReturnType<typeof getS3Config>,
     body?: string,
     contentType?: string
 ): Promise<{ url: string; headers: Record<string, string> }> {
-    const host = `${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com`;
+    const host = `${config.bucket}.s3.${config.region}.amazonaws.com`;
     const url = `https://${host}${path}`;
 
     const now = new Date();
-    const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+    const amzDate = now.toISOString().replace(/[:-]|\.\\d{3}/g, '');
     const dateStamp = amzDate.slice(0, 8);
 
     // Create canonical request
@@ -46,7 +50,7 @@ async function signRequest(
     ].join('\n');
 
     // Create string to sign
-    const credentialScope = `${dateStamp}/${AWS_REGION}/s3/aws4_request`;
+    const credentialScope = `${dateStamp}/${config.region}/s3/aws4_request`;
     const stringToSign = [
         'AWS4-HMAC-SHA256',
         amzDate,
@@ -55,13 +59,13 @@ async function signRequest(
     ].join('\n');
 
     // Calculate signature
-    const kDate = await hmacSha256(`AWS4${AWS_SECRET_KEY}`, dateStamp);
-    const kRegion = await hmacSha256(kDate, AWS_REGION);
+    const kDate = await hmacSha256(`AWS4${config.secretKey}`, dateStamp);
+    const kRegion = await hmacSha256(kDate, config.region);
     const kService = await hmacSha256(kRegion, 's3');
     const kSigning = await hmacSha256(kService, 'aws4_request');
     const signature = await hmacSha256Hex(kSigning, stringToSign);
 
-    const authHeader = `AWS4-HMAC-SHA256 Credential=${AWS_ACCESS_KEY}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+    const authHeader = `AWS4-HMAC-SHA256 Credential=${config.accessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
     const headers: Record<string, string> = {
         'Host': host,
@@ -119,14 +123,18 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Key is required' }, { status: 400 });
         }
 
+        // Get config at runtime
+        const config = getS3Config();
+
         // Check if S3 is configured
-        if (!S3_BUCKET || !AWS_ACCESS_KEY || !AWS_SECRET_KEY) {
+        if (!config.bucket || !config.accessKey || !config.secretKey) {
+            console.log('S3 not configured - bucket:', !!config.bucket, 'accessKey:', !!config.accessKey);
             // Fallback: return empty for unconfigured S3
             return NextResponse.json(null, { status: 404 });
         }
 
         const path = `/data/${key}.json`;
-        const { url, headers } = await signRequest('GET', path);
+        const { url, headers } = await signRequest('GET', path, config);
 
         const response = await fetch(url, { headers });
 
@@ -157,15 +165,18 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Key and value are required' }, { status: 400 });
         }
 
+        // Get config at runtime
+        const config = getS3Config();
+
         // Check if S3 is configured
-        if (!S3_BUCKET || !AWS_ACCESS_KEY || !AWS_SECRET_KEY) {
+        if (!config.bucket || !config.accessKey || !config.secretKey) {
             // Return success anyway - data will be stored in localStorage fallback
             return NextResponse.json({ success: true, fallback: true });
         }
 
         const path = `/data/${key}.json`;
         const body = JSON.stringify(value);
-        const { url, headers } = await signRequest('PUT', path, body, 'application/json');
+        const { url, headers } = await signRequest('PUT', path, config, body, 'application/json');
 
         const response = await fetch(url, {
             method: 'PUT',
@@ -196,13 +207,16 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: 'Key is required' }, { status: 400 });
         }
 
+        // Get config at runtime
+        const config = getS3Config();
+
         // Check if S3 is configured
-        if (!S3_BUCKET || !AWS_ACCESS_KEY || !AWS_SECRET_KEY) {
+        if (!config.bucket || !config.accessKey || !config.secretKey) {
             return NextResponse.json({ success: true, fallback: true });
         }
 
         const path = `/data/${key}.json`;
-        const { url, headers } = await signRequest('DELETE', path);
+        const { url, headers } = await signRequest('DELETE', path, config);
 
         const response = await fetch(url, {
             method: 'DELETE',
