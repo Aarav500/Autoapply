@@ -590,7 +590,6 @@ export default function DocumentsPage() {
                                         />
                                         <Button
                                             icon={<Plus className="w-4 h-4" />}
-                                            onClick={() => { fileInputRef.current?.click(); }}
                                             disabled={isUploading}
                                         >
                                             Choose Files

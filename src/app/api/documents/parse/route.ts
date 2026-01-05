@@ -65,12 +65,12 @@ export async function POST(request: NextRequest) {
 }
 
 // ============================================
-// PDF EXTRACTION using pdf-parse
+// PDF EXTRACTION using pdf-parse with fallback
 // ============================================
 async function extractFromPDF(buffer: Buffer): Promise<{ text: string; metadata: Record<string, unknown> }> {
     try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const pdfParse = require('pdf-parse') as (buffer: Buffer) => Promise<{
+        const pdfParse = require('pdf-parse') as (buffer: Buffer, options?: Record<string, unknown>) => Promise<{
             text: string;
             numpages: number;
             numrender: number;
@@ -78,7 +78,30 @@ async function extractFromPDF(buffer: Buffer): Promise<{ text: string; metadata:
             metadata: unknown;
         }>;
 
-        const data = await pdfParse(buffer);
+        // Set a timeout for parsing (some PDFs can hang)
+        const parsePromise = pdfParse(buffer, {
+            // Limit pages to prevent hanging on huge documents
+            max: 50,
+        });
+
+        // Timeout after 30 seconds
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('PDF parsing timed out')), 30000);
+        });
+
+        const data = await Promise.race([parsePromise, timeoutPromise]);
+
+        // Check if we got any usable text
+        if (!data.text || data.text.trim().length < 10) {
+            // Try fallback extraction
+            const fallbackText = extractTextFromPDFBuffer(buffer);
+            if (fallbackText.length > data.text.length) {
+                return {
+                    text: fallbackText,
+                    metadata: { pages: data.numpages, fallback: true },
+                };
+            }
+        }
 
         return {
             text: data.text,
@@ -89,8 +112,61 @@ async function extractFromPDF(buffer: Buffer): Promise<{ text: string; metadata:
         };
     } catch (error) {
         console.error('PDF parse error:', error);
-        throw new Error('Failed to parse PDF - file may be corrupted or password protected');
+
+        // Try fallback extraction before giving up
+        try {
+            const fallbackText = extractTextFromPDFBuffer(buffer);
+            if (fallbackText.length > 50) {
+                return {
+                    text: fallbackText,
+                    metadata: { fallback: true, error: 'Primary parser failed' },
+                };
+            }
+        } catch (fallbackError) {
+            console.error('PDF fallback also failed:', fallbackError);
+        }
+
+        throw new Error('Failed to parse PDF - file may be corrupted, scanned, or password protected');
     }
+}
+
+/**
+ * Fallback PDF text extraction - extracts readable strings from binary
+ * Works for some PDFs where pdf-parse fails
+ */
+function extractTextFromPDFBuffer(buffer: Buffer): string {
+    const text = buffer.toString('utf-8', 0, Math.min(buffer.length, 1000000));
+    const segments: string[] = [];
+
+    // Find text between parentheses (PDF text objects)
+    const textPattern = /\(([^)]+)\)/g;
+    let match;
+    while ((match = textPattern.exec(text)) !== null) {
+        const segment = match[1]
+            .replace(/\\n/g, '\n')
+            .replace(/\\r/g, '')
+            .replace(/\\\(/g, '(')
+            .replace(/\\\)/g, ')')
+            .replace(/\\\\/g, '\\');
+        if (segment.length > 2 && /[a-zA-Z]{2,}/.test(segment)) {
+            segments.push(segment);
+        }
+    }
+
+    // Also look for stream content
+    const streamPattern = /stream[\s\S]*?endstream/g;
+    while ((match = streamPattern.exec(text)) !== null) {
+        // Extract readable parts
+        const readable = match[0]
+            .replace(/[^\x20-\x7E\n]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+        if (readable.length > 20 && /[a-zA-Z]{3,}/.test(readable)) {
+            segments.push(readable);
+        }
+    }
+
+    return segments.join(' ').replace(/\s+/g, ' ').trim();
 }
 
 // ============================================
