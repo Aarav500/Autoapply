@@ -63,12 +63,45 @@ export async function POST(request: NextRequest) {
 Extract ALL relevant information - be thorough and don't miss anything important.`;
 
             const typeSpecificInstructions: Record<string, string> = {
-                'paper': `This is a RESEARCH PAPER. Extract:
-- The research project as an ACTIVITY (name: paper title, role: "Researcher/Author", organization: institution/lab, description: abstract/key findings)
-- Any publications, presentations, or conferences as ACHIEVEMENTS
-- Co-authors and their affiliations if mentioned
-- Funding sources or grants as achievements
-- Key methodologies or skills demonstrated`,
+                'paper': `This is an ACADEMIC/RESEARCH PAPER. Papers come in many formats - IEEE, ACM, arXiv, Nature, Science, Elsevier, Springer, APA, MLA, Chicago, conference proceedings, journal articles, theses, dissertations, working papers, preprints, etc.
+
+INTELLIGENTLY DETECT AND EXTRACT regardless of format:
+
+1. PAPER METADATA (extract as ACTIVITY):
+   - Title: Look for the largest/boldest text at the top, or after "Title:" 
+   - Authors: Names listed after title, look for affiliations in superscripts/footnotes
+   - YOUR role: If you see the user's name, they are an Author. Check author order (1st author, co-author, corresponding author)
+   - Institution: University, lab, company, or research group affiliations
+   - Date: Look for submission date, publication date, or copyright year
+
+2. ABSTRACT/SUMMARY (use for description):
+   - Look for "Abstract", "Summary", or the italicized paragraph after authors
+   - Extract key findings, methodology, and contributions
+
+3. EXTRACT AS ACHIEVEMENTS:
+   - Publication venue (journal name, conference name)
+   - Impact factor or ranking if mentioned
+   - Citations count if mentioned
+   - Awards (Best Paper, Honorable Mention, etc.)
+   - Grants/funding acknowledged
+
+4. KEY SECTIONS TO SCAN:
+   - Introduction: Research problem and motivation
+   - Methodology/Methods: Technical skills demonstrated
+   - Results/Findings: Key outcomes and discoveries
+   - Conclusion: Impact and contributions
+   - Acknowledgments: Funding, collaborators, mentors
+
+5. TECHNICAL SKILLS DEMONSTRATED:
+   - Programming languages, tools, frameworks mentioned
+   - Statistical methods, ML algorithms
+   - Lab techniques, equipment used
+
+CREATE ONE ACTIVITY for the research project with a rich description summarizing:
+- What problem was solved
+- What methods/tools were used
+- What was discovered/achieved
+- Why it matters`,
 
                 'resume': `This is a RESUME/CV. Extract ALL:
 - Work experiences, internships, part-time jobs
