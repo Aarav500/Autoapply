@@ -644,64 +644,79 @@ export async function extractFromDocument(
     documentText: string,
     documentType: 'resume' | 'paper' | 'transcript' | 'certificate' | 'other'
 ): Promise<DocumentExtractionResult> {
-    const systemPrompt = `You are an expert at reading resumes, CVs, research papers, and academic documents.
-Your task is to extract ALL relevant information that could be useful for college application essays.
+    const systemPrompt = `You are an expert at reading documents and extracting ONLY verifiable information.
+
+⚠️ CRITICAL ANTI-HALLUCINATION RULES:
+1. You MUST ONLY extract information that is EXPLICITLY stated in the document
+2. You MUST NOT invent, imagine, or hallucinate ANY activities, achievements, or experiences
+3. You MUST NOT assume the author held any positions or roles unless explicitly stated
+4. If the document contains no activities/achievements, return EMPTY arrays - this is CORRECT
+5. For research papers: extract ONLY the paper itself as ONE activity - NOT student clubs/sports/volunteering
+
+VERIFICATION CHECK: Before including ANY item, ask yourself:
+"Can I point to the EXACT text in this document that proves this exists?"
+If NO, do NOT include it.
 
 You must respond in valid JSON format with this exact structure:
 {
     "activities": [
         {
-            "name": "Activity name (e.g., 'Robotics Club')",
-            "role": "Your position (e.g., 'President', 'Member')",
-            "organization": "Where (e.g., 'Lincoln High School')",
-            "startDate": "When started (e.g., 'Sep 2022')",
-            "endDate": "When ended (e.g., 'Present')",
-            "description": "What you did - be specific and action-oriented",
-            "hoursPerWeek": number (estimate if not stated, typically 3-10),
-            "weeksPerYear": number (estimate if not stated, typically 30-52),
-            "impact": "Quantified results or outcomes (numbers, percentages, achievements)"
+            "name": "Activity name (MUST be explicitly in document)",
+            "role": "Your position (MUST be stated in document)",
+            "organization": "Where (MUST be stated)",
+            "startDate": "When started (or 'Unknown')",
+            "endDate": "When ended (or 'Unknown')",
+            "description": "Based on actual document text",
+            "hoursPerWeek": 0,
+            "weeksPerYear": 0,
+            "impact": "Outcomes explicitly mentioned in document"
         }
     ],
     "achievements": [
         {
-            "title": "Achievement name (e.g., 'National Merit Scholar')",
-            "description": "What it was",
-            "date": "When (e.g., '2023')",
-            "significance": "Why it matters for college apps - be specific"
+            "title": "Achievement name (MUST be in document)",
+            "description": "What it was (from document)",
+            "date": "When (or 'Unknown')",
+            "significance": "Why it matters"
         }
     ],
     "research": [
         {
-            "topic": "Research area/title",
-            "findings": "Key contributions or discoveries",
-            "methodology": "How the research was conducted",
-            "essayContext": "How to reference this in essays - specific talking points"
+            "topic": "Research area/title (from document)",
+            "findings": "Key contributions (from document)",
+            "methodology": "How research was conducted (from document)",
+            "essayContext": "How to reference this in essays"
         }
     ],
-    "summary": "2-3 sentence summary of the applicant's profile based on this document"
+    "summary": "Summary of what was actually found in this document"
 }
 
-CRITICAL RULES:
-1. Extract EVERYTHING relevant - don't skip activities
-2. For each activity, estimate hours if not explicitly stated
-3. For achievements, explain WHY they matter for college apps
-4. For research papers, focus on what can be discussed in essays
-5. Be generous with extraction - include leadership roles, clubs, sports, jobs, volunteering
-6. Convert vague descriptions into specific, action-oriented language
-7. If it's a research paper, the main content IS the research - extract topic, methodology, findings`;
+DOCUMENT TYPE: ${documentType}
+${documentType === 'paper' ? `
+FOR RESEARCH PAPERS:
+- Extract ONLY the research project as ONE activity (the paper itself)
+- DO NOT invent student activities, clubs, sports, or volunteering
+- A research paper should have AT MOST 1 activity and maybe 1-2 achievements (publication, awards)
+` : ''}
 
-    const userMessage = `Extract all activities, achievements, and research from this ${documentType}.
+CRITICAL RULES:
+1. Extract ONLY what is EXPLICITLY in the document
+2. Do NOT estimate or invent hours/weeks - use 0 if not stated
+3. Do NOT invent achievements or activities not mentioned
+4. Return EMPTY arrays if nothing is found - this is the CORRECT response
+5. When in doubt, EXCLUDE rather than include`;
+
+    const userMessage = `Extract ONLY verifiable information from this ${documentType}.
 
 DOCUMENT CONTENT:
 ${documentText.slice(0, 15000)}
 
-${documentText.length > 15000 ? '\n[Document truncated for processing - additional content not shown]' : ''}
+${documentText.length > 15000 ? '\n[Document truncated for processing]' : ''}
 
-Remember:
-- Extract EVERY activity, even small ones
-- Estimate hours/weeks if not stated
-- Make descriptions action-oriented
-- Explain significance for college applications
+REMEMBER:
+- ONLY extract what is EXPLICITLY in the document
+- Do NOT invent or hallucinate any information
+- Empty arrays are the CORRECT response if nothing is found
 - Return valid JSON only`;
 
     try {

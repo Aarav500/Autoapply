@@ -60,70 +60,70 @@ export async function POST(request: NextRequest) {
         // Build document-type specific prompt
         const getExtractionPrompt = (docType: string, documentText: string) => {
             const baseInstructions = `You are an expert at extracting structured information from documents for college/job applications.
-Extract ALL relevant information - be thorough and don't miss anything important.`;
+
+⚠️ CRITICAL ANTI-HALLUCINATION RULES - READ CAREFULLY:
+1. You MUST ONLY extract information that is EXPLICITLY stated in the document
+2. You MUST NOT invent, imagine, or hallucinate ANY activities, achievements, or experiences
+3. You MUST NOT assume the document author held any positions, roles, or titles unless explicitly stated
+4. If the document doesn't contain activities or achievements, return EMPTY arrays - this is correct behavior
+5. For academic papers: extract ONLY the research itself as an activity - DO NOT invent extracurricular activities
+6. If you're unsure whether something is actually in the document, DO NOT include it
+
+VERIFICATION CHECK: Before including ANY item, ask yourself:
+"Can I point to the EXACT text in this document that proves this exists?"
+If the answer is NO, do NOT include it.`;
 
             const typeSpecificInstructions: Record<string, string> = {
-                'paper': `This is an ACADEMIC/RESEARCH PAPER. Papers come in many formats - IEEE, ACM, arXiv, Nature, Science, Elsevier, Springer, APA, MLA, Chicago, conference proceedings, journal articles, theses, dissertations, working papers, preprints, etc.
+                'paper': `This is an ACADEMIC/RESEARCH PAPER (could be IEEE, ACM, arXiv, journal article, conference paper, thesis, etc.)
 
-INTELLIGENTLY DETECT AND EXTRACT regardless of format:
+FOR RESEARCH PAPERS, extract ONLY:
 
-1. PAPER METADATA (extract as ACTIVITY):
-   - Title: Look for the largest/boldest text at the top, or after "Title:" 
-   - Authors: Names listed after title, look for affiliations in superscripts/footnotes
-   - YOUR role: If you see the user's name, they are an Author. Check author order (1st author, co-author, corresponding author)
-   - Institution: University, lab, company, or research group affiliations
-   - Date: Look for submission date, publication date, or copyright year
+1. THE RESEARCH PROJECT AS ONE ACTIVITY:
+   - name: The paper title (MUST be explicitly stated in the document)
+   - role: "Researcher" or "Author" (ONLY if author names are visible)
+   - organization: The institution/lab/university (ONLY if stated in the document)
+   - description: Summarize the abstract/introduction - what problem was addressed, methodology used, key findings
+   - dates: Use publication date if visible, otherwise leave as "Unknown"
 
-2. ABSTRACT/SUMMARY (use for description):
-   - Look for "Abstract", "Summary", or the italicized paragraph after authors
-   - Extract key findings, methodology, and contributions
+2. ACHIEVEMENTS - ONLY if explicitly mentioned:
+   - Publication venue (journal/conference name if stated)
+   - Awards (Best Paper, etc.) ONLY if explicitly mentioned
+   - Grants/funding ONLY if mentioned in acknowledgments
+   - Citations ONLY if explicitly stated
 
-3. EXTRACT AS ACHIEVEMENTS:
-   - Publication venue (journal name, conference name)
-   - Impact factor or ranking if mentioned
-   - Citations count if mentioned
-   - Awards (Best Paper, Honorable Mention, etc.)
-   - Grants/funding acknowledged
+3. DO NOT EXTRACT (common mistakes):
+   ❌ Random student activities (clubs, sports, volunteering) - these are NOT in a research paper
+   ❌ Leadership positions like "President of X" - not relevant to a research paper
+   ❌ Invented achievements or honors
+   ❌ Anything not explicitly written in this specific document
 
-4. KEY SECTIONS TO SCAN:
-   - Introduction: Research problem and motivation
-   - Methodology/Methods: Technical skills demonstrated
-   - Results/Findings: Key outcomes and discoveries
-   - Conclusion: Impact and contributions
-   - Acknowledgments: Funding, collaborators, mentors
+REMEMBER: A research paper should produce AT MOST 1 activity (the research itself) and possibly a few achievements (publication, awards) - NOT multiple student activities.`,
 
-5. TECHNICAL SKILLS DEMONSTRATED:
-   - Programming languages, tools, frameworks mentioned
-   - Statistical methods, ML algorithms
-   - Lab techniques, equipment used
+                'resume': `This is a RESUME/CV. Extract ONLY what is EXPLICITLY listed:
+- Work experiences, internships (ONLY if described in the document)
+- Extracurricular activities, clubs (ONLY if listed)
+- Leadership positions (ONLY with exact titles from the document)
+- Projects (ONLY if described)
+- Awards, honors (ONLY if explicitly stated)
 
-CREATE ONE ACTIVITY for the research project with a rich description summarizing:
-- What problem was solved
-- What methods/tools were used
-- What was discovered/achieved
-- Why it matters`,
+DO NOT invent experiences or positions not mentioned in the resume.`,
 
-                'resume': `This is a RESUME/CV. Extract ALL:
-- Work experiences, internships, part-time jobs
-- Extracurricular activities, clubs, volunteering
-- Leadership positions
-- Projects (personal, academic, professional)
-- Skills and certifications
-- Awards, honors, scholarships`,
+                'transcript': `This is an ACADEMIC TRANSCRIPT. Extract ONLY:
+- Honors/awards EXPLICITLY stated (Dean's List, etc.)
+- Academic achievements EXPLICITLY mentioned
+- GPA milestones if shown
 
-                'transcript': `This is an ACADEMIC TRANSCRIPT. Extract:
-- Academic achievements (Dean's List, honors)
-- Notable courses as activities if relevant
-- GPA milestones as achievements
-- Academic awards or recognitions`,
+DO NOT invent achievements or assume anything not explicitly stated.`,
 
-                'certificate': `This is a CERTIFICATE/AWARD. Extract:
-- The certification/award as an ACHIEVEMENT
-- Any training or coursework as an ACTIVITY
-- Issuing organization and date
-- Skills or competencies certified`,
+                'certificate': `This is a CERTIFICATE/AWARD. Extract ONLY:
+- The specific certification/award named in the document
+- Issuing organization and date if stated
+- Skills/competencies if explicitly mentioned
 
-                'other': `Extract any activities, experiences, achievements, awards, or notable accomplishments.`
+DO NOT add information not present in the certificate.`,
+
+                'other': `Extract ONLY activities, experiences, achievements that are EXPLICITLY stated in this document.
+DO NOT invent or assume any information.`
             };
 
             return `${baseInstructions}
@@ -131,22 +131,26 @@ CREATE ONE ACTIVITY for the research project with a rich description summarizing
 ${typeSpecificInstructions[docType] || typeSpecificInstructions['other']}
 
 EXTRACTION RULES:
-1. Extract EVERY activity, experience, or achievement you can find
-2. For dates, use "Month Year" format or estimate if unclear
-3. For hours/weeks, estimate based on typical commitment levels
-4. Descriptions should be detailed (2-3 sentences) highlighting impact and responsibilities
-5. Don't skip anything - err on the side of including more rather than less
+1. Extract ONLY what is EXPLICITLY stated in the document - nothing more
+2. For dates, use "Month Year" format or "Unknown" if not stated
+3. For hours/weeks, use 0 if not stated (do NOT estimate)
+4. Descriptions should quote or closely paraphrase the actual document text
+5. When in doubt, EXCLUDE rather than include something you're not sure about
+
+BEFORE RETURNING: Review each item and verify it exists in the document text below.
 
 Return a JSON object with this exact structure:
 {
   "activities": [
-    {"name": "Activity/Experience Name", "role": "Your Role/Position", "organization": "Org/Company/School", "startDate": "Month Year", "endDate": "Month Year or Present", "description": "Detailed description of what you did and achieved", "hoursPerWeek": 10, "weeksPerYear": 40}
+    {"name": "Activity/Experience Name", "role": "Your Role/Position", "organization": "Org/Company/School", "startDate": "Month Year", "endDate": "Month Year or Present", "description": "Description based on document text", "hoursPerWeek": 0, "weeksPerYear": 0}
   ],
   "achievements": [
-    {"title": "Achievement Title", "description": "What this achievement represents and its significance", "date": "Month Year"}
+    {"title": "Achievement Title", "description": "What this achievement represents", "date": "Month Year"}
   ],
-  "summary": "Brief summary: Found X activities and Y achievements including [key highlights]"
+  "summary": "Brief summary of what was found in this document"
 }
+
+If the document contains no extractable activities or achievements, return empty arrays - this is the CORRECT response.
 
 Document text:
 ${documentText.substring(0, 10000)}`;
