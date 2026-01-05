@@ -758,43 +758,25 @@ export default function CollegeEssayPage() {
                                 <div className="flex items-center justify-between mb-4">
                                     <h2 className="text-xl font-bold flex items-center gap-2">
                                         <Key className="w-5 h-5" style={{ color: 'var(--accent-gold)' }} />
-                                        AI API Key Setup
+                                        Claude API Key
                                     </h2>
                                     <Button variant="ghost" size="sm" onClick={() => setShowAPIKeyModal(false)}>
                                         <X className="w-5 h-5" />
                                     </Button>
                                 </div>
                                 <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
-                                    Enter an API key to enable AI essay generation. Gemini has a free tier.
+                                    Enter your Claude API key to enable AI essay generation. Get one at{' '}
+                                    <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer"
+                                        style={{ color: 'var(--accent-primary)' }}>console.anthropic.com</a>
                                 </p>
 
                                 <div className="space-y-4">
-                                    {/* Provider Selection */}
-                                    <div>
-                                        <label className="block text-sm font-medium mb-2">Provider</label>
-                                        <div className="flex gap-2">
-                                            {(['gemini', 'claude', 'openai'] as AIProvider[]).map(provider => (
-                                                <button
-                                                    key={provider}
-                                                    onClick={() => setSelectedProvider(provider)}
-                                                    className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all"
-                                                    style={{
-                                                        background: selectedProvider === provider ? 'var(--gradient-primary)' : 'var(--bg-secondary)',
-                                                        color: selectedProvider === provider ? 'white' : 'inherit'
-                                                    }}
-                                                >
-                                                    {provider === 'gemini' ? '⚡ Gemini (Free)' : provider === 'claude' ? '🎯 Claude' : '🤖 OpenAI'}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
                                     {/* API Key Input */}
                                     <div>
                                         <label className="block text-sm font-medium mb-2">API Key</label>
                                         <Input
                                             type="password"
-                                            placeholder={selectedProvider === 'gemini' ? 'AIza...' : selectedProvider === 'claude' ? 'sk-ant-...' : 'sk-...'}
+                                            placeholder="sk-ant-api03-..."
                                             value={apiKeyInput}
                                             onChange={e => setApiKeyInput(e.target.value)}
                                         />
@@ -808,11 +790,11 @@ export default function CollegeEssayPage() {
                                                 toast.error('Please enter an API key');
                                                 return;
                                             }
-                                            setAPIKey(selectedProvider, apiKeyInput);
-                                            setAiConfig({ provider: selectedProvider, apiKey: apiKeyInput });
+                                            setAPIKey('claude', apiKeyInput);
+                                            setAiConfig({ provider: 'claude', apiKey: apiKeyInput });
                                             setShowAPIKeyModal(false);
                                             setApiKeyInput('');
-                                            toast.success(`✅ ${selectedProvider} API key saved!`);
+                                            toast.success('✅ Claude API key saved!');
                                         }}
                                     >
                                         Save API Key
