@@ -201,7 +201,19 @@ export default function CollegeEssayPage() {
             await handleReviewEssay(generatedEssay);
         } catch (error) {
             console.error('AI generation error:', error);
-            toast.error('Failed to generate essay. Check your API key and try again.');
+            // Show specific error message on UI
+            const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+            if (errorMsg.includes('Claude')) {
+                toast.error(`❌ Claude API Error: ${errorMsg}. Check your API key or try Gemini instead.`);
+            } else if (errorMsg.includes('Gemini')) {
+                toast.error(`❌ Gemini API Error: ${errorMsg}. Check your API key or try Claude instead.`);
+            } else if (errorMsg.includes('OpenAI')) {
+                toast.error(`❌ OpenAI API Error: ${errorMsg}. Check your API key.`);
+            } else if (errorMsg.includes('API')) {
+                toast.error(`❌ API Error: ${errorMsg}`);
+            } else {
+                toast.error(`❌ Failed to generate essay: ${errorMsg}. Check your API key and try again.`);
+            }
         } finally {
             setIsGenerating(false);
         }
@@ -256,11 +268,12 @@ export default function CollegeEssayPage() {
             }]);
         } catch (error) {
             console.error('AI review error:', error);
-            toast.error('Failed to review essay. Using basic feedback.');
+            const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+            toast.error(`❌ Review failed: ${errorMsg}`);
             setConfidence(70);
             setFeedback([{
                 type: 'suggestion',
-                text: 'AI review failed. Check your API key connection.',
+                text: `AI review failed: ${errorMsg}. Check your API key connection.`,
             }]);
         } finally {
             setIsReviewing(false);
