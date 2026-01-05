@@ -230,20 +230,45 @@ export default function DocumentsPage() {
                     const parseResult = await parseResponse.json();
 
                     // Check if AI is configured for extraction
-                    const aiConfig = getAIConfig();
-                    if (aiConfig && parseResult.text && parseResult.text.length > 100) {
+                    if (parseResult.text && parseResult.text.length > 100) {
                         toast.info(`🧠 AI extracting activities from ${file.name}...`);
 
-                        // Extract activities and achievements using AI
-                        const extraction = await extractFromDocument(
-                            aiConfig,
-                            parseResult.text,
-                            docType as 'resume' | 'paper' | 'transcript' | 'certificate' | 'other'
-                        );
+                        // Call server-side AI extraction API (uses runtime CLAUDE_API_KEY)
+                        const extractResponse = await fetch('/api/documents/extract', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                text: parseResult.text,
+                                documentType: docType,
+                            }),
+                        });
+
+                        const extraction = await extractResponse.json();
+
+                        if (extraction.error === 'AI not configured') {
+                            // AI not configured on server - fallback to local config
+                            const aiConfig = getAIConfig();
+                            if (aiConfig) {
+                                const clientExtraction = await extractFromDocument(
+                                    aiConfig,
+                                    parseResult.text,
+                                    docType as 'resume' | 'paper' | 'transcript' | 'certificate' | 'other'
+                                );
+                                extraction.activities = clientExtraction.activities;
+                                extraction.achievements = clientExtraction.achievements;
+                                extraction.summary = clientExtraction.summary;
+                            } else {
+                                setDocuments(prev => prev.map(doc =>
+                                    doc.id === docId ? { ...doc, status: 'analyzed' as const } : doc
+                                ));
+                                toast.info(`📄 ${file.name} processed. Set up AI API key for auto-extraction.`);
+                                continue;
+                            }
+                        }
 
                         // Add extracted activities
-                        if (extraction.activities.length > 0) {
-                            const newActivities: ActivityItem[] = extraction.activities.map(a => ({
+                        if (extraction.activities && extraction.activities.length > 0) {
+                            const newActivities: ActivityItem[] = extraction.activities.map((a: ExtractedActivity) => ({
                                 id: Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9),
                                 name: a.name,
                                 role: a.role,
@@ -259,8 +284,8 @@ export default function DocumentsPage() {
                         }
 
                         // Add extracted achievements
-                        if (extraction.achievements.length > 0) {
-                            const newAchievements: Achievement[] = extraction.achievements.map(a => ({
+                        if (extraction.achievements && extraction.achievements.length > 0) {
+                            const newAchievements: Achievement[] = extraction.achievements.map((a: ExtractedAchievement) => ({
                                 id: Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9),
                                 title: a.title,
                                 org: a.description, // Map description to org field
@@ -279,11 +304,11 @@ export default function DocumentsPage() {
                             toast.success(`📄 ${extraction.summary}`);
                         }
                     } else {
-                        // No AI config - just mark as analyzed
+                        // Document too short
                         setDocuments(prev => prev.map(doc =>
                             doc.id === docId ? { ...doc, status: 'analyzed' as const } : doc
                         ));
-                        toast.info(`📄 ${file.name} processed. Set up AI API key for auto-extraction.`);
+                        toast.info(`📄 ${file.name} processed.`);
                     }
                 } catch (parseError) {
                     console.error('Parse error:', parseError);
