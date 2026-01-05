@@ -600,3 +600,137 @@ export function getAvailableProviders(): AIProvider[] {
 
     return providers;
 }
+
+// ============================================
+// DOCUMENT EXTRACTION - AI-Powered
+// Extracts activities, achievements, research from documents
+// ============================================
+
+export interface ExtractedActivity {
+    name: string;
+    role: string;
+    organization: string;
+    startDate: string;
+    endDate: string;
+    description: string;
+    hoursPerWeek: number;
+    weeksPerYear: number;
+    impact: string;
+}
+
+export interface ExtractedAchievement {
+    title: string;
+    description: string;
+    date: string;
+    significance: string;
+}
+
+export interface ExtractedResearch {
+    topic: string;
+    findings: string;
+    methodology: string;
+    essayContext: string;
+}
+
+export interface DocumentExtractionResult {
+    activities: ExtractedActivity[];
+    achievements: ExtractedAchievement[];
+    research: ExtractedResearch[];
+    summary: string;
+}
+
+export async function extractFromDocument(
+    config: AIConfig,
+    documentText: string,
+    documentType: 'resume' | 'paper' | 'transcript' | 'certificate' | 'other'
+): Promise<DocumentExtractionResult> {
+    const systemPrompt = `You are an expert at reading resumes, CVs, research papers, and academic documents.
+Your task is to extract ALL relevant information that could be useful for college application essays.
+
+You must respond in valid JSON format with this exact structure:
+{
+    "activities": [
+        {
+            "name": "Activity name (e.g., 'Robotics Club')",
+            "role": "Your position (e.g., 'President', 'Member')",
+            "organization": "Where (e.g., 'Lincoln High School')",
+            "startDate": "When started (e.g., 'Sep 2022')",
+            "endDate": "When ended (e.g., 'Present')",
+            "description": "What you did - be specific and action-oriented",
+            "hoursPerWeek": number (estimate if not stated, typically 3-10),
+            "weeksPerYear": number (estimate if not stated, typically 30-52),
+            "impact": "Quantified results or outcomes (numbers, percentages, achievements)"
+        }
+    ],
+    "achievements": [
+        {
+            "title": "Achievement name (e.g., 'National Merit Scholar')",
+            "description": "What it was",
+            "date": "When (e.g., '2023')",
+            "significance": "Why it matters for college apps - be specific"
+        }
+    ],
+    "research": [
+        {
+            "topic": "Research area/title",
+            "findings": "Key contributions or discoveries",
+            "methodology": "How the research was conducted",
+            "essayContext": "How to reference this in essays - specific talking points"
+        }
+    ],
+    "summary": "2-3 sentence summary of the applicant's profile based on this document"
+}
+
+CRITICAL RULES:
+1. Extract EVERYTHING relevant - don't skip activities
+2. For each activity, estimate hours if not explicitly stated
+3. For achievements, explain WHY they matter for college apps
+4. For research papers, focus on what can be discussed in essays
+5. Be generous with extraction - include leadership roles, clubs, sports, jobs, volunteering
+6. Convert vague descriptions into specific, action-oriented language
+7. If it's a research paper, the main content IS the research - extract topic, methodology, findings`;
+
+    const userMessage = `Extract all activities, achievements, and research from this ${documentType}.
+
+DOCUMENT CONTENT:
+${documentText.slice(0, 15000)}
+
+${documentText.length > 15000 ? '\n[Document truncated for processing - additional content not shown]' : ''}
+
+Remember:
+- Extract EVERY activity, even small ones
+- Estimate hours/weeks if not stated
+- Make descriptions action-oriented
+- Explain significance for college applications
+- Return valid JSON only`;
+
+    try {
+        const result = await callAI(config, systemPrompt, userMessage);
+
+        // Parse the JSON response
+        const jsonMatch = result.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+            throw new Error('No valid JSON in response');
+        }
+
+        const parsed = JSON.parse(jsonMatch[0]) as DocumentExtractionResult;
+
+        // Validate and ensure arrays exist
+        return {
+            activities: parsed.activities || [],
+            achievements: parsed.achievements || [],
+            research: parsed.research || [],
+            summary: parsed.summary || 'Document processed successfully.',
+        };
+    } catch (error) {
+        console.error('Document extraction error:', error);
+        // Return empty result on error
+        return {
+            activities: [],
+            achievements: [],
+            research: [],
+            summary: 'Failed to extract information from document.',
+        };
+    }
+}
+

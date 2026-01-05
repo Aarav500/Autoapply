@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Button, StatusBadge, Input, Tag } from '@/components/ui';
 import { useS3Storage } from '@/lib/useS3Storage';
 import { toast } from '@/lib/error-handling';
+import { getAIConfig, extractFromDocument, ExtractedActivity, ExtractedAchievement } from '@/lib/ai-providers';
 import {
     FolderOpen,
     Upload,
@@ -25,7 +26,9 @@ import {
     Loader2,
     Save,
     RefreshCw,
-    AlertCircle
+    AlertCircle,
+    Sparkles,
+    Brain
 } from 'lucide-react';
 
 interface Document {
@@ -172,31 +175,106 @@ export default function DocumentsPage() {
         toast.info(`📁 Processing ${validFiles.length} file(s)...`);
 
         try {
-            const newDocuments: Document[] = validFiles.map(file => ({
-                id: Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9),
-                name: file.name,
-                type: detectDocumentType(file.name),
-                size: formatFileSize(file.size),
-                uploadedAt: new Date().toLocaleDateString('en-US', {
-                    month: 'short', day: 'numeric', year: 'numeric'
-                }),
-                status: 'pending' as const,
-            }));
+            for (const file of validFiles) {
+                const docId = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
+                const docType = detectDocumentType(file.name);
 
-            // Add to documents list
-            setDocuments(prev => [...prev, ...newDocuments]);
+                // Add document with pending status
+                const newDoc: Document = {
+                    id: docId,
+                    name: file.name,
+                    type: docType,
+                    size: formatFileSize(file.size),
+                    uploadedAt: new Date().toLocaleDateString('en-US', {
+                        month: 'short', day: 'numeric', year: 'numeric'
+                    }),
+                    status: 'pending' as const,
+                };
+                setDocuments(prev => [...prev, newDoc]);
 
-            toast.success(`✅ ${validFiles.length} document(s) added successfully!`);
+                // Parse document to extract text
+                toast.info(`🔍 Parsing ${file.name}...`);
+                const formData = new FormData();
+                formData.append('file', file);
 
-            // Simulate processing (in a real app, this would parse the documents)
-            setTimeout(() => {
-                setDocuments(prev => prev.map(doc =>
-                    newDocuments.find(nd => nd.id === doc.id)
-                        ? { ...doc, status: 'analyzed' as const }
-                        : doc
-                ));
-                toast.success('📄 Documents analyzed and ready!');
-            }, 2000);
+                try {
+                    const parseResponse = await fetch('/api/documents/parse', {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    if (!parseResponse.ok) {
+                        throw new Error('Failed to parse document');
+                    }
+
+                    const parseResult = await parseResponse.json();
+
+                    // Check if AI is configured for extraction
+                    const aiConfig = getAIConfig();
+                    if (aiConfig && parseResult.text && parseResult.text.length > 100) {
+                        toast.info(`🧠 AI extracting activities from ${file.name}...`);
+
+                        // Extract activities and achievements using AI
+                        const extraction = await extractFromDocument(
+                            aiConfig,
+                            parseResult.text,
+                            docType as 'resume' | 'paper' | 'transcript' | 'certificate' | 'other'
+                        );
+
+                        // Add extracted activities
+                        if (extraction.activities.length > 0) {
+                            const newActivities: ActivityItem[] = extraction.activities.map(a => ({
+                                id: Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9),
+                                name: a.name,
+                                role: a.role,
+                                organization: a.organization,
+                                startDate: a.startDate,
+                                endDate: a.endDate,
+                                description: a.description,
+                                hoursPerWeek: a.hoursPerWeek,
+                                weeksPerYear: a.weeksPerYear,
+                            }));
+                            setActivities(prev => [...prev, ...newActivities]);
+                            toast.success(`✨ Extracted ${extraction.activities.length} activities from ${file.name}`);
+                        }
+
+                        // Add extracted achievements
+                        if (extraction.achievements.length > 0) {
+                            const newAchievements: Achievement[] = extraction.achievements.map(a => ({
+                                id: Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9),
+                                title: a.title,
+                                org: a.description, // Map description to org field
+                                date: a.date,
+                            }));
+                            setAchievements(prev => [...prev, ...newAchievements]);
+                            toast.success(`🏆 Extracted ${extraction.achievements.length} achievements from ${file.name}`);
+                        }
+
+                        // Update document status to analyzed
+                        setDocuments(prev => prev.map(doc =>
+                            doc.id === docId ? { ...doc, status: 'analyzed' as const } : doc
+                        ));
+
+                        if (extraction.summary) {
+                            toast.success(`📄 ${extraction.summary}`);
+                        }
+                    } else {
+                        // No AI config - just mark as analyzed
+                        setDocuments(prev => prev.map(doc =>
+                            doc.id === docId ? { ...doc, status: 'analyzed' as const } : doc
+                        ));
+                        toast.info(`📄 ${file.name} processed. Set up AI API key for auto-extraction.`);
+                    }
+                } catch (parseError) {
+                    console.error('Parse error:', parseError);
+                    setDocuments(prev => prev.map(doc =>
+                        doc.id === docId ? { ...doc, status: 'pending' as const } : doc
+                    ));
+                    toast.error(`Failed to process ${file.name}`);
+                }
+            }
+
+            toast.success(`✅ All documents processed!`);
 
         } catch (error) {
             console.error('Upload error:', error);
@@ -204,7 +282,7 @@ export default function DocumentsPage() {
         } finally {
             setIsUploading(false);
         }
-    }, [setDocuments]);
+    }, [setDocuments, setActivities, setAchievements]);
 
     const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
