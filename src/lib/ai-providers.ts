@@ -582,19 +582,22 @@ export function getAIConfig(): AIConfig | null {
 }
 
 export function setAPIKey(provider: AIProvider, apiKey: string) {
-    localStorage.setItem(`${provider}_api_key`, apiKey);
+    if (typeof window !== 'undefined') {
+        localStorage.setItem(`${provider}_api_key`, apiKey);
+    }
 }
 
 export function getAvailableProviders(): AIProvider[] {
     const providers: AIProvider[] = [];
+    const isBrowser = typeof window !== 'undefined';
 
-    if (process.env.NEXT_PUBLIC_CLAUDE_API_KEY || localStorage.getItem('claude_api_key')) {
+    if (process.env.NEXT_PUBLIC_CLAUDE_API_KEY || (isBrowser && localStorage.getItem('claude_api_key'))) {
         providers.push('claude');
     }
-    if (process.env.NEXT_PUBLIC_GEMINI_API_KEY || localStorage.getItem('gemini_api_key')) {
+    if (process.env.NEXT_PUBLIC_GEMINI_API_KEY || (isBrowser && localStorage.getItem('gemini_api_key'))) {
         providers.push('gemini');
     }
-    if (process.env.NEXT_PUBLIC_OPENAI_API_KEY || localStorage.getItem('openai_api_key')) {
+    if (process.env.NEXT_PUBLIC_OPENAI_API_KEY || (isBrowser && localStorage.getItem('openai_api_key'))) {
         providers.push('openai');
     }
 

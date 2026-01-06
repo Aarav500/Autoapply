@@ -120,6 +120,7 @@ class LocalStorageBackup {
 
     // Save data with backup
     save<T>(key: string, data: T): void {
+        if (typeof window === 'undefined') return;
         try {
             const storageData: StorageData<T> = {
                 data,
@@ -145,6 +146,7 @@ class LocalStorageBackup {
 
     // Load data
     load<T>(key: string): T | null {
+        if (typeof window === 'undefined') return null;
         try {
             const item = localStorage.getItem(this.prefix + key);
             if (!item) return null;
@@ -158,6 +160,7 @@ class LocalStorageBackup {
 
     // Load with metadata
     loadWithMeta<T>(key: string): StorageData<T> | null {
+        if (typeof window === 'undefined') return null;
         try {
             const item = localStorage.getItem(this.prefix + key);
             if (!item) return null;
@@ -170,11 +173,13 @@ class LocalStorageBackup {
 
     // Delete data
     delete(key: string): void {
+        if (typeof window === 'undefined') return;
         localStorage.removeItem(this.prefix + key);
     }
 
     // Get all keys
     getAllKeys(): string[] {
+        if (typeof window === 'undefined') return [];
         const keys: string[] = [];
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -215,6 +220,7 @@ class LocalStorageBackup {
 
     // Mark as synced
     markSynced(key: string): void {
+        if (typeof window === 'undefined') return;
         const meta = this.loadWithMeta(key);
         if (meta) {
             meta.synced = true;
