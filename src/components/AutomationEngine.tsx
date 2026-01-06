@@ -223,6 +223,18 @@ export function useAutomationEngine() {
         try {
             // GENERATE -> REVIEW -> IMPROVE LOOP
             while (iteration < MAX_ITERATIONS) {
+                // Check if paused - exit early if so
+                if (!runningRef.current) {
+                    console.log(`⏸️ Paused during iteration ${iteration} for ${college.name}`);
+                    clearInterval(progressInterval);
+                    setTasks(prev => prev.map(t =>
+                        t.id === task.id
+                            ? { ...t, status: 'paused' as TaskStatus }
+                            : t
+                    ));
+                    return; // Exit early without marking as complete
+                }
+
                 iteration++;
                 console.log(`\n📝 Iteration ${iteration}/${MAX_ITERATIONS} for ${college.name}`);
 
@@ -430,6 +442,11 @@ export function useAutomationEngine() {
     const start = useCallback(() => {
         if (tasks.length === 0) {
             generateAllTasks();
+        } else {
+            // Resume paused tasks by setting them back to pending
+            setTasks(prev => prev.map(t =>
+                t.status === 'paused' ? { ...t, status: 'pending' as TaskStatus } : t
+            ));
         }
         setIsRunning(true);
         runningRef.current = true;
@@ -441,7 +458,11 @@ export function useAutomationEngine() {
     const pause = useCallback(() => {
         setIsRunning(false);
         runningRef.current = false;
-        toast.warning('⏸️ Automation paused');
+        // Mark currently running tasks as paused for immediate visual feedback
+        setTasks(prev => prev.map(t =>
+            t.status === 'running' ? { ...t, status: 'paused' as TaskStatus } : t
+        ));
+        toast.warning('⏸️ Automation paused - tasks will stop after current API call');
     }, []);
 
     // Reset all tasks
