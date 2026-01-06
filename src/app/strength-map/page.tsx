@@ -1,37 +1,35 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Card, Button, StatusBadge, ProgressBar } from '@/components/ui';
+import { Card, Button, StatusBadge } from '@/components/ui';
 import { targetColleges } from '@/lib/colleges-data';
+import { activityStorage, profileStorage, Activity } from '@/lib/storage';
 import {
     Map,
     Target,
     TrendingUp,
     Star,
     Award,
-    Users,
     Lightbulb,
-    GraduationCap,
-    Building2,
     ChevronRight,
-    BarChart3
+    RefreshCw
 } from 'lucide-react';
 import Link from 'next/link';
 
-// Real user profile - Aarav Nikhil Shah @ UC Riverside, Bourns College of Engineering
-const userProfile = {
+// Default profile - will be overwritten by loaded data
+const defaultProfile = {
     gpa: 3.90,
     major: 'Computer Science',
-    skills: ['Python', 'Data Science', 'Statistical Analysis', 'Programming', 'Research', 'Academic Writing'],
-    activities: ['ARIMA Time Series Research Paper (Published)', 'CS Coursework Projects', 'Data Science Analysis', 'Engineering Program'],
+    skills: [] as string[],
+    activities: [] as string[],
     values: ['Innovation', 'Research', 'Technical Excellence', 'Impact'],
-    interests: ['AI/ML', 'Data Science', 'Time Series Analysis', 'Quantitative Finance', 'Research'],
-    experience: ['Published Research', 'Engineering Coursework', 'Data Analysis Projects'],
+    interests: ['AI/ML', 'Data Science', 'Time Series Analysis'],
+    experience: [] as string[],
 };
 
 // Calculate match score for each college
-function calculateStrengthMatch(college: typeof targetColleges[0]) {
+function calculateStrengthMatch(college: typeof targetColleges[0], userProfile: typeof defaultProfile) {
     let score = 0;
     let strengths: string[] = [];
     let gaps: string[] = [];
@@ -63,7 +61,19 @@ function calculateStrengthMatch(college: typeof targetColleges[0]) {
         strengths.push(`Strong ${userProfile.major} program`);
     }
 
-    // What they look for match
+    // Activity-based matching (dynamic!)
+    if (userProfile.activities.length > 0) {
+        // Research match
+        if (userProfile.activities.some(a => a.toLowerCase().includes('research')) &&
+            college.research.whatTheyLookFor.some(t => t.toLowerCase().includes('research'))) {
+            score += 15;
+            strengths.push('Research experience valued');
+        }
+        // More activities = higher score
+        score += Math.min(userProfile.activities.length * 3, 15);
+    }
+
+    // Skills matching
     const traitMatches = college.research.whatTheyLookFor.filter(trait =>
         userProfile.skills.some(s => trait.toLowerCase().includes(s.toLowerCase())) ||
         userProfile.values.some(v => trait.toLowerCase().includes(v.toLowerCase()))
@@ -73,19 +83,7 @@ function calculateStrengthMatch(college: typeof targetColleges[0]) {
         strengths.push(`Matches: ${traitMatches.slice(0, 2).join(', ')}`);
     }
 
-    // Experience match
-    if (userProfile.experience.includes('Research') &&
-        college.research.whatTheyLookFor.some(t => t.toLowerCase().includes('research'))) {
-        score += 10;
-        strengths.push('Research experience valued');
-    }
-    if (userProfile.experience.includes('Leadership') &&
-        college.research.values.includes('Leadership')) {
-        score += 10;
-        strengths.push('Leadership experience valued');
-    }
-
-    // Acceptance rate consideration (higher rate = slightly easier)
+    // Acceptance rate consideration
     const acceptanceRate = parseFloat(college.transferInfo.acceptanceRate.replace(/[~%]/g, ''));
     if (acceptanceRate > 50) score += 5;
     else if (acceptanceRate < 10) gaps.push('Highly competitive admissions');
@@ -108,10 +106,63 @@ function getCategory(score: number, acceptanceRate: number): Category {
 export default function StrengthMapPage() {
     const [sortBy, setSortBy] = useState<'score' | 'name' | 'deadline'>('score');
     const [filterCategory, setFilterCategory] = useState<Category | 'all'>('all');
+    const [userProfile, setUserProfile] = useState(defaultProfile);
+    const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    // Load activities from storage
+    const loadUserData = useCallback(() => {
+        const activities = activityStorage.loadActivities();
+        const profile = profileStorage.loadProfile();
+
+        // Extract activity names and skills
+        const activityNames = activities.map((a: Activity) => a.name);
+        const allSkills = activities.flatMap((a: Activity) => a.skills || []);
+        const uniqueSkills = [...new Set(allSkills)];
+
+        setUserProfile({
+            gpa: profile?.gpa || 3.90,
+            major: profile?.major || 'Computer Science',
+            skills: uniqueSkills.length > 0 ? uniqueSkills : defaultProfile.skills,
+            activities: activityNames.length > 0 ? activityNames : defaultProfile.activities,
+            values: profile?.values || defaultProfile.values,
+            interests: profile?.interests || defaultProfile.interests,
+            experience: activityNames,
+        });
+        setLastRefresh(new Date());
+    }, []);
+
+    // Initial load
+    useEffect(() => {
+        loadUserData();
+    }, [loadUserData]);
+
+    // Auto-refresh every 30 minutes
+    useEffect(() => {
+        const interval = setInterval(() => {
+            console.log('Auto-refreshing strength map data...');
+            loadUserData();
+        }, 30 * 60 * 1000); // 30 minutes
+
+        return () => clearInterval(interval);
+    }, [loadUserData]);
+
+    // Manual refresh
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        loadUserData();
+        // Also trigger intelligence scraper
+        try {
+            await fetch('/api/intelligence?action=all');
+        } catch (e) {
+            console.log('Intelligence refresh skipped');
+        }
+        setTimeout(() => setIsRefreshing(false), 1000);
+    };
 
     const collegesWithScores = useMemo(() => {
         return targetColleges.map(college => {
-            const match = calculateStrengthMatch(college);
+            const match = calculateStrengthMatch(college, userProfile);
             const acceptanceRate = parseFloat(college.transferInfo.acceptanceRate.replace(/[~%]/g, ''));
             return {
                 ...college,
@@ -120,7 +171,7 @@ export default function StrengthMapPage() {
                 acceptanceRate,
             };
         });
-    }, []);
+    }, [userProfile]);
 
     const sortedColleges = useMemo(() => {
         let result = [...collegesWithScores];
