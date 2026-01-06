@@ -251,7 +251,7 @@ export default function StrengthMapPage() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        essay: essayContent,
+                        essay: essayContent.content,
                         prompt: essay.prompt,
                         college: {
                             name: college.name,
@@ -293,6 +293,7 @@ export default function StrengthMapPage() {
                 }
             } catch (err) {
                 console.error(`Failed to analyze ${college.name}:`, err);
+                toast.error(`❌ Failed to analyze ${college.name}`);
                 errors++;
             }
         }
