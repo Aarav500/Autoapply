@@ -10,6 +10,7 @@ import { toast } from '@/lib/error-handling';
 import { essayStorage, matchAnalysisStorage, automationHistoryStorage, AutomationLog } from '@/lib/storage';
 import { targetColleges } from '@/lib/colleges-data';
 import { getFromS3 } from '@/lib/useS3Storage';
+import { Button } from '@/components/ui';
 
 // ============================================
 // ACTIVITY & ACHIEVEMENT TYPES (from Document Hub)
@@ -465,6 +466,10 @@ export function useAutomationEngine() {
         isRunning,
         config,
         stats,
+        activeTab,
+        setActiveTab,
+        history,
+        setHistory,
         setConfig,
         start,
         pause,
@@ -484,6 +489,10 @@ export function AutomationDashboard() {
         isRunning,
         config,
         stats,
+        activeTab,
+        setActiveTab,
+        history,
+        setHistory,
         setConfig,
         start,
         pause,
