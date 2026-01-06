@@ -7,7 +7,7 @@ import {
     Loader2, Zap, Settings, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { toast } from '@/lib/error-handling';
-import { essayStorage } from '@/lib/storage';
+import { essayStorage, matchAnalysisStorage } from '@/lib/storage';
 import { targetColleges } from '@/lib/colleges-data';
 import { getFromS3 } from '@/lib/useS3Storage';
 
@@ -263,6 +263,17 @@ export function useAutomationEngine() {
 
                     console.log(`📊 Review score: ${currentScore}% (target: ${TARGET_SCORE}%)`);
                     toast.info(`📊 Essay scored ${currentScore}% (target: ${TARGET_SCORE}%)`);
+
+                    // Save the match analysis for the Strength Map
+                    matchAnalysisStorage.saveAnalysis(task.collegeId, {
+                        overallScore: currentScore,
+                        categoryScores: reviewResult.categoryScores || {},
+                        strengths: reviewResult.strengths || [],
+                        improvements: reviewResult.improvements || [],
+                        suggestions: reviewResult.suggestions || [],
+                        collegeSpecific: reviewResult.collegeSpecific || '',
+                        oneThingToFix: reviewResult.oneThingToFix || '',
+                    });
 
                     // If score meets target, we're done!
                     if (currentScore >= TARGET_SCORE) {

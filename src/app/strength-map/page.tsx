@@ -13,9 +13,13 @@ import {
     Award,
     Lightbulb,
     ChevronRight,
-    RefreshCw
+    RefreshCw,
+    ShieldCheck,
+    AlertTriangle,
+    Zap
 } from 'lucide-react';
 import Link from 'next/link';
+import { matchAnalysisStorage, MatchAnalysis } from '@/lib/storage';
 
 // Activity type from Document Hub
 interface ActivityItem {
@@ -121,6 +125,11 @@ export default function StrengthMapPage() {
     const [filterCategory, setFilterCategory] = useState<Category | 'all'>('all');
     const [isRefreshing, setIsRefreshing] = useState(false);
 
+    // Load AI-driven Match Analysis
+    const aiAnalyses = useMemo(() => {
+        return matchAnalysisStorage.getAllAnalyses();
+    }, [isRefreshing]);
+
     // Load activities from S3 storage (same source as Document Hub)
     const {
         data: activities,
@@ -196,15 +205,26 @@ export default function StrengthMapPage() {
     const collegesWithScores = useMemo(() => {
         return targetColleges.map(college => {
             const match = calculateStrengthMatch(college, userProfile);
+            const aiMatch = aiAnalyses.find(a => a.collegeId === college.id);
             const acceptanceRate = parseFloat(college.transferInfo.acceptanceRate.replace(/[~%]/g, ''));
+
+            // Overlay AI insights if available
+            const finalScore = aiMatch ? aiMatch.overallScore : match.score;
+            const finalStrengths = aiMatch && aiMatch.strengths.length > 0 ? aiMatch.strengths : match.strengths;
+            const finalGaps = aiMatch && aiMatch.improvements.length > 0 ? aiMatch.improvements : match.gaps;
+
             return {
                 ...college,
-                ...match,
-                category: getCategory(match.score, acceptanceRate),
+                score: finalScore,
+                strengths: finalStrengths,
+                gaps: finalGaps,
+                aiAnalysis: aiMatch,
+                isVerified: !!aiMatch,
+                category: getCategory(finalScore, acceptanceRate),
                 acceptanceRate,
             };
         });
-    }, [userProfile]);
+    }, [userProfile, aiAnalyses]);
 
     const sortedColleges = useMemo(() => {
         let result = [...collegesWithScores];
@@ -415,7 +435,8 @@ export default function StrengthMapPage() {
                                     <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <h4 className="text-sm font-semibold mb-2 flex items-center gap-2" style={{ color: 'var(--success)' }}>
-                                                <TrendingUp className="w-4 h-4" /> Your Strengths
+                                                {college.isVerified ? <ShieldCheck className="w-4 h-4" /> : <TrendingUp className="w-4 h-4" />}
+                                                {college.isVerified ? 'AI-Verified Strengths' : 'Your Strengths'}
                                             </h4>
                                             <ul className="space-y-1">
                                                 {college.strengths.slice(0, 3).map((s, i) => (
@@ -425,7 +446,8 @@ export default function StrengthMapPage() {
                                         </div>
                                         <div>
                                             <h4 className="text-sm font-semibold mb-2 flex items-center gap-2" style={{ color: 'var(--warning)' }}>
-                                                <Lightbulb className="w-4 h-4" /> Areas to Address
+                                                {college.isVerified ? <AlertTriangle className="w-4 h-4" /> : <Lightbulb className="w-4 h-4" />}
+                                                {college.isVerified ? 'AI-Detected Gaps' : 'Areas to Address'}
                                             </h4>
                                             <ul className="space-y-1">
                                                 {college.gaps.length > 0 ? college.gaps.slice(0, 2).map((g, i) => (
@@ -434,6 +456,16 @@ export default function StrengthMapPage() {
                                                     <li className="text-sm" style={{ color: 'var(--text-secondary)' }}>• Focus on essay quality</li>
                                                 )}
                                             </ul>
+                                            {college.aiAnalysis?.oneThingToFix && (
+                                                <div className="mt-2 p-2 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                                                    <p className="text-[10px] uppercase font-bold text-orange-400 mb-1 flex items-center gap-1">
+                                                        <Zap className="w-3 h-3" /> Priority Fix
+                                                    </p>
+                                                    <p className="text-xs text-orange-200 leading-tight">
+                                                        {college.aiAnalysis.oneThingToFix}
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 

@@ -329,7 +329,47 @@ export const profileStorage = {
 };
 
 // ============================================
-// 6. ONLINE/OFFLINE DETECTION
+// 6. MATCH ANALYSIS STORAGE
+// ============================================
+
+export interface MatchAnalysis {
+    collegeId: string;
+    overallScore: number;
+    categoryScores: Record<string, number>;
+    strengths: string[];
+    improvements: string[];
+    suggestions: string[];
+    collegeSpecific: string;
+    oneThingToFix: string;
+    lastUpdated: string;
+}
+
+export const matchAnalysisStorage = {
+    saveAnalysis(collegeId: string, analysis: Omit<MatchAnalysis, 'collegeId' | 'lastUpdated'>) {
+        const key = `match_analysis_${collegeId}`;
+        const data: MatchAnalysis = {
+            ...analysis,
+            collegeId,
+            lastUpdated: new Date().toISOString(),
+        };
+        storage.save(key, data);
+    },
+
+    loadAnalysis(collegeId: string): MatchAnalysis | null {
+        const key = `match_analysis_${collegeId}`;
+        return storage.load(key);
+    },
+
+    getAllAnalyses(): MatchAnalysis[] {
+        const keys = storage.getAllKeys().filter(k => k.startsWith('match_analysis_'));
+        return keys
+            .map(k => storage.load<MatchAnalysis>(k))
+            .filter((a): a is MatchAnalysis => a !== null);
+    },
+};
+
+// ============================================
+// 7. ONLINE/OFFLINE DETECTION
 // ============================================
 
 export function useOnlineStatus() {
