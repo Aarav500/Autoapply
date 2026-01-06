@@ -108,6 +108,11 @@ jobs:
           # Wait a moment for port to be released
           sleep 3
 
+          # Clean up old Docker resources (images, stopped containers, cache)
+          echo "Cleaning up old Docker resources..."
+          sudo docker system prune -af --volumes 2>/dev/null || true
+          echo "Docker cleanup complete"
+
           # Verify port is free
           echo "Verifying port 3000 is free..."
           if sudo lsof -i:3000 2>/dev/null; then
