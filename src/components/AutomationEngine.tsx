@@ -10,10 +10,30 @@ import { toast } from '@/lib/error-handling';
 import { getAIConfig, generateEssay, reviewEssay, AIConfig } from '@/lib/ai-providers';
 import { essayStorage } from '@/lib/storage';
 import { targetColleges } from '@/lib/colleges-data';
+import { getFromS3 } from '@/lib/useS3Storage';
 
 // ============================================
-// TYPES
+// ACTIVITY & ACHIEVEMENT TYPES (from Document Hub)
 // ============================================
+
+interface ActivityItem {
+    id: string;
+    name: string;
+    role: string;
+    organization: string;
+    startDate: string;
+    endDate: string;
+    description: string;
+    hoursPerWeek: number;
+    weeksPerYear: number;
+}
+
+interface Achievement {
+    id: string;
+    title: string;
+    org: string;
+    date: string;
+}
 
 export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'paused';
 
@@ -117,6 +137,27 @@ export function useAutomationEngine() {
         const college = targetColleges.find(c => c.id === task.collegeId);
         if (!college) throw new Error(`College not found: ${task.collegeId}`);
 
+        // Load REAL activities and achievements from S3 storage
+        const rawActivities = await getFromS3<ActivityItem[]>('activities');
+        const rawAchievements = await getFromS3<Achievement[]>('achievements');
+
+        const activities = rawActivities || [];
+        const achievements = rawAchievements || [];
+
+        console.log(`📚 Loaded ${activities.length} activities and ${achievements.length} achievements for essay generation`);
+
+        // Transform activities to the format expected by generateEssay
+        const formattedActivities = activities.map(a => ({
+            name: a.name,
+            description: `${a.role} at ${a.organization}. ${a.description}`,
+            impact: `${a.hoursPerWeek} hrs/week for ${a.weeksPerYear} weeks/year`,
+        }));
+
+        // Include achievements as additional context
+        const achievementContext = achievements.length > 0
+            ? achievements.map(a => `${a.title} - ${a.org} (${a.date})`).join('; ')
+            : '';
+
         // Simulate progress updates
         const progressInterval = setInterval(() => {
             setTasks(prev => prev.map(t =>
@@ -127,9 +168,13 @@ export function useAutomationEngine() {
         }, 1000);
 
         try {
-            // Generate the essay
+            // Get essay word limit from the essay prompt
+            const essayInfo = college.essays.find(e => e.prompt === task.essayPrompt);
+            const wordLimit = essayInfo?.wordLimit || 650;
+
+            // Generate the essay with REAL user data
             const essay = await generateEssay(aiConfig, {
-                prompt: task.essayPrompt,
+                prompt: task.essayPrompt + (achievementContext ? `\n\n[Student Achievements: ${achievementContext}]` : ''),
                 college: {
                     name: college.name,
                     values: college.research.values,
@@ -137,12 +182,11 @@ export function useAutomationEngine() {
                     culture: college.research.culture,
                     notablePrograms: college.research.notablePrograms,
                 },
-                activities: [
-                    { name: 'Research Project', description: 'Led machine learning research', impact: 'Published paper' },
-                    { name: 'Startup', description: 'Founded tech startup', impact: '1000+ users' },
-                    { name: 'Tutoring', description: 'Tutored calculus', impact: 'Helped 50+ students' },
+                activities: formattedActivities.length > 0 ? formattedActivities : [
+                    // Fallback if no activities loaded
+                    { name: 'No activities loaded', description: 'Please add activities in Document Hub', impact: 'N/A' }
                 ],
-                wordLimit: 650,
+                wordLimit: wordLimit,
                 tone: 'confident',
             });
 
