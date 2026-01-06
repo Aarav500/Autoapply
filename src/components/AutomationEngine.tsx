@@ -66,16 +66,30 @@ type Tab = 'tasks' | 'history';
 // ============================================
 
 export function useAutomationEngine() {
-    const [tasks, setTasks] = useState<AutomationTask[]>([]);
-    const [isRunning, setIsRunning] = useState(false);
-    const [config, setConfig] = useState<AutomationConfig>({
+    // Load persisted state from localStorage on initial render
+    const loadPersistedState = () => {
+        if (typeof window === 'undefined') return null;
+        try {
+            const saved = localStorage.getItem('automation_state');
+            if (saved) return JSON.parse(saved);
+        } catch (e) {
+            console.error('Failed to load automation state:', e);
+        }
+        return null;
+    };
+
+    const persistedState = loadPersistedState();
+
+    const [tasks, setTasks] = useState<AutomationTask[]>(persistedState?.tasks || []);
+    const [isRunning, setIsRunning] = useState(false); // Always start paused
+    const [config, setConfig] = useState<AutomationConfig>(persistedState?.config || {
         maxParallel: 3,
         delayBetweenTasks: 2000,
         autoStart: false,
         provider: 'gemini',
     });
     const [activeTab, setActiveTab] = useState<Tab>('tasks');
-    const [stats, setStats] = useState({
+    const [stats, setStats] = useState(persistedState?.stats || {
         completed: 0,
         failed: 0,
         totalTime: 0,
@@ -85,6 +99,25 @@ export function useAutomationEngine() {
     const runningRef = useRef(false);
     const tasksRef = useRef<AutomationTask[]>([]);
     const activeTasksRef = useRef<Set<string>>(new Set());
+
+    // Persist state to localStorage whenever it changes
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        try {
+            // Mark any 'running' tasks as 'paused' when persisting (since we can't resume mid-API call)
+            const tasksToSave = tasks.map(t =>
+                t.status === 'running' ? { ...t, status: 'paused' as TaskStatus } : t
+            );
+            localStorage.setItem('automation_state', JSON.stringify({
+                tasks: tasksToSave,
+                config,
+                stats,
+                savedAt: new Date().toISOString(),
+            }));
+        } catch (e) {
+            console.error('Failed to persist automation state:', e);
+        }
+    }, [tasks, config, stats]);
 
     // Keep refs in sync
     useEffect(() => {
