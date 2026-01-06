@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Card, Button, StatusBadge } from '@/components/ui';
 import { targetColleges } from '@/lib/colleges-data';
-import { activityStorage, profileStorage, Activity } from '@/lib/storage';
+import { useS3Storage } from '@/lib/useS3Storage';
 import {
     Map,
     Target,
@@ -16,6 +16,19 @@ import {
     RefreshCw
 } from 'lucide-react';
 import Link from 'next/link';
+
+// Activity type from Document Hub
+interface ActivityItem {
+    id: string;
+    name: string;
+    role: string;
+    organization: string;
+    startDate: string;
+    endDate: string;
+    description: string;
+    hoursPerWeek: number;
+    weeksPerYear: number;
+}
 
 // Default profile - will be overwritten by loaded data
 const defaultProfile = {
@@ -106,51 +119,41 @@ function getCategory(score: number, acceptanceRate: number): Category {
 export default function StrengthMapPage() {
     const [sortBy, setSortBy] = useState<'score' | 'name' | 'deadline'>('score');
     const [filterCategory, setFilterCategory] = useState<Category | 'all'>('all');
-    const [userProfile, setUserProfile] = useState(defaultProfile);
-    const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
     const [isRefreshing, setIsRefreshing] = useState(false);
 
-    // Load activities from storage
-    const loadUserData = useCallback(() => {
-        const activities = activityStorage.loadActivities();
-        const profile = profileStorage.loadProfile();
+    // Load activities from S3 storage (same source as Document Hub)
+    const {
+        data: activities,
+        isLoading: activitiesLoading,
+        refresh: refreshActivities,
+    } = useS3Storage<ActivityItem[]>('activities', { defaultValue: [] });
 
-        // Extract activity names and skills
-        const activityNames = activities.map((a: Activity) => a.name);
-        const allSkills = activities.flatMap((a: Activity) => a.skills || []);
-        const uniqueSkills = [...new Set(allSkills)];
+    // Build user profile from activities
+    const userProfile = useMemo(() => {
+        const activityNames = activities.map(a => a.name);
+        const allDescriptions = activities.map(a => a.description).join(' ');
 
-        setUserProfile({
-            gpa: profile?.gpa || 3.90,
-            major: profile?.major || 'Computer Science',
-            skills: uniqueSkills.length > 0 ? uniqueSkills : defaultProfile.skills,
-            activities: activityNames.length > 0 ? activityNames : defaultProfile.activities,
-            values: profile?.values || defaultProfile.values,
-            interests: profile?.interests || defaultProfile.interests,
+        // Extract skills from descriptions (simple keyword extraction)
+        const skillKeywords = ['python', 'java', 'research', 'data', 'analysis', 'leadership', 'programming', 'machine learning', 'ai', 'statistics'];
+        const foundSkills = skillKeywords.filter(skill =>
+            allDescriptions.toLowerCase().includes(skill)
+        );
+
+        return {
+            gpa: 3.90,
+            major: 'Computer Science',
+            skills: foundSkills.length > 0 ? foundSkills : defaultProfile.skills,
+            activities: activityNames,
+            values: defaultProfile.values,
+            interests: defaultProfile.interests,
             experience: activityNames,
-        });
-        setLastRefresh(new Date());
-    }, []);
-
-    // Initial load
-    useEffect(() => {
-        loadUserData();
-    }, [loadUserData]);
-
-    // Auto-refresh every 30 minutes
-    useEffect(() => {
-        const interval = setInterval(() => {
-            console.log('Auto-refreshing strength map data...');
-            loadUserData();
-        }, 30 * 60 * 1000); // 30 minutes
-
-        return () => clearInterval(interval);
-    }, [loadUserData]);
+        };
+    }, [activities]);
 
     // Manual refresh
     const handleRefresh = async () => {
         setIsRefreshing(true);
-        loadUserData();
+        refreshActivities();
         // Also trigger intelligence scraper
         try {
             await fetch('/api/intelligence?action=all');
