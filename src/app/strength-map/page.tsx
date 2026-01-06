@@ -210,12 +210,10 @@ export default function StrengthMapPage() {
         setTimeout(() => setIsRefreshing(false), 1000);
     };
 
-    // Reset all AI analyses and re-evaluate
+    // Refresh AI analyses display (does NOT delete data)
     const handleResetAnalyses = async () => {
         setIsResetting(true);
-        // Clear all stored match analyses
-        matchAnalysisStorage.clearAllAnalyses();
-        // Trigger version update to re-fetch
+        // Trigger version update to re-fetch from storage
         setAnalysisVersion(v => v + 1);
         setTimeout(() => setIsResetting(false), 500);
     };
@@ -296,7 +294,7 @@ export default function StrengthMapPage() {
                     disabled={isResetting}
                     icon={<RefreshCw className={`w-4 h-4 ${isResetting ? 'animate-spin' : ''}`} />}
                 >
-                    {isResetting ? 'Resetting...' : `Reset All Scores (${Object.keys(aiAnalyses).length})`}
+                    {isResetting ? 'Refreshing...' : `Refresh (${aiAnalyses.length})`}
                 </Button>
             </div>
 
