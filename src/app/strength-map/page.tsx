@@ -133,6 +133,11 @@ export default function StrengthMapPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isRefreshing, analysisVersion]);
 
+    // Refresh analysis data on mount (so it picks up new data when navigating back)
+    useEffect(() => {
+        setAnalysisVersion(v => v + 1);
+    }, []);
+
     // Load activities from S3 storage (same source as Document Hub)
     const {
         data: activities,
