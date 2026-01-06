@@ -121,9 +121,9 @@ export function useAutomationEngine() {
 
     // Process a single task with GENERATE -> REVIEW -> IMPROVE loop
     const processTask = useCallback(async (task: AutomationTask) => {
-        // Target score for essay acceptance
-        const TARGET_SCORE = 75;
-        const MAX_ITERATIONS = 3;
+        // Target score for essay acceptance (Raising to 90% for Elite Quality)
+        const TARGET_SCORE = 90;
+        const MAX_ITERATIONS = 5;
 
         // Update task status
         setTasks(prev => prev.map(t =>
