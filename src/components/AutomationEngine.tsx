@@ -662,6 +662,22 @@ export function AutomationDashboard() {
                             </motion.button>
                         )}
 
+                        {failedCount > 0 && (
+                            <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => {
+                                    retryFailed();
+                                    toast.info(`🔄 Retrying ${failedCount} failed essays...`);
+                                    if (!isRunning) start();
+                                }}
+                                className="px-4 py-2 rounded-xl font-medium"
+                                style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--error)' }}
+                            >
+                                Retry Failed ({failedCount})
+                            </motion.button>
+                        )}
+
                         <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}

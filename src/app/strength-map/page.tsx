@@ -473,8 +473,10 @@ export default function StrengthMapPage() {
                                             <ul className="space-y-1">
                                                 {college.gaps.length > 0 ? college.gaps.slice(0, 2).map((g, i) => (
                                                     <li key={i} className="text-sm" style={{ color: 'var(--text-secondary)' }}>• {g}</li>
-                                                )) : (
-                                                    <li className="text-sm" style={{ color: 'var(--text-secondary)' }}>• Focus on essay quality</li>
+                                                )) : college.isVerified ? (
+                                                    <li className="text-sm" style={{ color: 'var(--text-secondary)' }}>• Essay meets quality threshold!</li>
+                                                ) : (
+                                                    <li className="text-sm" style={{ color: 'var(--text-muted)' }}>• Run AI Automate to get feedback</li>
                                                 )}
                                             </ul>
                                             {college.aiAnalysis?.oneThingToFix && (
