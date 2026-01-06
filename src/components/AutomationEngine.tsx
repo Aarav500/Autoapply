@@ -112,6 +112,25 @@ export function useAutomationEngine() {
         sortedColleges.forEach((college, index) => {
             college.essays.forEach((essay) => {
                 const existingEssay = essayStorage.loadEssay(college.id, essay.id);
+                const existingAnalysis = matchAnalysisStorage.loadAnalysis(college.id);
+
+                // Skip essays that already have 85%+ score
+                if (existingAnalysis && existingAnalysis.overallScore >= 85) {
+                    console.log(`✅ Skipping ${college.name} - already at ${existingAnalysis.overallScore}%`);
+                    newTasks.push({
+                        id: essay.id,
+                        type: 'improve',
+                        collegeId: college.id,
+                        collegeName: college.name,
+                        essayPrompt: essay.prompt,
+                        status: 'completed',
+                        progress: 100,
+                        priority: index + 1,
+                        result: `Already at ${existingAnalysis.overallScore}% - skipped`,
+                    });
+                    return; // Skip to next essay
+                }
+
                 newTasks.push({
                     id: essay.id,
                     type: existingEssay ? 'improve' : 'generate',
@@ -125,8 +144,16 @@ export function useAutomationEngine() {
             });
         });
 
+        // Count skipped vs pending
+        const skipped = newTasks.filter(t => t.status === 'completed').length;
+        const pending = newTasks.filter(t => t.status === 'pending').length;
+
         setTasks(newTasks);
-        toast.info(`Created ${newTasks.length} essay tasks sorted by deadline`);
+        if (skipped > 0) {
+            toast.info(`Created ${pending} tasks (${skipped} already at 85%+ skipped)`);
+        } else {
+            toast.info(`Created ${newTasks.length} essay tasks sorted by deadline`);
+        }
         return newTasks;
     }, []);
 
@@ -136,6 +163,19 @@ export function useAutomationEngine() {
         const TARGET_SCORE = 85;
         // Reduced max iterations to save API costs (most gains happen in 1-2 iterations)
         const MAX_ITERATIONS = 3;
+
+        // Early exit: Check if essay already has high score
+        const existingAnalysis = matchAnalysisStorage.loadAnalysis(task.collegeId);
+        if (existingAnalysis && existingAnalysis.overallScore >= TARGET_SCORE) {
+            console.log(`✅ Early exit: ${task.collegeName} already at ${existingAnalysis.overallScore}%`);
+            setTasks(prev => prev.map(t =>
+                t.id === task.id
+                    ? { ...t, status: 'completed' as TaskStatus, progress: 100, result: `Already at ${existingAnalysis.overallScore}%` }
+                    : t
+            ));
+            setStats(prev => ({ ...prev, completed: prev.completed + 1 }));
+            return;
+        }
 
         // Update task status
         setTasks(prev => prev.map(t =>
