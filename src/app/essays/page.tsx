@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, Button, StatusBadge, Input, ProgressBar } from '@/components/ui';
 import { CountdownTimer } from '@/components/CountdownTimer';
 import { targetColleges, getTimeUntilDeadline } from '@/lib/colleges-data';
-import { useS3Storage } from '@/lib/useS3Storage';
+import { essayStorage } from '@/lib/storage';
 import {
     FileText,
     Plus,
@@ -18,28 +18,50 @@ import {
     TrendingUp,
     GraduationCap,
     MapPin,
-    ExternalLink
+    ExternalLink,
+    RefreshCw
 } from 'lucide-react';
 import Link from 'next/link';
 
 type FilterType = 'all' | 'completed' | 'in-progress' | 'not-started';
 type SortType = 'deadline' | 'name' | 'progress';
 
-// Type for essay progress data stored in S3
-interface EssayProgressData {
-    [collegeId: string]: { completed: number };
-}
+// Track which essays are completed based on essayStorage
 
 export default function EssaysPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [filter, setFilter] = useState<FilterType>('all');
     const [sortBy, setSortBy] = useState<SortType>('deadline');
+    const [essayProgress, setEssayProgress] = useState<Record<string, number>>({});
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
-    // Load essay progress from persistent storage (replaces hardcoded mock data)
-    const { data: essayProgress, isLoading: progressLoading } = useS3Storage<EssayProgressData>(
-        'essay-progress',
-        { defaultValue: {} }
-    );
+    // Load saved essays from essayStorage and count completed per college
+    const loadEssayProgress = () => {
+        setIsRefreshing(true);
+        const progress: Record<string, number> = {};
+
+        // Get all saved essays from essayStorage
+        const savedEssays = essayStorage.getAllEssays();
+
+        // Group by college and count completed
+        targetColleges.forEach(college => {
+            const collegeEssays = savedEssays.filter(e => e.collegeId === college.id);
+            progress[college.id] = collegeEssays.length;
+        });
+
+        setEssayProgress(progress);
+        setIsRefreshing(false);
+        console.log('📊 Loaded essay progress:', progress);
+    };
+
+    // Load progress on mount and set up auto-refresh
+    useEffect(() => {
+        loadEssayProgress();
+
+        // Refresh every 5 seconds to pick up automation updates
+        const interval = setInterval(loadEssayProgress, 5000);
+        return () => clearInterval(interval);
+    }, []);
 
     const containerVariants = {
         hidden: { opacity: 0 },
@@ -57,10 +79,10 @@ export default function EssaysPage() {
     const collegesWithProgress = useMemo(() => {
         return targetColleges.map(college => ({
             ...college,
-            completed: essayProgress[college.id]?.completed || 0,
+            completed: essayProgress[college.id] || 0,
             total: college.essays.length,
         }));
-    }, []);
+    }, [essayProgress]);
 
     const getStatus = (college: typeof collegesWithProgress[0]) => {
         if (college.completed === college.total) return 'completed';
