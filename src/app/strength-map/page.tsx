@@ -128,9 +128,19 @@ export default function StrengthMapPage() {
         refresh: refreshActivities,
     } = useS3Storage<ActivityItem[]>('activities', { defaultValue: [] });
 
-    // Build user profile from activities
+    // Load achievements from S3 storage
+    const {
+        data: achievements,
+        isLoading: achievementsLoading,
+        refresh: refreshAchievements,
+    } = useS3Storage<{ id: string; title: string; org: string; date: string }[]>('achievements', { defaultValue: [] });
+
+    const isLoading = activitiesLoading || achievementsLoading;
+
+    // Build user profile from activities and achievements
     const userProfile = useMemo(() => {
         const activityNames = activities.map(a => a.name);
+        const achievementTitles = achievements.map(a => a.title);
         const allDescriptions = activities.map(a => a.description).join(' ');
 
         // Extract skills from descriptions (simple keyword extraction)
@@ -144,16 +154,18 @@ export default function StrengthMapPage() {
             major: 'Computer Science',
             skills: foundSkills.length > 0 ? foundSkills : defaultProfile.skills,
             activities: activityNames,
+            achievements: achievementTitles,
             values: defaultProfile.values,
             interests: defaultProfile.interests,
             experience: activityNames,
         };
-    }, [activities]);
+    }, [activities, achievements]);
 
     // Manual refresh
     const handleRefresh = async () => {
         setIsRefreshing(true);
         refreshActivities();
+        refreshAchievements();
         // Also trigger intelligence scraper
         try {
             await fetch('/api/intelligence?action=all');
@@ -228,19 +240,38 @@ export default function StrengthMapPage() {
             <Card style={{ background: 'var(--gradient-primary)' }}>
                 <div className="flex items-center justify-between">
                     <div>
-                        <h3 className="text-xl font-bold text-white mb-2">Your Profile</h3>
-                        <div className="flex gap-4 text-white/80">
-                            <span>GPA: {userProfile.gpa}</span>
-                            <span>•</span>
-                            <span>{userProfile.major}</span>
-                            <span>•</span>
-                            <span>{userProfile.activities.length} Activities</span>
+                        <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-xl font-bold text-white">Your Profile</h3>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleRefresh}
+                                disabled={isRefreshing || isLoading}
+                                className="text-white/80 hover:text-white"
+                            >
+                                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                            </Button>
                         </div>
-                        <div className="flex flex-wrap gap-2 mt-3">
-                            {userProfile.values.map(v => (
-                                <span key={v} className="px-2 py-1 rounded-full text-xs bg-white/20 text-white">{v}</span>
-                            ))}
-                        </div>
+                        {isLoading ? (
+                            <p className="text-white/80">Loading your data...</p>
+                        ) : (
+                            <>
+                                <div className="flex gap-4 text-white/80">
+                                    <span>GPA: {userProfile.gpa}</span>
+                                    <span>•</span>
+                                    <span>{userProfile.major}</span>
+                                    <span>•</span>
+                                    <span>{userProfile.activities.length} Activities</span>
+                                    <span>•</span>
+                                    <span>{userProfile.achievements?.length || 0} Achievements</span>
+                                </div>
+                                <div className="flex flex-wrap gap-2 mt-3">
+                                    {userProfile.values.map(v => (
+                                        <span key={v} className="px-2 py-1 rounded-full text-xs bg-white/20 text-white">{v}</span>
+                                    ))}
+                                </div>
+                            </>
+                        )}
                     </div>
                     <div className="text-center">
                         <div className="text-5xl font-bold text-white">{stats.avgScore}%</div>
