@@ -100,9 +100,9 @@ export function useAutomationEngine() {
         );
 
         sortedColleges.forEach((college, index) => {
-            college.essays.forEach((essay, promptIndex) => {
+            college.essays.forEach((essay) => {
                 newTasks.push({
-                    id: `${college.id}-${promptIndex}`,
+                    id: essay.id,  // Use actual essay ID from college data (e.g., 'umich-1')
                     type: 'generate',
                     collegeId: college.id,
                     collegeName: college.name,
