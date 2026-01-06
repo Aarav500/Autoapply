@@ -310,7 +310,9 @@ export default function StrengthMapPage() {
             // Overlay AI insights if available
             const finalScore = aiMatch ? aiMatch.overallScore : match.score;
             const finalStrengths = aiMatch && aiMatch.strengths.length > 0 ? aiMatch.strengths : match.strengths;
-            const finalGaps = aiMatch && aiMatch.improvements.length > 0 ? aiMatch.improvements : match.gaps;
+            const finalGaps = aiMatch
+                ? (aiMatch.improvements.length > 0 ? aiMatch.improvements : aiMatch.suggestions)
+                : match.gaps;
 
             return {
                 ...college,
