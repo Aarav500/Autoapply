@@ -19,15 +19,15 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-// Sample user profile - would come from documents/activities
+// Real user profile - Aarav Nikhil Shah @ UC Riverside, Bourns College of Engineering
 const userProfile = {
-    gpa: 3.85,
+    gpa: 3.90,
     major: 'Computer Science',
-    skills: ['Python', 'Machine Learning', 'Leadership', 'Research', 'Public Speaking'],
-    activities: ['AI Research', 'Coding Club President', 'Tech Startup Intern', 'Volunteer Tutoring', 'Robotics Team'],
-    values: ['Innovation', 'Collaboration', 'Impact', 'Leadership'],
-    interests: ['AI/ML', 'Entrepreneurship', 'Education', 'Robotics'],
-    experience: ['Research', 'Leadership', 'Professional Work', 'Community Service'],
+    skills: ['Python', 'Data Science', 'Statistical Analysis', 'Programming', 'Research', 'Academic Writing'],
+    activities: ['ARIMA Time Series Research Paper (Published)', 'CS Coursework Projects', 'Data Science Analysis', 'Engineering Program'],
+    values: ['Innovation', 'Research', 'Technical Excellence', 'Impact'],
+    interests: ['AI/ML', 'Data Science', 'Time Series Analysis', 'Quantitative Finance', 'Research'],
+    experience: ['Published Research', 'Engineering Coursework', 'Data Analysis Projects'],
 };
 
 // Calculate match score for each college
