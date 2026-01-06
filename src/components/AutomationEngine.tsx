@@ -7,7 +7,6 @@ import {
     Loader2, Zap, Settings, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { toast } from '@/lib/error-handling';
-import { getAIConfig, generateEssay, reviewEssay, AIConfig } from '@/lib/ai-providers';
 import { essayStorage } from '@/lib/storage';
 import { targetColleges } from '@/lib/colleges-data';
 import { getFromS3 } from '@/lib/useS3Storage';
@@ -122,11 +121,6 @@ export function useAutomationEngine() {
 
     // Process a single task
     const processTask = useCallback(async (task: AutomationTask) => {
-        const aiConfig = getAIConfig();
-        if (!aiConfig) {
-            throw new Error('No AI API key configured. Please add your API key in settings.');
-        }
-
         // Update task status
         setTasks(prev => prev.map(t =>
             t.id === task.id
@@ -172,23 +166,37 @@ export function useAutomationEngine() {
             const essayInfo = college.essays.find(e => e.prompt === task.essayPrompt);
             const wordLimit = essayInfo?.wordLimit || 650;
 
-            // Generate the essay with REAL user data
-            const essay = await generateEssay(aiConfig, {
-                prompt: task.essayPrompt + (achievementContext ? `\n\n[Student Achievements: ${achievementContext}]` : ''),
-                college: {
-                    name: college.name,
-                    values: college.research.values,
-                    whatTheyLookFor: college.research.whatTheyLookFor,
-                    culture: college.research.culture,
-                    notablePrograms: college.research.notablePrograms,
-                },
-                activities: formattedActivities.length > 0 ? formattedActivities : [
-                    // Fallback if no activities loaded
-                    { name: 'No activities loaded', description: 'Please add activities in Document Hub', impact: 'N/A' }
-                ],
-                wordLimit: wordLimit,
-                tone: 'confident',
+            // Call SERVER-SIDE API (uses env vars from GitHub secrets - no client API key needed!)
+            const response = await fetch('/api/essays/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: task.essayPrompt,
+                    college: {
+                        name: college.name,
+                        values: college.research.values,
+                        whatTheyLookFor: college.research.whatTheyLookFor,
+                        culture: college.research.culture,
+                        notablePrograms: college.research.notablePrograms,
+                    },
+                    activities: formattedActivities.length > 0 ? formattedActivities : [
+                        { name: 'No activities loaded', description: 'Please add activities in Document Hub', impact: 'N/A' }
+                    ],
+                    achievements: achievementContext,
+                    wordLimit: wordLimit,
+                    tone: 'confident',
+                }),
             });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to generate essay');
+            }
+
+            const result = await response.json();
+            const essay = result.essay;
+
+            console.log(`✅ Generated essay using ${result.provider} (${result.wordCount} words)`);
 
             clearInterval(progressInterval);
 
