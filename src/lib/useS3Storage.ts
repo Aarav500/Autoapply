@@ -194,10 +194,34 @@ export async function getFromS3<T>(key: string): Promise<T | null> {
     try {
         const response = await fetch(`/api/storage?key=${encodeURIComponent(key)}`);
         if (response.ok) {
-            return await response.json();
+            const data = await response.json();
+            if (data !== null) return data;
+        }
+
+        // Fallback to localStorage
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(`s3_cache_${key}`);
+            if (cached) {
+                try {
+                    return JSON.parse(cached);
+                } catch {
+                    return null;
+                }
+            }
         }
         return null;
     } catch {
+        // Even on network error, try localStorage
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(`s3_cache_${key}`);
+            if (cached) {
+                try {
+                    return JSON.parse(cached);
+                } catch {
+                    return null;
+                }
+            }
+        }
         return null;
     }
 }

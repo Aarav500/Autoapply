@@ -146,10 +146,22 @@ export function useAutomationEngine() {
 
         console.log(`📚 Loaded ${activities.length} activities, ${achievements.length} achievements, and profile: ${userProfile?.major || 'No major'}`);
 
-        // CRITICAL: Warn if no activities loaded
+        // Handle missing activities gracefully if we have profile goals
         if (activities.length === 0) {
-            console.warn('⚠️ NO ACTIVITIES LOADED! Essays will be generic. Add activities in Document Hub.');
-            toast.error('⚠️ No activities found! Add activities in Document Hub for personalized essays.');
+            if (userProfile?.goals) {
+                console.log('📝 No activities found, but using Profile Goals for personalization.');
+                // Only toast once per session to avoid clutter
+                if (!(window as any)._hasToastedProfileInfo) {
+                    toast.info('📝 Using your Profile Goals to personalize essays (no activities found).');
+                    (window as any)._hasToastedProfileInfo = true;
+                }
+            } else {
+                console.warn('⚠️ NO ACTIVITIES OR GOALS LOADED! Essays will be generic.');
+                if (!(window as any)._hasToastedProfileError) {
+                    toast.error('⚠️ No activities or profile goals found! Add them in Document Hub for personalized essays.');
+                    (window as any)._hasToastedProfileError = true;
+                }
+            }
         }
 
         // Transform activities with DETAILED information
