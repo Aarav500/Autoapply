@@ -116,7 +116,7 @@ async function callOpenAI(apiKey: string, systemPrompt: string, userMessage: str
 export async function POST(request: NextRequest) {
     try {
         const body: EssayRequest = await request.json();
-        const { prompt, college, activities, achievements, wordLimit, tone, previousFeedback, previousDraft } = body;
+        const { prompt, college, activities, achievements, wordLimit, tone, major, goals, previousFeedback, previousDraft } = body;
 
         // Detect if this is an improvement iteration
         const isImprovement = previousFeedback && previousDraft;

@@ -30,7 +30,8 @@ import {
     Sparkles,
     Brain,
     Link,
-    ExternalLink
+    ExternalLink,
+    Target
 } from 'lucide-react';
 
 interface Document {
@@ -940,6 +941,7 @@ export default function DocumentsPage() {
                                 </Card>
                             </motion.div>
                         </motion.div>
+                    )}
                     {/* Profile Tab */}
                     {activeTab === 'profile' && (
                         <motion.div variants={containerVariants} className="space-y-6">

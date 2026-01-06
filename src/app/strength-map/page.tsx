@@ -58,8 +58,8 @@ function calculateStrengthMatch(college: typeof targetColleges[0], userProfile: 
     }
 
     // Values alignment
-    const valueMatches = college.research.values.filter(v =>
-        userProfile.values.some(uv => v.toLowerCase().includes(uv.toLowerCase()) ||
+    const valueMatches = college.research.values.filter((v: string) =>
+        userProfile.values.some((uv: string) => v.toLowerCase().includes(uv.toLowerCase()) ||
             uv.toLowerCase().includes(v.toLowerCase()))
     );
     score += valueMatches.length * 8;
@@ -87,9 +87,9 @@ function calculateStrengthMatch(college: typeof targetColleges[0], userProfile: 
     }
 
     // Skills matching
-    const traitMatches = college.research.whatTheyLookFor.filter(trait =>
-        userProfile.skills.some(s => trait.toLowerCase().includes(s.toLowerCase())) ||
-        userProfile.values.some(v => trait.toLowerCase().includes(v.toLowerCase()))
+    const traitMatches = college.research.whatTheyLookFor.filter((trait: string) =>
+        userProfile.skills.some((s: string) => trait.toLowerCase().includes(s.toLowerCase())) ||
+        userProfile.values.some((v: string) => trait.toLowerCase().includes(v.toLowerCase()))
     );
     score += traitMatches.length * 10;
     if (traitMatches.length > 0) {
@@ -284,7 +284,7 @@ export default function StrengthMapPage() {
                                     <span>{userProfile.achievements?.length || 0} Achievements</span>
                                 </div>
                                 <div className="flex flex-wrap gap-2 mt-3">
-                                    {userProfile.values.map(v => (
+                                    {userProfile.values.map((v: string) => (
                                         <span key={v} className="px-2 py-1 rounded-full text-xs bg-white/20 text-white">{v}</span>
                                     ))}
                                 </div>
