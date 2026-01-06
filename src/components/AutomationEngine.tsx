@@ -89,7 +89,7 @@ export function useAutomationEngine() {
         provider: 'gemini',
     });
     const [activeTab, setActiveTab] = useState<Tab>('tasks');
-    const [stats, setStats] = useState(persistedState?.stats || {
+    const [stats, setStats] = useState<{ completed: number; failed: number; totalTime: number }>(persistedState?.stats || {
         completed: 0,
         failed: 0,
         totalTime: 0,
