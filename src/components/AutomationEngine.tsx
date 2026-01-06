@@ -717,7 +717,7 @@ export function AutomationDashboard() {
                                 <Clock className="w-12 h-12 mb-4" />
                                 <p>No tasks in queue</p>
                                 <Button
-                                    variant="outline"
+                                    variant="secondary"
                                     className="mt-4"
                                     onClick={generateAllTasks}
                                 >
@@ -808,7 +808,7 @@ export function AutomationDashboard() {
                                 <>
                                     <div className="flex justify-end mb-2">
                                         <Button
-                                            variant="outline"
+                                            variant="secondary"
                                             size="sm"
                                             onClick={() => {
                                                 automationHistoryStorage.clearHistory();
