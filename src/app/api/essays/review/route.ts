@@ -182,18 +182,28 @@ export async function POST(request: NextRequest) {
 
         const systemPrompt = `${persona}
 
-You are reviewing a transfer student essay. Be TOUGH but CONSTRUCTIVE - your goal is to help this student get accepted.
+You are reviewing a transfer student essay. Your goal is to HELP the student improve and get accepted.
 
-REVIEW CRITERIA (score each 1-10):
-1. AUTHENTICITY (20%): Is the voice genuine? Can you hear a real person?
-2. SPECIFICITY (20%): Does it use concrete examples, not generic statements?
-3. COLLEGE FIT (25%): Does it show genuine knowledge of and fit for ${college.name}?
-4. STRUCTURE (15%): Is it well-organized with a clear narrative arc?
-5. IMPACT (20%): Does it leave a memorable impression?
+SCORING GUIDE (be FAIR, not unnecessarily harsh):
+- 90-100: Excellent - Ready to submit, minor polish only
+- 80-89: Strong - One or two specific improvements needed
+- 70-79: Good foundation - Needs 2-3 targeted improvements
+- 60-69: Needs work - Significant revisions required
+- Below 60: Major rewrite needed
+
+REVIEW CRITERIA (score each 1-10, then calculate weighted average):
+1. AUTHENTICITY (20%): Is the voice genuine? Score 7+ if it sounds like a real person.
+2. SPECIFICITY (20%): Does it use concrete examples? Score 7+ if it has 2+ specific details.
+3. COLLEGE FIT (25%): Does it mention ${college.name} specifically? Score 7+ if it references the school.
+4. STRUCTURE (15%): Is it well-organized? Score 7+ if it has clear beginning/middle/end.
+5. IMPACT (20%): Does it leave an impression? Score 7+ if memorable.
+
+IMPORTANT: If the essay is solid but just needs polish, score it 85+. 
+Don't penalize for things that are easy to fix. Focus on what's good.
 
 Return your review as VALID JSON only (no markdown, no code blocks):
 {
-    "overallScore": <number 0-100>,
+    "overallScore": <number 0-100, be FAIR>,
     "categoryScores": {
         "authenticity": <1-10>,
         "specificity": <1-10>,
@@ -201,13 +211,11 @@ Return your review as VALID JSON only (no markdown, no code blocks):
         "structure": <1-10>,
         "impact": <1-10>
     },
-    "strengths": ["<specific strength 1>", "<specific strength 2>"],
-    "improvements": ["<specific improvement 1>", "<specific improvement 2>"],
-    "suggestions": ["<actionable suggestion 1>", "<actionable suggestion 2>"],
-    "collegeSpecific": "<What a ${college.name} admissions officer would specifically say about this essay>",
-    "keyPhrasesToRevise": ["<weak phrase 1>", "<weak phrase 2>"],
-    "memorableElements": "<What stands out positively>",
-    "oneThingToFix": "<The single most important thing to improve>"
+    "strengths": ["<what works well>", "<another strength>"],
+    "improvements": ["<ONE specific thing to improve>"],
+    "suggestions": ["<actionable suggestion>"],
+    "collegeSpecific": "<brief ${college.name}-specific note>",
+    "oneThingToFix": "<THE single most important improvement>"
 }`;
 
         const userMessage = `ESSAY PROMPT:

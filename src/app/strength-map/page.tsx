@@ -124,11 +124,14 @@ export default function StrengthMapPage() {
     const [sortBy, setSortBy] = useState<'score' | 'name' | 'deadline'>('score');
     const [filterCategory, setFilterCategory] = useState<Category | 'all'>('all');
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isResetting, setIsResetting] = useState(false);
+    const [analysisVersion, setAnalysisVersion] = useState(0); // Force refresh on reset
 
-    // Load AI-driven Match Analysis
+    // Load AI-driven Match Analysis (re-fetch when analysisVersion changes)
     const aiAnalyses = useMemo(() => {
         return matchAnalysisStorage.getAllAnalyses();
-    }, [isRefreshing]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isRefreshing, analysisVersion]);
 
     // Load activities from S3 storage (same source as Document Hub)
     const {
@@ -202,6 +205,16 @@ export default function StrengthMapPage() {
         setTimeout(() => setIsRefreshing(false), 1000);
     };
 
+    // Reset all AI analyses and re-evaluate
+    const handleResetAnalyses = async () => {
+        setIsResetting(true);
+        // Clear all stored match analyses
+        matchAnalysisStorage.clearAllAnalyses();
+        // Trigger version update to re-fetch
+        setAnalysisVersion(v => v + 1);
+        setTimeout(() => setIsResetting(false), 500);
+    };
+
     const collegesWithScores = useMemo(() => {
         return targetColleges.map(college => {
             const match = calculateStrengthMatch(college, userProfile);
@@ -272,6 +285,14 @@ export default function StrengthMapPage() {
                         See how your profile matches each college
                     </p>
                 </div>
+                <Button
+                    variant="secondary"
+                    onClick={handleResetAnalyses}
+                    disabled={isResetting}
+                    icon={<RefreshCw className={`w-4 h-4 ${isResetting ? 'animate-spin' : ''}`} />}
+                >
+                    {isResetting ? 'Resetting...' : `Reset All Scores (${Object.keys(aiAnalyses).length})`}
+                </Button>
             </div>
 
             {/* Your Profile Summary */}

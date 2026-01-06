@@ -372,6 +372,11 @@ export const matchAnalysisStorage = {
             .map(k => storage.load<MatchAnalysis>(k))
             .filter((a): a is MatchAnalysis => a !== null);
     },
+
+    clearAllAnalyses() {
+        const keys = storage.getAllKeys().filter(k => k.startsWith('match_analysis_'));
+        keys.forEach(k => storage.remove(k));
+    },
 };
 
 // ============================================
