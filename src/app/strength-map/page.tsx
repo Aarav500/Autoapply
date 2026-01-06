@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { matchAnalysisStorage, MatchAnalysis, essayStorage } from '@/lib/storage';
-import { toast } from 'react-toastify';
+import { toast } from '@/lib/error-handling';
 
 // Activity type from Document Hub
 interface ActivityItem {
