@@ -5,9 +5,9 @@
 // ============================================
 
 export type ClaudeModel =
-    | 'claude-3-opus-20240229'      // Best for essays - highest quality
-    | 'claude-3-5-sonnet-20241022'  // Good for quick tasks
-    | 'claude-3-haiku-20240307';    // Fast for simple tasks
+    | 'claude-opus-4-20250514'      // Best for essays - Claude Opus 4.5
+    | 'claude-sonnet-4-20250514'    // Good for quick tasks
+    | 'claude-haiku-3-20240307';    // Fast for simple tasks
 
 export interface ClaudeConfig {
     apiKey: string;
@@ -29,7 +29,7 @@ export async function callClaude(
     apiKey: string,
     systemPrompt: string,
     messages: ClaudeMessage[],
-    model: ClaudeModel = 'claude-3-opus-20240229',
+    model: ClaudeModel = 'claude-opus-4-20250514',
     maxTokens: number = 4096
 ): Promise<string> {
     const response = await fetch(CLAUDE_API_URL, {
@@ -127,7 +127,7 @@ Write the essay now. Start directly with the opening - no titles or headers.`;
         apiKey,
         systemPrompt,
         [{ role: 'user', content: userMessage }],
-        'claude-3-opus-20240229', // OPUS for best essay quality
+        'claude-opus-4-20250514', // Claude Opus 4.5 for best essay quality
         4096
     );
 }
@@ -178,7 +178,7 @@ Rate and provide feedback. Respond with this exact JSON structure:
         apiKey,
         systemPrompt,
         [{ role: 'user', content: userMessage }],
-        'claude-3-5-sonnet-20241022', // SONNET for fast reviews
+        'claude-opus-4-20250514', // Claude Opus 4.5 for high quality reviews
         2048
     );
 
@@ -249,7 +249,7 @@ Respond with JSON:
         apiKey,
         systemPrompt,
         [{ role: 'user', content: userMessage }],
-        'claude-3-5-sonnet-20241022',
+        'claude-opus-4-20250514',
         1024
     );
 
@@ -305,7 +305,7 @@ Only include good matches. Be selective.`;
         apiKey,
         systemPrompt,
         [{ role: 'user', content: userMessage }],
-        'claude-3-5-sonnet-20241022',
+        'claude-opus-4-20250514',
         2048
     );
 
@@ -343,10 +343,10 @@ export function setClaudeApiKey(key: string): void {
     }
 }
 
-// Model recommendations
+// Model recommendations - Claude Opus 4.5 for everything
 export const MODEL_RECOMMENDATIONS = {
-    essays: 'claude-3-opus-20240229',        // Best quality, slower
-    review: 'claude-3-5-sonnet-20241022',    // Fast, good quality
-    jobMatch: 'claude-3-5-sonnet-20241022',  // Fast analysis
-    quickTasks: 'claude-3-haiku-20240307',   // Very fast, simple tasks
+    essays: 'claude-opus-4-20250514',        // Claude Opus 4.5 - best quality
+    review: 'claude-opus-4-20250514',        // Claude Opus 4.5 - high quality
+    jobMatch: 'claude-opus-4-20250514',      // Claude Opus 4.5 - quality analysis
+    quickTasks: 'claude-opus-4-20250514',    // Claude Opus 4.5 - consistent quality
 } as const;

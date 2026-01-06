@@ -161,7 +161,7 @@ async function callClaude(
     apiKey: string,
     systemPrompt: string,
     userMessage: string,
-    model: string = 'claude-3-5-sonnet-20241022'
+    model: string = 'claude-opus-4-20250514'
 ): Promise<string> {
     const response = await fetch(CLAUDE_API_URL, {
         method: 'POST',
