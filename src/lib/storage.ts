@@ -375,7 +375,7 @@ export const matchAnalysisStorage = {
 
     clearAllAnalyses() {
         const keys = storage.getAllKeys().filter(k => k.startsWith('match_analysis_'));
-        keys.forEach(k => storage.remove(k));
+        keys.forEach(k => storage.delete(k));
     },
 };
 
