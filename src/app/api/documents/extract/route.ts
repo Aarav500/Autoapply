@@ -31,6 +31,8 @@ interface ExtractionResult {
     activities: ExtractedActivity[];
     achievements: ExtractedAchievement[];
     summary?: string;
+    major?: string;
+    gpa?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -147,6 +149,8 @@ Return a JSON object with this exact structure:
   "achievements": [
     {"title": "Achievement Title", "description": "What this achievement represents", "date": "Month Year"}
   ],
+  "major": "Extracted Intended/Current Major (if found, else null)",
+  "gpa": "Extracted Cumulative GPA (if found, e.g. '3.95', else null)",
   "summary": "Brief summary of what was found in this document"
 }
 

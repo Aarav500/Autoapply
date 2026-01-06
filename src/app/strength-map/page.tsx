@@ -135,7 +135,23 @@ export default function StrengthMapPage() {
         refresh: refreshAchievements,
     } = useS3Storage<{ id: string; title: string; org: string; date: string }[]>('achievements', { defaultValue: [] });
 
-    const isLoading = activitiesLoading || achievementsLoading;
+    // Load profile from S3 storage
+    const {
+        data: profile,
+        isLoading: profileLoading,
+        refresh: refreshProfile,
+    } = useS3Storage<any>('profile', {
+        defaultValue: {
+            gpa: '3.90',
+            major: 'Computer Science',
+            targetMajor: '',
+            values: ['Innovation', 'Technical Excellence', 'Design', 'Impact'],
+            interests: ['Artificial Intelligence', 'Software Engineering', 'Robotics'],
+            goals: '',
+        }
+    });
+
+    const isLoading = activitiesLoading || achievementsLoading || profileLoading;
 
     // Build user profile from activities and achievements
     const userProfile = useMemo(() => {
@@ -150,22 +166,24 @@ export default function StrengthMapPage() {
         );
 
         return {
-            gpa: 3.90,
-            major: 'Computer Science',
-            skills: foundSkills.length > 0 ? foundSkills : defaultProfile.skills,
+            gpa: parseFloat(profile?.gpa) || 3.90,
+            major: profile?.major || 'Computer Science',
+            skills: foundSkills.length > 0 ? foundSkills : (profile?.interests || defaultProfile.skills),
             activities: activityNames,
             achievements: achievementTitles,
-            values: defaultProfile.values,
-            interests: defaultProfile.interests,
+            values: profile?.values || defaultProfile.values,
+            interests: profile?.interests || defaultProfile.interests,
             experience: activityNames,
+            goals: profile?.goals || '',
         };
-    }, [activities, achievements]);
+    }, [activities, achievements, profile]);
 
     // Manual refresh
     const handleRefresh = async () => {
         setIsRefreshing(true);
         refreshActivities();
         refreshAchievements();
+        refreshProfile();
         // Also trigger intelligence scraper
         try {
             await fetch('/api/intelligence?action=all');

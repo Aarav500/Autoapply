@@ -33,6 +33,8 @@ interface EssayRequest {
     achievements?: string;
     wordLimit: number;
     tone?: string;
+    major?: string;
+    goals?: string;
     // For improvement iterations
     previousFeedback?: string;
     previousDraft?: string;
@@ -204,6 +206,9 @@ ${prompt}
 STUDENT'S ACTIVITIES AND EXPERIENCES (use these - do NOT ask for more):
 ${activitiesContext}
 
+${major ? `STUDENT'S FIELD/MAJOR: ${major}\n` : ''}
+${goals ? `STUDENT'S GOALS: ${goals}\n` : ''}
+
 ${achievements ? `STUDENT ACHIEVEMENTS:\n${achievements}\n` : ''}
 
 PREVIOUS DRAFT:
@@ -224,6 +229,9 @@ Write the IMPROVED essay now (${wordLimit} words max):`;
 ${prompt}
 
 ${achievements ? `STUDENT ACHIEVEMENTS:\n${achievements}\n` : ''}
+
+${major ? `STUDENT'S FIELD/MAJOR: ${major}\n` : ''}
+${goals ? `STUDENT'S GOALS: ${goals}\n` : ''}
 
 STUDENT'S ACTIVITIES AND EXPERIENCES (use these - do NOT ask for more):
 ${activitiesContext}

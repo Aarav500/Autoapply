@@ -139,11 +139,12 @@ export function useAutomationEngine() {
         console.log('🔄 Loading activities and achievements from S3...');
         const rawActivities = await getFromS3<ActivityItem[]>('activities');
         const rawAchievements = await getFromS3<Achievement[]>('achievements');
+        const userProfile = await getFromS3<any>('profile');
 
         const activities = rawActivities || [];
         const achievements = rawAchievements || [];
 
-        console.log(`📚 Loaded ${activities.length} activities and ${achievements.length} achievements`);
+        console.log(`📚 Loaded ${activities.length} activities, ${achievements.length} achievements, and profile: ${userProfile?.major || 'No major'}`);
 
         // CRITICAL: Warn if no activities loaded
         if (activities.length === 0) {
@@ -206,6 +207,8 @@ export function useAutomationEngine() {
                         achievements: achievementContext,
                         wordLimit: wordLimit,
                         tone: 'confident',
+                        major: userProfile?.major,
+                        goals: userProfile?.goals,
                         // Pass previous feedback for improvement
                         previousFeedback: previousFeedback || undefined,
                         previousDraft: currentEssay || undefined,

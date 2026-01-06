@@ -61,7 +61,16 @@ interface Achievement {
     date: string;
 }
 
-type TabType = 'documents' | 'activities' | 'achievements';
+interface UserProfile {
+    gpa: string;
+    major: string;
+    targetMajor: string;
+    values: string[];
+    interests: string[];
+    goals: string;
+}
+
+type TabType = 'documents' | 'activities' | 'achievements' | 'profile';
 
 const emptyActivity: Partial<ActivityItem> = {
     name: '',
@@ -128,6 +137,22 @@ export default function DocumentsPage() {
         data: links,
         setData: setLinks,
     } = useS3Storage<LinksData>('user-links', { defaultValue: defaultLinks });
+
+    const defaultProfile: UserProfile = {
+        gpa: '3.90',
+        major: 'Computer Science',
+        targetMajor: '',
+        values: ['Innovation', 'Technical Excellence', 'Design', 'Impact'],
+        interests: ['Artificial Intelligence', 'Software Engineering', 'Robotics'],
+        goals: 'I want to transfer to a top university to deepen my knowledge in Computer Science and work on cutting-edge research.',
+    };
+
+    const {
+        data: profile,
+        setData: setProfile,
+        isLoading: profileLoading,
+        isSaving: profileSaving,
+    } = useS3Storage<UserProfile>('profile', { defaultValue: defaultProfile });
 
     const containerVariants = {
         hidden: { opacity: 0 },
@@ -295,6 +320,22 @@ export default function DocumentsPage() {
                             toast.success(`🏆 Extracted ${extraction.achievements.length} achievements from ${file.name}`);
                         }
 
+                        // Add extracted profile info
+                        if (extraction.major || extraction.gpa) {
+                            setProfile(prev => ({
+                                ...prev,
+                                major: extraction.major || prev.major,
+                                gpa: extraction.gpa || prev.gpa,
+                            }));
+                            if (extraction.major && extraction.gpa) {
+                                toast.success(`🎓 Extracted Profile: ${extraction.major} (GPA: ${extraction.gpa})`);
+                            } else if (extraction.major) {
+                                toast.success(`🎓 Extracted Major: ${extraction.major}`);
+                            } else if (extraction.gpa) {
+                                toast.success(`📈 Extracted GPA: ${extraction.gpa}`);
+                            }
+                        }
+
                         // Update document status to analyzed
                         setDocuments(prev => prev.map(doc =>
                             doc.id === docId ? { ...doc, status: 'analyzed' as const } : doc
@@ -459,8 +500,8 @@ export default function DocumentsPage() {
         doc.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const isLoading = docsLoading || activitiesLoading || achievementsLoading;
-    const isSaving = docsSaving || activitiesSaving || achievementsSaving;
+    const isLoading = docsLoading || activitiesLoading || achievementsLoading || profileLoading;
+    const isSaving = docsSaving || activitiesSaving || achievementsSaving || profileSaving;
 
     return (
         <motion.div
@@ -546,13 +587,18 @@ export default function DocumentsPage() {
                     </motion.div>
 
                     {/* Tabs */}
-                    <motion.div variants={itemVariants} className="flex gap-2">
-                        {(['documents', 'activities', 'achievements'] as TabType[]).map((tab) => (
+                    <motion.div variants={itemVariants} className="flex flex-wrap gap-2">
+                        {(['documents', 'activities', 'achievements', 'profile'] as TabType[]).map((tab) => (
                             <Button
                                 key={tab}
                                 variant={activeTab === tab ? 'primary' : 'secondary'}
                                 onClick={() => setActiveTab(tab)}
-                                icon={tab === 'documents' ? <FolderOpen className="w-4 h-4" /> : tab === 'activities' ? <Activity className="w-4 h-4" /> : <Award className="w-4 h-4" />}
+                                icon={
+                                    tab === 'documents' ? <FolderOpen className="w-4 h-4" /> :
+                                        tab === 'activities' ? <Activity className="w-4 h-4" /> :
+                                            tab === 'achievements' ? <Award className="w-4 h-4" /> :
+                                                <GraduationCap className="w-4 h-4" />
+                                }
                             >
                                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
                             </Button>
@@ -893,6 +939,80 @@ export default function DocumentsPage() {
                                     </div>
                                 </Card>
                             </motion.div>
+                        </motion.div>
+                    {/* Profile Tab */}
+                    {activeTab === 'profile' && (
+                        <motion.div variants={containerVariants} className="space-y-6">
+                            <Card>
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(20, 184, 166, 0.15)' }}>
+                                        <GraduationCap className="w-6 h-6" style={{ color: 'var(--accent-teal)' }} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold">Academic Profile</h3>
+                                        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>This information is used to personalize your essays and match you with colleges</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Cumulative GPA</label>
+                                            <Input
+                                                placeholder="e.g. 3.95"
+                                                value={profile.gpa}
+                                                onChange={(e) => setProfile(prev => ({ ...prev, gpa: e.target.value }))}
+                                                icon={<Award className="w-4 h-4" />}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Current/Intended Major</label>
+                                            <Input
+                                                placeholder="e.g. Computer Science"
+                                                value={profile.major}
+                                                onChange={(e) => setProfile(prev => ({ ...prev, major: e.target.value }))}
+                                                icon={<BookOpen className="w-4 h-4" />}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Target Transfer Major (if different)</label>
+                                            <Input
+                                                placeholder="e.g. Artificial Intelligence"
+                                                value={profile.targetMajor}
+                                                onChange={(e) => setProfile(prev => ({ ...prev, targetMajor: e.target.value }))}
+                                                icon={<Target className="w-4 h-4" />}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1">Personal Goals & Aspirations</label>
+                                            <textarea
+                                                className="input-field w-full"
+                                                rows={8}
+                                                placeholder="What do you hope to achieve by transferring? What are your long-term career goals?"
+                                                value={profile.goals}
+                                                onChange={(e) => setProfile(prev => ({ ...prev, goals: e.target.value }))}
+                                            />
+                                            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                                                💡 Mention specific research interests or career paths to help the AI write more authentically.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
+
+                            <Card className="bg-primary-500/5 border-primary-500/20">
+                                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                                    <Sparkles className="w-4 h-4 text-primary-400" />
+                                    AI Personalization Tip
+                                </h4>
+                                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                    Your GPA and Major help the AI understand your academic standing, but your **Goals** are what make your essays truly unique.
+                                    The more specific you are about your "Why", the better the AI can weave your activities into a compelling narrative for {profile.major || 'your field'}.
+                                </p>
+                            </Card>
                         </motion.div>
                     )}
                 </>
