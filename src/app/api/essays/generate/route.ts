@@ -146,8 +146,15 @@ export async function POST(request: NextRequest) {
             `Activity ${i + 1}: ${a.name}\n- Description: ${a.description}\n- Impact: ${a.impact}`
         ).join('\n\n');
 
-        // Build system prompt
+        // Calculate target word count (aim for 90% of limit to leave buffer)
+        const targetWords = Math.floor(wordLimit * 0.9);
+        const minWords = Math.floor(wordLimit * 0.75);
+
+        // Build system prompt with STRICT word limit
         const systemPrompt = `You are an expert college essay writer helping a student craft a compelling transfer application essay.
+
+⚠️ CRITICAL WORD LIMIT: You MUST write EXACTLY between ${minWords}-${wordLimit} words. NOT A SINGLE WORD MORE than ${wordLimit}. 
+Count your words carefully. Essays over the limit will be REJECTED.
 
 WRITING STYLE:
 - Write in first person with a genuine, authentic voice
@@ -155,7 +162,7 @@ WRITING STYLE:
 - Show personal growth and self-reflection
 - Avoid clichés and AI-sounding phrases
 - Be confident but not arrogant
-- Connect experiences to future goals at this specific college
+- Be CONCISE - every word must earn its place
 
 BANNED PHRASES (never use these):
 - "Ever since I was young"
@@ -174,7 +181,8 @@ Culture: ${college.culture}
 Notable programs: ${college.notablePrograms.join(', ')}
 
 TONE: ${tone || 'confident and reflective'}
-WORD LIMIT: ${wordLimit} words (MUST stay within this limit)`;
+
+STRICT WORD LIMIT: ${wordLimit} words maximum. Target: ${targetWords} words.`;
 
         const userMessage = `ESSAY PROMPT:
 ${prompt}
@@ -184,14 +192,18 @@ ${achievements ? `STUDENT ACHIEVEMENTS:\n${achievements}\n` : ''}
 STUDENT'S ACTIVITIES AND EXPERIENCES:
 ${activitiesContext}
 
-Write a complete essay that:
-1. Opens with a compelling hook (specific moment/scene)
-2. Weaves in the student's actual activities naturally
-3. Connects to ${college.name}'s specific values and programs
-4. Stays UNDER ${wordLimit} words
-5. Ends with a clear connection to future at ${college.name}
+⚠️ WORD LIMIT: MAXIMUM ${wordLimit} words. Aim for ${targetWords} words.
 
-Write the essay now:`;
+Write a CONCISE essay that:
+1. Opens with a compelling hook (specific moment/scene) - 2-3 sentences MAX
+2. Weaves in 1-2 of the student's most relevant activities
+3. Briefly connects to ${college.name}'s specific values
+4. STAYS STRICTLY UNDER ${wordLimit} words - this is NON-NEGOTIABLE
+5. Ends with ONE sentence connecting to future at ${college.name}
+
+COUNT YOUR WORDS BEFORE RESPONDING. If over ${wordLimit}, CUT content immediately.
+
+Write the essay now (${wordLimit} words max):`;
 
         // Call the AI
         let essay: string;
@@ -203,12 +215,44 @@ Write the essay now:`;
             essay = await callOpenAI(apiKey, systemPrompt, userMessage);
         }
 
-        console.log(`✅ Generated essay (${essay.split(/\s+/).length} words) using ${provider}`);
+        // POST-PROCESSING: Trim essay if it exceeds word limit
+        let words = essay.split(/\s+/).filter(w => w.length > 0);
+        if (words.length > wordLimit) {
+            console.log(`⚠️ Essay was ${words.length} words, trimming to ${wordLimit}...`);
+
+            // Find the last complete sentence within the word limit
+            const trimmedWords = words.slice(0, wordLimit);
+            let trimmedText = trimmedWords.join(' ');
+
+            // Find the last sentence ending
+            const sentenceEndings = ['.', '!', '?'];
+            let lastSentenceEnd = -1;
+
+            for (let i = trimmedText.length - 1; i >= 0; i--) {
+                if (sentenceEndings.includes(trimmedText[i])) {
+                    lastSentenceEnd = i;
+                    break;
+                }
+            }
+
+            // If we found a sentence ending in the last 50 characters, cut there
+            if (lastSentenceEnd > trimmedText.length - 100) {
+                essay = trimmedText.slice(0, lastSentenceEnd + 1);
+            } else {
+                // Otherwise just cut at word limit
+                essay = trimmedText;
+            }
+
+            words = essay.split(/\s+/).filter(w => w.length > 0);
+            console.log(`✂️ Trimmed essay to ${words.length} words`);
+        }
+
+        console.log(`✅ Generated essay (${words.length} words) using ${provider}`);
 
         return NextResponse.json({
             essay,
             provider,
-            wordCount: essay.split(/\s+/).length,
+            wordCount: words.length,
         });
 
     } catch (error) {
