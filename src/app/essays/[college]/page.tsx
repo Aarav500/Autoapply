@@ -214,82 +214,100 @@ export default function CollegeEssayPage() {
 
         setIsReviewing(true);
         const textToReview = content || essayContent;
-        const words = textToReview.trim().split(/\s+/).length;
-        const wordLimit = selectedPrompt.wordLimit;
 
-        // Simulate review delay
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        if (textToReview.trim().length < 50) {
+            toast.error('Please write more before requesting a review');
+            setIsReviewing(false);
+            return;
+        }
+
+        toast.info(`🔍 Reviewing essay as a ${college.name} admissions counselor...`);
 
         try {
-            // Calculate confidence based on various factors
-            let score = 50;
+            // Call server-side AI review API
+            const response = await fetch('/api/essays/review', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    essay: textToReview,
+                    prompt: selectedPrompt.prompt,
+                    college: {
+                        name: college.name,
+                        fullName: college.fullName,
+                        values: college.research.values,
+                        whatTheyLookFor: college.research.whatTheyLookFor,
+                        culture: college.research.culture,
+                        notablePrograms: college.research.notablePrograms,
+                    },
+                    wordLimit: selectedPrompt.wordLimit,
+                }),
+            });
 
-            // Word count scoring
-            if (words >= wordLimit * 0.9 && words <= wordLimit) {
-                score += 20; // Good word count
-            } else if (words >= wordLimit * 0.7) {
-                score += 10; // Acceptable word count
+            if (!response.ok) {
+                throw new Error('Review failed');
             }
 
-            // Check for college name mentions
-            if (textToReview.toLowerCase().includes(college.name.toLowerCase())) {
-                score += 10;
-            }
+            const review = await response.json();
 
-            // Check for specific details (longer sentences indicate more detail)
-            const avgSentenceLength = words / (textToReview.split(/[.!?]+/).length || 1);
-            if (avgSentenceLength > 15 && avgSentenceLength < 25) {
-                score += 10;
-            }
+            setConfidence(review.overallScore || 50);
 
-            // Cap at 95
-            score = Math.min(score, 95);
-
-            setConfidence(score);
-
+            // Convert review to feedback format
             const aiFeedback: Feedback[] = [];
 
-            if (words < wordLimit * 0.9) {
-                aiFeedback.push({
-                    type: 'improvement',
-                    text: `Essay is ${wordLimit - words} words short of the limit. Add more specific examples.`
-                });
-            }
-            if (words > wordLimit) {
-                aiFeedback.push({
-                    type: 'improvement',
-                    text: `Essay is ${words - wordLimit} words over the limit. Consider condensing.`
-                });
-            }
-            if (!textToReview.toLowerCase().includes(college.name.toLowerCase())) {
-                aiFeedback.push({
-                    type: 'suggestion',
-                    text: `Consider mentioning ${college.name} directly to show specific interest.`
-                });
-            }
-            if (score >= 80) {
-                aiFeedback.push({
-                    type: 'strength',
-                    text: 'Good essay structure and length!'
+            // Add strengths
+            if (review.strengths) {
+                review.strengths.slice(0, 2).forEach((s: string) => {
+                    aiFeedback.push({ type: 'strength', text: s });
                 });
             }
 
-            setFeedback(aiFeedback.slice(0, 6));
-            toast.success(`📊 Essay scored ${score}% confidence`);
+            // Add improvements
+            if (review.improvements) {
+                review.improvements.slice(0, 2).forEach((i: string) => {
+                    aiFeedback.push({ type: 'improvement', text: i });
+                });
+            }
+
+            // Add suggestions
+            if (review.suggestions) {
+                review.suggestions.slice(0, 2).forEach((s: string) => {
+                    aiFeedback.push({ type: 'suggestion', text: s });
+                });
+            }
+
+            // Add college-specific feedback as a special suggestion
+            if (review.collegeSpecific) {
+                aiFeedback.push({
+                    type: 'suggestion',
+                    text: `${college.name} Counselor: ${review.collegeSpecific}`
+                });
+            }
+
+            // Add the one thing to fix
+            if (review.oneThingToFix) {
+                aiFeedback.push({
+                    type: 'improvement',
+                    text: `Priority Fix: ${review.oneThingToFix}`
+                });
+            }
+
+            setFeedback(aiFeedback.slice(0, 8));
+            toast.success(`📊 ${college.name} counselor scored essay: ${review.overallScore}%`);
 
             // Save version
             setVersions(prev => [...prev, {
                 id: prev.length + 1,
                 content: textToReview,
-                confidence: score,
+                confidence: review.overallScore || 50,
                 timestamp: new Date(),
             }]);
         } catch (error) {
             console.error('Review error:', error);
-            setConfidence(60);
+            toast.error('Review failed. Please try again.');
+            setConfidence(50);
             setFeedback([{
                 type: 'suggestion',
-                text: 'Continue refining your essay for better results.',
+                text: 'Review could not be completed. Please try again.',
             }]);
         } finally {
             setIsReviewing(false);
