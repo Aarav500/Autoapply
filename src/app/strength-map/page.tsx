@@ -19,7 +19,8 @@ import {
     Zap
 } from 'lucide-react';
 import Link from 'next/link';
-import { matchAnalysisStorage, MatchAnalysis } from '@/lib/storage';
+import { matchAnalysisStorage, MatchAnalysis, essayStorage } from '@/lib/storage';
+import { toast } from 'react-toastify';
 
 // Activity type from Document Hub
 interface ActivityItem {
@@ -218,6 +219,77 @@ export default function StrengthMapPage() {
         setTimeout(() => setIsResetting(false), 500);
     };
 
+    // Analyze existing essays from essayStorage
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const analyzeExistingEssays = async () => {
+        setIsAnalyzing(true);
+        let analyzed = 0;
+        let errors = 0;
+
+        for (const college of targetColleges) {
+            // Check if we already have analysis for this college
+            const existingAnalysis = matchAnalysisStorage.loadAnalysis(college.id);
+            if (existingAnalysis) {
+                analyzed++;
+                continue; // Skip if already analyzed
+            }
+
+            // Get the first essay for this college
+            const essay = college.essays[0];
+            if (!essay) continue;
+
+            // Load essay from storage
+            const essayContent = essayStorage.loadEssay(college.id, essay.id);
+            if (!essayContent) continue; // No essay saved
+
+            toast.info(`🔍 Analyzing ${college.name}...`);
+
+            try {
+                const response = await fetch('/api/essays/review', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        essay: essayContent,
+                        prompt: essay.prompt,
+                        college: {
+                            name: college.name,
+                            fullName: college.fullName,
+                            values: college.research.values,
+                            whatTheyLookFor: college.research.whatTheyLookFor,
+                            culture: college.research.culture,
+                            notablePrograms: college.research.notablePrograms,
+                        },
+                        wordLimit: essay.wordLimit || 250,
+                    }),
+                });
+
+                if (response.ok) {
+                    const reviewResult = await response.json();
+                    matchAnalysisStorage.saveAnalysis(college.id, {
+                        overallScore: reviewResult.overallScore || 75,
+                        categoryScores: reviewResult.categoryScores || {},
+                        strengths: reviewResult.strengths || [],
+                        improvements: reviewResult.improvements || [],
+                        suggestions: reviewResult.suggestions || [],
+                        collegeSpecific: reviewResult.collegeSpecific || '',
+                        oneThingToFix: reviewResult.oneThingToFix || '',
+                    });
+                    analyzed++;
+                    toast.success(`✅ ${college.name}: ${reviewResult.overallScore}%`);
+                } else {
+                    errors++;
+                }
+            } catch (err) {
+                console.error(`Failed to analyze ${college.name}:`, err);
+                errors++;
+            }
+        }
+
+        setAnalysisVersion(v => v + 1); // Refresh display
+        setIsAnalyzing(false);
+        toast.info(`✨ Done! Analyzed ${analyzed} essays (${errors} errors)`);
+    };
+
     const collegesWithScores = useMemo(() => {
         return targetColleges.map(college => {
             const match = calculateStrengthMatch(college, userProfile);
@@ -288,14 +360,24 @@ export default function StrengthMapPage() {
                         See how your profile matches each college
                     </p>
                 </div>
-                <Button
-                    variant="secondary"
-                    onClick={handleResetAnalyses}
-                    disabled={isResetting}
-                    icon={<RefreshCw className={`w-4 h-4 ${isResetting ? 'animate-spin' : ''}`} />}
-                >
-                    {isResetting ? 'Refreshing...' : `Refresh (${aiAnalyses.length})`}
-                </Button>
+                <div className="flex gap-2">
+                    <Button
+                        variant="primary"
+                        onClick={analyzeExistingEssays}
+                        disabled={isAnalyzing}
+                        icon={<Zap className={`w-4 h-4 ${isAnalyzing ? 'animate-pulse' : ''}`} />}
+                    >
+                        {isAnalyzing ? 'Analyzing...' : 'Analyze Essays'}
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        onClick={handleResetAnalyses}
+                        disabled={isResetting}
+                        icon={<RefreshCw className={`w-4 h-4 ${isResetting ? 'animate-spin' : ''}`} />}
+                    >
+                        {isResetting ? 'Refreshing...' : `Refresh (${aiAnalyses.length})`}
+                    </Button>
+                </div>
             </div>
 
             {/* Your Profile Summary */}
