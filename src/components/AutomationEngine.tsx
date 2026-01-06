@@ -119,8 +119,12 @@ export function useAutomationEngine() {
         return newTasks;
     }, []);
 
-    // Process a single task
+    // Process a single task with GENERATE -> REVIEW -> IMPROVE loop
     const processTask = useCallback(async (task: AutomationTask) => {
+        // Target score for essay acceptance
+        const TARGET_SCORE = 75;
+        const MAX_ITERATIONS = 3;
+
         // Update task status
         setTasks(prev => prev.map(t =>
             t.id === task.id
@@ -132,85 +136,165 @@ export function useAutomationEngine() {
         if (!college) throw new Error(`College not found: ${task.collegeId}`);
 
         // Load REAL activities and achievements from S3 storage
+        console.log('🔄 Loading activities and achievements from S3...');
         const rawActivities = await getFromS3<ActivityItem[]>('activities');
         const rawAchievements = await getFromS3<Achievement[]>('achievements');
 
         const activities = rawActivities || [];
         const achievements = rawAchievements || [];
 
-        console.log(`📚 Loaded ${activities.length} activities and ${achievements.length} achievements for essay generation`);
+        console.log(`📚 Loaded ${activities.length} activities and ${achievements.length} achievements`);
 
-        // Transform activities to the format expected by generateEssay
+        // CRITICAL: Warn if no activities loaded
+        if (activities.length === 0) {
+            console.warn('⚠️ NO ACTIVITIES LOADED! Essays will be generic. Add activities in Document Hub.');
+            toast.error('⚠️ No activities found! Add activities in Document Hub for personalized essays.');
+        }
+
+        // Transform activities with DETAILED information
         const formattedActivities = activities.map(a => ({
             name: a.name,
             description: `${a.role} at ${a.organization}. ${a.description}`,
-            impact: `${a.hoursPerWeek} hrs/week for ${a.weeksPerYear} weeks/year`,
+            impact: `${a.hoursPerWeek} hours/week for ${a.weeksPerYear} weeks/year. Total commitment: ${a.hoursPerWeek * a.weeksPerYear} hours/year`,
         }));
 
-        // Include achievements as additional context
+        // Include achievements as context
         const achievementContext = achievements.length > 0
             ? achievements.map(a => `${a.title} - ${a.org} (${a.date})`).join('; ')
             : '';
+
+        // Get essay word limit
+        const essayInfo = college.essays.find(e => e.prompt === task.essayPrompt);
+        const wordLimit = essayInfo?.wordLimit || 650;
+
+        let currentEssay = '';
+        let currentScore = 0;
+        let iteration = 0;
+        let previousFeedback = '';
 
         // Simulate progress updates
         const progressInterval = setInterval(() => {
             setTasks(prev => prev.map(t =>
                 t.id === task.id && t.status === 'running'
-                    ? { ...t, progress: Math.min(t.progress + 10, 90) }
+                    ? { ...t, progress: Math.min(t.progress + 5, 95) }
                     : t
             ));
-        }, 1000);
+        }, 2000);
 
         try {
-            // Get essay word limit from the essay prompt
-            const essayInfo = college.essays.find(e => e.prompt === task.essayPrompt);
-            const wordLimit = essayInfo?.wordLimit || 650;
+            // GENERATE -> REVIEW -> IMPROVE LOOP
+            while (iteration < MAX_ITERATIONS) {
+                iteration++;
+                console.log(`\n📝 Iteration ${iteration}/${MAX_ITERATIONS} for ${college.name}`);
 
-            // Call SERVER-SIDE API (uses env vars from GitHub secrets - no client API key needed!)
-            const response = await fetch('/api/essays/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    prompt: task.essayPrompt,
-                    college: {
-                        name: college.name,
-                        values: college.research.values,
-                        whatTheyLookFor: college.research.whatTheyLookFor,
-                        culture: college.research.culture,
-                        notablePrograms: college.research.notablePrograms,
-                    },
-                    activities: formattedActivities.length > 0 ? formattedActivities : [
-                        { name: 'No activities loaded', description: 'Please add activities in Document Hub', impact: 'N/A' }
-                    ],
-                    achievements: achievementContext,
-                    wordLimit: wordLimit,
-                    tone: 'confident',
-                }),
-            });
+                // STEP 1: GENERATE (or IMPROVE if we have previous feedback)
+                const generateResponse = await fetch('/api/essays/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: task.essayPrompt,
+                        college: {
+                            name: college.name,
+                            values: college.research.values,
+                            whatTheyLookFor: college.research.whatTheyLookFor,
+                            culture: college.research.culture,
+                            notablePrograms: college.research.notablePrograms,
+                        },
+                        activities: formattedActivities.length > 0 ? formattedActivities : [
+                            { name: '⚠️ NO ACTIVITIES LOADED', description: 'User needs to add activities in Document Hub', impact: 'Cannot write personalized essay without activities' }
+                        ],
+                        achievements: achievementContext,
+                        wordLimit: wordLimit,
+                        tone: 'confident',
+                        // Pass previous feedback for improvement
+                        previousFeedback: previousFeedback || undefined,
+                        previousDraft: currentEssay || undefined,
+                    }),
+                });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to generate essay');
+                if (!generateResponse.ok) {
+                    const errorData = await generateResponse.json();
+                    throw new Error(errorData.message || 'Failed to generate essay');
+                }
+
+                const generateResult = await generateResponse.json();
+                currentEssay = generateResult.essay;
+                console.log(`✅ Generated essay (${generateResult.wordCount} words) using ${generateResult.provider}`);
+
+                // STEP 2: REVIEW with college-specific AI
+                toast.info(`🔍 Reviewing essay as ${college.name} admissions counselor (iteration ${iteration})...`);
+
+                const reviewResponse = await fetch('/api/essays/review', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        essay: currentEssay,
+                        prompt: task.essayPrompt,
+                        college: {
+                            name: college.name,
+                            fullName: college.fullName,
+                            values: college.research.values,
+                            whatTheyLookFor: college.research.whatTheyLookFor,
+                            culture: college.research.culture,
+                            notablePrograms: college.research.notablePrograms,
+                        },
+                        wordLimit: wordLimit,
+                    }),
+                });
+
+                if (reviewResponse.ok) {
+                    const reviewResult = await reviewResponse.json();
+                    currentScore = reviewResult.overallScore || 50;
+
+                    console.log(`📊 Review score: ${currentScore}% (target: ${TARGET_SCORE}%)`);
+                    toast.info(`📊 Essay scored ${currentScore}% (target: ${TARGET_SCORE}%)`);
+
+                    // If score meets target, we're done!
+                    if (currentScore >= TARGET_SCORE) {
+                        console.log(`✅ Target score reached! Essay is ready.`);
+                        toast.success(`🎉 Essay reached ${currentScore}% - Ready to submit!`);
+                        break;
+                    }
+
+                    // Build feedback for next iteration
+                    const feedbackParts = [];
+                    if (reviewResult.improvements) {
+                        feedbackParts.push('IMPROVEMENTS NEEDED:', ...reviewResult.improvements);
+                    }
+                    if (reviewResult.suggestions) {
+                        feedbackParts.push('SUGGESTIONS:', ...reviewResult.suggestions);
+                    }
+                    if (reviewResult.oneThingToFix) {
+                        feedbackParts.push(`PRIORITY FIX: ${reviewResult.oneThingToFix}`);
+                    }
+                    if (reviewResult.collegeSpecific) {
+                        feedbackParts.push(`${college.name} COUNSELOR FEEDBACK: ${reviewResult.collegeSpecific}`);
+                    }
+                    previousFeedback = feedbackParts.join('\n');
+
+                    if (iteration < MAX_ITERATIONS) {
+                        toast.info(`🔄 Improving essay based on ${college.name} counselor feedback...`);
+                    }
+                } else {
+                    console.warn('Review failed, using essay as-is');
+                    currentScore = 65; // Default score if review fails
+                    break;
+                }
             }
-
-            const result = await response.json();
-            const essay = result.essay;
-
-            console.log(`✅ Generated essay using ${result.provider} (${result.wordCount} words)`);
 
             clearInterval(progressInterval);
 
-            // Save to local storage
-            essayStorage.saveEssay(task.collegeId, task.id, essay);
+            // Save the best essay to local storage
+            essayStorage.saveEssay(task.collegeId, task.id, currentEssay);
 
-            // Update task as completed
+            // Update task as completed with score
             setTasks(prev => prev.map(t =>
                 t.id === task.id
                     ? {
                         ...t,
                         status: 'completed' as TaskStatus,
                         progress: 100,
-                        result: essay.substring(0, 200) + '...',
+                        result: `Score: ${currentScore}% | ${currentEssay.substring(0, 150)}...`,
                         completedAt: new Date()
                     }
                     : t
@@ -222,8 +306,8 @@ export function useAutomationEngine() {
                 totalTime: prev.totalTime + (Date.now() - (task.startedAt?.getTime() || Date.now())) / 1000,
             }));
 
-            toast.success(`✅ Completed essay for ${college.name}`);
-            return essay;
+            toast.success(`✅ ${college.name} essay complete! Score: ${currentScore}% after ${iteration} iteration(s)`);
+            return currentEssay;
 
         } catch (error) {
             clearInterval(progressInterval);

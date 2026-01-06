@@ -33,6 +33,9 @@ interface EssayRequest {
     achievements?: string;
     wordLimit: number;
     tone?: string;
+    // For improvement iterations
+    previousFeedback?: string;
+    previousDraft?: string;
 }
 
 // Call Claude API
@@ -111,7 +114,13 @@ async function callOpenAI(apiKey: string, systemPrompt: string, userMessage: str
 export async function POST(request: NextRequest) {
     try {
         const body: EssayRequest = await request.json();
-        const { prompt, college, activities, achievements, wordLimit, tone } = body;
+        const { prompt, college, activities, achievements, wordLimit, tone, previousFeedback, previousDraft } = body;
+
+        // Detect if this is an improvement iteration
+        const isImprovement = previousFeedback && previousDraft;
+        if (isImprovement) {
+            console.log('📝 This is an IMPROVEMENT iteration with previous feedback');
+        }
 
         // Try Claude first, then Gemini, then OpenAI
         const claudeKey = getClaudeKey();
@@ -139,7 +148,7 @@ export async function POST(request: NextRequest) {
             }, { status: 500 });
         }
 
-        console.log(`📝 Generating essay using ${provider} for ${college.name}`);
+        console.log(`📝 ${isImprovement ? 'Improving' : 'Generating'} essay using ${provider} for ${college.name}`);
 
         // Build activities context
         const activitiesContext = activities.map((a, i) =>
@@ -163,6 +172,7 @@ WRITING STYLE:
 - Avoid clichés and AI-sounding phrases
 - Be confident but not arrogant
 - Be CONCISE - every word must earn its place
+- USE THE STUDENT'S ACTUAL ACTIVITIES - do NOT ask for more information
 
 BANNED PHRASES (never use these):
 - "Ever since I was young"
@@ -184,12 +194,38 @@ TONE: ${tone || 'confident and reflective'}
 
 STRICT WORD LIMIT: ${wordLimit} words maximum. Target: ${targetWords} words.`;
 
-        const userMessage = `ESSAY PROMPT:
+        // Build user message - different for first draft vs improvement
+        let userMessage: string;
+
+        if (isImprovement) {
+            userMessage = `ESSAY PROMPT:
+${prompt}
+
+STUDENT'S ACTIVITIES AND EXPERIENCES (use these - do NOT ask for more):
+${activitiesContext}
+
+${achievements ? `STUDENT ACHIEVEMENTS:\n${achievements}\n` : ''}
+
+PREVIOUS DRAFT:
+${previousDraft}
+
+ADMISSIONS COUNSELOR FEEDBACK ON PREVIOUS DRAFT:
+${previousFeedback}
+
+⚠️ TASK: IMPROVE the essay based on the counselor's feedback above.
+- Address EVERY piece of feedback
+- Keep what works, fix what doesn't
+- STAY UNDER ${wordLimit} words
+- Make the essay stronger, more authentic, and better aligned with ${college.name}
+
+Write the IMPROVED essay now (${wordLimit} words max):`;
+        } else {
+            userMessage = `ESSAY PROMPT:
 ${prompt}
 
 ${achievements ? `STUDENT ACHIEVEMENTS:\n${achievements}\n` : ''}
 
-STUDENT'S ACTIVITIES AND EXPERIENCES:
+STUDENT'S ACTIVITIES AND EXPERIENCES (use these - do NOT ask for more):
 ${activitiesContext}
 
 ⚠️ WORD LIMIT: MAXIMUM ${wordLimit} words. Aim for ${targetWords} words.
@@ -201,9 +237,12 @@ Write a CONCISE essay that:
 4. STAYS STRICTLY UNDER ${wordLimit} words - this is NON-NEGOTIABLE
 5. Ends with ONE sentence connecting to future at ${college.name}
 
+IMPORTANT: Use the activities provided above. Do NOT ask for more information.
+
 COUNT YOUR WORDS BEFORE RESPONDING. If over ${wordLimit}, CUT content immediately.
 
 Write the essay now (${wordLimit} words max):`;
+        }
 
         // Call the AI
         let essay: string;
@@ -247,7 +286,7 @@ Write the essay now (${wordLimit} words max):`;
             console.log(`✂️ Trimmed essay to ${words.length} words`);
         }
 
-        console.log(`✅ Generated essay (${words.length} words) using ${provider}`);
+        console.log(`✅ Generated essay(${words.length} words) using ${provider}`);
 
         return NextResponse.json({
             essay,
