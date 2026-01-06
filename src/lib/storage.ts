@@ -375,7 +375,45 @@ export const matchAnalysisStorage = {
 };
 
 // ============================================
-// 7. ONLINE/OFFLINE DETECTION
+// 7. AUTOMATION HISTORY STORAGE
+// ============================================
+
+export interface AutomationLog {
+    id: string;
+    collegeId: string;
+    collegeName: string;
+    taskType: string;
+    essayPrompt: string;
+    status: 'completed' | 'failed';
+    result?: string;
+    score?: number;
+    timestamp: string;
+}
+
+export const automationHistoryStorage = {
+    addLog(log: Omit<AutomationLog, 'id' | 'timestamp'>) {
+        const history = this.getHistory();
+        const newLog: AutomationLog = {
+            ...log,
+            id: Math.random().toString(36).substr(2, 9),
+            timestamp: new Date().toISOString(),
+        };
+        // Keep last 100 logs
+        const updated = [newLog, ...history].slice(0, 100);
+        storage.save('automation_history', updated);
+    },
+
+    getHistory(): AutomationLog[] {
+        return storage.load('automation_history') || [];
+    },
+
+    clearHistory() {
+        storage.delete('automation_history');
+    }
+};
+
+// ============================================
+// 8. ONLINE/OFFLINE DETECTION
 // ============================================
 
 export function useOnlineStatus() {

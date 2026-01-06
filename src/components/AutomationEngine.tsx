@@ -7,7 +7,7 @@ import {
     Loader2, Zap, Settings, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { toast } from '@/lib/error-handling';
-import { essayStorage, matchAnalysisStorage } from '@/lib/storage';
+import { essayStorage, matchAnalysisStorage, automationHistoryStorage, AutomationLog } from '@/lib/storage';
 import { targetColleges } from '@/lib/colleges-data';
 import { getFromS3 } from '@/lib/useS3Storage';
 
@@ -58,6 +58,8 @@ export interface AutomationConfig {
     provider: 'claude' | 'gemini' | 'openai';
 }
 
+type Tab = 'tasks' | 'history';
+
 // ============================================
 // AUTOMATION ENGINE HOOK
 // ============================================
@@ -71,11 +73,13 @@ export function useAutomationEngine() {
         autoStart: false,
         provider: 'gemini',
     });
+    const [activeTab, setActiveTab] = useState<Tab>('tasks');
     const [stats, setStats] = useState({
         completed: 0,
         failed: 0,
         totalTime: 0,
     });
+    const [history, setHistory] = useState<AutomationLog[]>([]);
 
     const runningRef = useRef(false);
     const tasksRef = useRef<AutomationTask[]>([]);
@@ -90,6 +94,11 @@ export function useAutomationEngine() {
         runningRef.current = isRunning;
     }, [isRunning]);
 
+    // Load history on mount
+    useEffect(() => {
+        setHistory(automationHistoryStorage.getHistory());
+    }, []);
+
     // Generate tasks for all colleges
     const generateAllTasks = useCallback(() => {
         const newTasks: AutomationTask[] = [];
@@ -101,9 +110,10 @@ export function useAutomationEngine() {
 
         sortedColleges.forEach((college, index) => {
             college.essays.forEach((essay) => {
+                const existingEssay = essayStorage.loadEssay(college.id, essay.id);
                 newTasks.push({
-                    id: essay.id,  // Use actual essay ID from college data (e.g., 'umich-1')
-                    type: 'generate',
+                    id: essay.id,
+                    type: existingEssay ? 'improve' : 'generate',
                     collegeId: college.id,
                     collegeName: college.name,
                     essayPrompt: essay.prompt,
@@ -134,6 +144,14 @@ export function useAutomationEngine() {
 
         const college = targetColleges.find(c => c.id === task.collegeId);
         if (!college) throw new Error(`College not found: ${task.collegeId}`);
+
+        // Get AI-driven feedback from Strength Map (if available)
+        const matchAnalysis = matchAnalysisStorage.loadAnalysis(task.collegeId);
+        const strengthMapFeedback = matchAnalysis ? [
+            `STRENGTH MAP INTELLIGENCE for ${college.name}:`,
+            `- Previous Gap: ${matchAnalysis.oneThingToFix}`,
+            ...matchAnalysis.suggestions.map(s => `- Suggestion: ${s}`)
+        ].join('\n') : '';
 
         // Load REAL activities and achievements from S3 storage
         console.log('🔄 Loading activities and achievements from S3...');
@@ -176,14 +194,20 @@ export function useAutomationEngine() {
             ? achievements.map(a => `${a.title} - ${a.org} (${a.date})`).join('; ')
             : '';
 
-        // Get essay word limit
-        const essayInfo = college.essays.find(e => e.prompt === task.essayPrompt);
+        // Get essay word limit (using task.id which is the essay.id)
+        const essayInfo = college.essays.find(e => e.id === task.id) || college.essays.find(e => e.prompt === task.essayPrompt);
         const wordLimit = essayInfo?.wordLimit || 650;
 
-        let currentEssay = '';
+        // Initialize with existing essay if we're in "improve" mode or if it just exists
+        const existingDraft = essayStorage.loadEssay(task.collegeId, task.id);
+        let currentEssay = existingDraft?.content || '';
         let currentScore = 0;
         let iteration = 0;
         let previousFeedback = '';
+
+        if (existingDraft) {
+            console.log(`📝 Found existing draft for ${college.name}. Starting with perfection loop.`);
+        }
 
         // Simulate progress updates
         const progressInterval = setInterval(() => {
@@ -206,6 +230,7 @@ export function useAutomationEngine() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         prompt: task.essayPrompt,
+                        essayTitle: essayInfo?.title,
                         college: {
                             name: college.name,
                             values: college.research.values,
@@ -221,8 +246,8 @@ export function useAutomationEngine() {
                         tone: 'confident',
                         major: userProfile?.major,
                         goals: userProfile?.goals,
-                        // Pass previous feedback for improvement
-                        previousFeedback: previousFeedback || undefined,
+                        // Pass Strength Map feedback + previous loop feedback
+                        previousFeedback: [strengthMapFeedback, previousFeedback].filter(Boolean).join('\n---\n') || undefined,
                         previousDraft: currentEssay || undefined,
                     }),
                 });
@@ -312,6 +337,18 @@ export function useAutomationEngine() {
 
             // Save the best essay to local storage
             essayStorage.saveEssay(task.collegeId, task.id, currentEssay);
+
+            // Add to automation history
+            automationHistoryStorage.addLog({
+                collegeId: task.collegeId,
+                collegeName: task.collegeName,
+                taskType: task.type,
+                essayPrompt: task.essayPrompt,
+                status: 'completed',
+                result: currentEssay,
+                score: currentScore,
+            });
+            setHistory(automationHistoryStorage.getHistory());
 
             // Update task as completed with score
             setTasks(prev => prev.map(t =>
@@ -630,29 +667,186 @@ export function AutomationDashboard() {
                         Retry {failedCount} Failed Tasks
                     </motion.button>
                 )}
-            </motion.div>
 
-            {/* Task List */}
-            <div className="space-y-2">
-                <AnimatePresence>
-                    {tasks.map((task, index) => (
-                        <TaskCard key={task.id} task={task} index={index} />
-                    ))}
-                </AnimatePresence>
-
-                {tasks.length === 0 && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="text-center py-12"
-                        style={{ color: 'var(--text-muted)' }}
+                {/* Tabs */}
+                <div className="flex items-center gap-4 mt-6 border-b" style={{ borderColor: 'var(--glass-border)' }}>
+                    <button
+                        onClick={() => setActiveTab('tasks')}
+                        className={`pb-2 px-1 text-sm font-medium transition-colors relative`}
+                        style={{ color: activeTab === 'tasks' ? 'var(--primary-400)' : 'var(--text-muted)' }}
                     >
-                        <Brain className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                        <p>Click "Start All Essays" to begin automated processing</p>
-                        <p className="text-sm mt-2">AI will write all 15 college essays in parallel</p>
-                    </motion.div>
-                )}
-            </div>
+                        Active Tasks ({tasks.length})
+                        {activeTab === 'tasks' && (
+                            <motion.div
+                                layoutId="activeTab"
+                                className="absolute bottom-0 left-0 right-0 h-0.5"
+                                style={{ background: 'var(--primary-400)' }}
+                            />
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('history')}
+                        className={`pb-2 px-1 text-sm font-medium transition-colors relative`}
+                        style={{ color: activeTab === 'history' ? 'var(--primary-400)' : 'var(--text-muted)' }}
+                    >
+                        History ({history.length})
+                        {activeTab === 'history' && (
+                            <motion.div
+                                layoutId="activeTab"
+                                className="absolute bottom-0 left-0 right-0 h-0.5"
+                                style={{ background: 'var(--primary-400)' }}
+                            />
+                        )}
+                    </button>
+                </div>
+
+                {/* Main Content Area */}
+                <div className="mt-4 min-h-[400px]">
+                    {activeTab === 'tasks' ? (
+                        tasks.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-20 text-center opacity-50">
+                                <Clock className="w-12 h-12 mb-4" />
+                                <p>No tasks in queue</p>
+                                <Button
+                                    variant="outline"
+                                    className="mt-4"
+                                    onClick={generateAllTasks}
+                                >
+                                    Generate Drafts for All Deadlines
+                                </Button>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <AnimatePresence mode="popLayout">
+                                    {tasks.map((task) => (
+                                        <motion.div
+                                            key={task.id}
+                                            layout
+                                            initial={{ opacity: 0, scale: 0.95 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                            className="p-4 rounded-xl border flex items-center justify-between group"
+                                            style={{
+                                                background: task.status === 'running' ? 'rgba(91, 111, 242, 0.05)' : 'var(--bg-secondary)',
+                                                borderColor: task.status === 'running' ? 'var(--primary-400)' : 'var(--glass-border)'
+                                            }}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                                                    {task.status === 'completed' ? <CheckCircle2 className="w-5 h-5 text-green-400" /> :
+                                                        task.status === 'failed' ? <AlertCircle className="w-5 h-5 text-red-400" /> :
+                                                            task.status === 'running' ? <Loader2 className="w-5 h-5 animate-spin text-blue-400" /> :
+                                                                <Clock className="w-5 h-5 text-gray-400" />}
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-sm">{task.collegeName}</span>
+                                                        <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-white/5" style={{ color: 'var(--text-muted)' }}>
+                                                            {task.type}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs truncate max-w-[300px]" style={{ color: 'var(--text-muted)' }}>
+                                                        {task.essayPrompt}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-6">
+                                                {task.status === 'running' && (
+                                                    <div className="w-32">
+                                                        <div className="flex justify-between text-[10px] mb-1">
+                                                            <span>Progress</span>
+                                                            <span>{task.progress}%</span>
+                                                        </div>
+                                                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                                            <motion.div
+                                                                className="h-full bg-blue-500"
+                                                                initial={{ width: 0 }}
+                                                                animate={{ width: `${task.progress}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full`}
+                                                        style={{
+                                                            background: task.status === 'completed' ? 'rgba(34, 197, 94, 0.1)' :
+                                                                task.status === 'running' ? 'rgba(59, 130, 246, 0.1)' :
+                                                                    'rgba(255,255,255,0.05)',
+                                                            color: task.status === 'completed' ? '#4ade80' :
+                                                                task.status === 'running' ? '#60a5fa' :
+                                                                    'var(--text-muted)'
+                                                        }}
+                                                    >
+                                                        {task.status.toUpperCase()}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    ))}
+                                </AnimatePresence>
+                            </div>
+                        )
+                    ) : (
+                        <div className="space-y-3">
+                            {history.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-20 text-center opacity-50">
+                                    <Clock className="w-12 h-12 mb-4" />
+                                    <p>No automation history yet</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex justify-end mb-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                                automationHistoryStorage.clearHistory();
+                                                setHistory([]);
+                                            }}
+                                            className="text-[10px]"
+                                        >
+                                            Clear History
+                                        </Button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {history.map((log) => (
+                                            <div
+                                                key={log.id}
+                                                className="p-3 rounded-xl border flex items-center justify-between bg-white/5 border-white/10"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                                                        <CheckCircle2 className="w-4 h-4 text-green-400" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-bold text-xs">{log.collegeName}</span>
+                                                            {log.score && (
+                                                                <span className="text-[10px] font-bold text-green-400">
+                                                                    {log.score}% Score
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-[10px] truncate max-w-[400px]" style={{ color: 'var(--text-muted)' }}>
+                                                            {log.essayPrompt}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-[10px] text-right" style={{ color: 'var(--text-muted)' }}>
+                                                    <div>{new Date(log.timestamp).toLocaleDateString()}</div>
+                                                    <div>{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </motion.div>
         </div>
     );
 }

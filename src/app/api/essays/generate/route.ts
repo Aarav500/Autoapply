@@ -18,6 +18,7 @@ const getOpenAIKey = () => process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC
 
 interface EssayRequest {
     prompt: string;
+    essayTitle?: string;
     college: {
         name: string;
         values: string[];
@@ -116,7 +117,7 @@ async function callOpenAI(apiKey: string, systemPrompt: string, userMessage: str
 export async function POST(request: NextRequest) {
     try {
         const body: EssayRequest = await request.json();
-        const { prompt, college, activities, achievements, wordLimit, tone, major, goals, previousFeedback, previousDraft } = body;
+        const { prompt, essayTitle, college, activities, achievements, wordLimit, tone, major, goals, previousFeedback, previousDraft } = body;
 
         // Detect if this is an improvement iteration
         const isImprovement = previousFeedback && previousDraft;
@@ -200,7 +201,7 @@ STRICT WORD LIMIT: ${wordLimit} words maximum. Target: ${targetWords} words.`;
         let userMessage: string;
 
         if (isImprovement) {
-            userMessage = `ESSAY PROMPT:
+            userMessage = `ESSAY PROMPT${essayTitle ? ` (${essayTitle})` : ''}:
 ${prompt}
 
 STUDENT'S ACTIVITIES AND EXPERIENCES (use these - do NOT ask for more):
@@ -225,7 +226,7 @@ ${previousFeedback}
 
 Write the IMPROVED essay now (${wordLimit} words max):`;
         } else {
-            userMessage = `ESSAY PROMPT:
+            userMessage = `ESSAY PROMPT${essayTitle ? ` (${essayTitle})` : ''}:
 ${prompt}
 
 ${achievements ? `STUDENT ACHIEVEMENTS:\n${achievements}\n` : ''}
