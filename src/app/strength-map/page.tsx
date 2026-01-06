@@ -267,7 +267,8 @@ export default function StrengthMapPage() {
 
                 if (response.ok) {
                     const reviewResult = await response.json();
-                    matchAnalysisStorage.saveAnalysis(college.id, {
+                    const newAnalysis = {
+                        collegeId: college.id,
                         overallScore: reviewResult.overallScore || 75,
                         categoryScores: reviewResult.categoryScores || {},
                         strengths: reviewResult.strengths || [],
@@ -275,7 +276,16 @@ export default function StrengthMapPage() {
                         suggestions: reviewResult.suggestions || [],
                         collegeSpecific: reviewResult.collegeSpecific || '',
                         oneThingToFix: reviewResult.oneThingToFix || '',
+                        lastUpdated: new Date().toISOString(),
+                    };
+                    matchAnalysisStorage.saveAnalysis(college.id, newAnalysis);
+
+                    // Update state immediately so UI reflects the change
+                    setAiAnalyses(prev => {
+                        const filtered = prev.filter(a => a.collegeId !== college.id);
+                        return [...filtered, newAnalysis];
                     });
+
                     analyzed++;
                     toast.success(`✅ ${college.name}: ${reviewResult.overallScore}%`);
                 } else {
@@ -287,7 +297,6 @@ export default function StrengthMapPage() {
             }
         }
 
-        setAnalysisVersion(v => v + 1); // Refresh display
         setIsAnalyzing(false);
         toast.info(`✨ Done! Analyzed ${analyzed} essays (${errors} errors)`);
     };
