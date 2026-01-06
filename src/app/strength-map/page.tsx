@@ -127,12 +127,14 @@ export default function StrengthMapPage() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isResetting, setIsResetting] = useState(false);
     const [analysisVersion, setAnalysisVersion] = useState(0); // Force refresh on reset
+    const [aiAnalyses, setAiAnalyses] = useState<MatchAnalysis[]>([]);
 
     // Load AI-driven Match Analysis (re-fetch when analysisVersion changes)
-    const aiAnalyses = useMemo(() => {
-        return matchAnalysisStorage.getAllAnalyses();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isRefreshing, analysisVersion]);
+    useEffect(() => {
+        const analyses = matchAnalysisStorage.getAllAnalyses();
+        console.log(`🔄 Loading ${analyses.length} analyses (version ${analysisVersion})`);
+        setAiAnalyses(analyses);
+    }, [analysisVersion]);
 
     // Refresh analysis data on mount (so it picks up new data when navigating back)
     useEffect(() => {
