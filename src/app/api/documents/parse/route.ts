@@ -65,9 +65,12 @@ export async function POST(request: NextRequest) {
 }
 
 // ============================================
-// PDF EXTRACTION using pdf-parse with fallback
+// PDF EXTRACTION using pdf-parse with OCR fallback
 // ============================================
 async function extractFromPDF(buffer: Buffer): Promise<{ text: string; metadata: Record<string, unknown> }> {
+    // Import OCR utilities
+    const { isTextMeaningful, cleanAcademicPaperText, detectPDFType } = await import('@/lib/pdf-ocr');
+
     try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const pdfParse = require('pdf-parse') as (buffer: Buffer, options?: Record<string, unknown>) => Promise<{
@@ -91,23 +94,53 @@ async function extractFromPDF(buffer: Buffer): Promise<{ text: string; metadata:
 
         const data = await Promise.race([parsePromise, timeoutPromise]);
 
-        // Check if we got any usable text
-        if (!data.text || data.text.trim().length < 10) {
+        // Detect PDF type based on extracted text quality
+        const pdfType = detectPDFType(data.text, buffer.length, data.numpages);
+        console.log(`PDF type detected: ${pdfType}, pages: ${data.numpages}, text length: ${data.text.length}`);
+
+        // Check if we got meaningful text
+        if (!isTextMeaningful(data.text)) {
+            console.log('Primary extraction produced poor results, trying fallback...');
+
             // Try fallback extraction
             const fallbackText = extractTextFromPDFBuffer(buffer);
-            if (fallbackText.length > data.text.length) {
+
+            if (isTextMeaningful(fallbackText)) {
+                // Clean academic paper formatting
+                const cleanedText = cleanAcademicPaperText(fallbackText);
                 return {
-                    text: fallbackText,
-                    metadata: { pages: data.numpages, fallback: true },
+                    text: cleanedText,
+                    metadata: {
+                        pages: data.numpages,
+                        method: 'fallback',
+                        pdfType,
+                        warning: 'Used fallback extraction - some text may be missing'
+                    },
                 };
+            }
+
+            // If both methods fail, it's likely a scanned PDF
+            if (pdfType === 'scanned') {
+                throw new Error(
+                    'This appears to be a scanned PDF (image-based). ' +
+                    'Please try one of these options:\n' +
+                    '1. Use Adobe Acrobat or online tools to OCR the PDF first\n' +
+                    '2. Convert the PDF to images and upload those\n' +
+                    '3. If you have the original document, export as text-based PDF'
+                );
             }
         }
 
+        // Clean the text for academic papers
+        const cleanedText = cleanAcademicPaperText(data.text);
+
         return {
-            text: data.text,
+            text: cleanedText,
             metadata: {
                 pages: data.numpages,
                 info: data.info,
+                method: 'text-extraction',
+                pdfType,
             },
         };
     } catch (error) {
@@ -117,16 +150,29 @@ async function extractFromPDF(buffer: Buffer): Promise<{ text: string; metadata:
         try {
             const fallbackText = extractTextFromPDFBuffer(buffer);
             if (fallbackText.length > 50) {
+                const cleanedText = cleanAcademicPaperText(fallbackText);
                 return {
-                    text: fallbackText,
-                    metadata: { fallback: true, error: 'Primary parser failed' },
+                    text: cleanedText,
+                    metadata: { method: 'fallback', error: 'Primary parser failed' },
                 };
             }
         } catch (fallbackError) {
             console.error('PDF fallback also failed:', fallbackError);
         }
 
-        throw new Error('Failed to parse PDF - file may be corrupted, scanned, or password protected');
+        // Provide helpful error message
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        if (errorMessage.includes('scanned')) {
+            throw error; // Re-throw our helpful scanned PDF message
+        }
+
+        throw new Error(
+            'Failed to parse PDF. Possible reasons:\n' +
+            '• The PDF may be scanned (image-based) - try OCR first\n' +
+            '• The PDF may be password protected\n' +
+            '• The PDF may be corrupted\n' +
+            '• The PDF uses unusual encoding'
+        );
     }
 }
 
