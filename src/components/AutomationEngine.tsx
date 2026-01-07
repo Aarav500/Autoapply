@@ -565,19 +565,20 @@ export function useAutomationEngine() {
     const applyFeedbackToEssays = useCallback(async () => {
         setIsApplyingFeedback(true);
         let applied = 0;
+        let skipped = 0;
         let errors = 0;
         const essaysWithAnalysis: { college: typeof targetColleges[0]; analysis: ReturnType<typeof matchAnalysisStorage.loadAnalysis> }[] = [];
 
-        // Find essays that have analysis
+        // Find ALL essays that have analysis (not just those with improvements)
         for (const college of targetColleges) {
             const analysis = matchAnalysisStorage.loadAnalysis(college.id);
-            if (analysis && (analysis.improvements.length > 0 || analysis.suggestions.length > 0 || analysis.oneThingToFix)) {
+            if (analysis) {
                 essaysWithAnalysis.push({ college, analysis });
             }
         }
 
         setFeedbackProgress({ current: 0, total: essaysWithAnalysis.length });
-        toast.info(`🔧 Applying feedback to ${essaysWithAnalysis.length} essays...`);
+        toast.info(`🔧 Processing ${essaysWithAnalysis.length} essays with analysis...`);
 
         for (let i = 0; i < essaysWithAnalysis.length; i++) {
             const { college, analysis } = essaysWithAnalysis[i];
@@ -588,6 +589,17 @@ export function useAutomationEngine() {
 
             const essayDraft = essayStorage.loadEssay(college.id, essay.id);
             if (!essayDraft) continue;
+
+            // Check if there's actually feedback to apply
+            const hasFeedback = (analysis?.improvements?.length || 0) > 0 ||
+                (analysis?.suggestions?.length || 0) > 0 ||
+                analysis?.oneThingToFix;
+
+            if (!hasFeedback) {
+                skipped++;
+                toast.info(`⏭️ ${college.name}: No feedback to apply (already great!)`);
+                continue;
+            }
 
             toast.info(`📝 Applying feedback to ${college.name}...`);
 
@@ -627,6 +639,18 @@ export function useAutomationEngine() {
                     // Update the essay in storage
                     essayStorage.saveEssay(college.id, essay.id, result.updatedEssay);
 
+                    // Clear old analysis for this college so Strength Map will re-analyze
+                    // This ensures the feedback reflects the updated essay
+                    matchAnalysisStorage.saveAnalysis(college.id, {
+                        overallScore: analysis?.overallScore || 0,
+                        categoryScores: analysis?.categoryScores || {},
+                        strengths: analysis?.strengths || [],
+                        improvements: [],  // Clear improvements - they've been applied
+                        suggestions: [],   // Clear suggestions - they've been applied
+                        collegeSpecific: analysis?.collegeSpecific || 'Feedback has been applied. Re-run analysis to see updated assessment.',
+                        oneThingToFix: '',  // Clear - it's been fixed
+                    });
+
                     applied++;
                     toast.success(`✅ ${college.name}: Updated (${result.originalWordCount} → ${result.updatedWordCount} words)`);
                 } else {
@@ -642,7 +666,14 @@ export function useAutomationEngine() {
 
         setIsApplyingFeedback(false);
         setFeedbackProgress({ current: 0, total: 0 });
-        toast.success(`✨ Applied feedback to ${applied} essays (${errors} errors)`);
+
+        if (applied > 0) {
+            toast.success(`✨ Applied feedback to ${applied} essays! Re-run "Analyze Essays" in Strength Map to see updated scores.`);
+        } else if (skipped > 0) {
+            toast.info(`All ${skipped} essays already have great scores - no feedback to apply!`);
+        } else {
+            toast.warning(`No essays were updated (${errors} errors)`);
+        }
     }, []);
 
     return {
