@@ -397,12 +397,12 @@ export default function CollegeEssayPage() {
         }
     };
 
-    // ONE-CLICK PERFECT ESSAY - Creates the best possible version
+    // ONE-CLICK ULTIMATE ESSAY - Iteratively perfects until 95%+ with no feedback
     const handlePerfectEssay = async () => {
         if (!essayContent || !college || !selectedPrompt) return;
 
         setIsPerfecting(true);
-        toast.info('👑 Creating the PERFECT version of your essay...');
+        toast.info('🏆 Creating ULTIMATE essay (this may take a moment)...');
 
         try {
             // Prepare activities for context
@@ -412,7 +412,8 @@ export default function CollegeEssayPage() {
                 impact: `${a.hoursPerWeek * a.weeksPerYear} total hours committed`,
             }));
 
-            const response = await fetch('/api/essays/perfect', {
+            // Use the new Ultimate API that runs iterative perfection
+            const response = await fetch('/api/essays/ultimate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -431,7 +432,7 @@ export default function CollegeEssayPage() {
                 }),
             });
 
-            if (!response.ok) throw new Error('Failed to create perfect essay');
+            if (!response.ok) throw new Error('Failed to create ultimate essay');
 
             const result = await response.json();
 
@@ -443,32 +444,41 @@ export default function CollegeEssayPage() {
                 timestamp: new Date(),
             }]);
 
-            // Update essay content with perfect version
-            setEssayContent(result.perfectEssay);
+            // Update essay content with ultimate version
+            setEssayContent(result.ultimateEssay);
 
             // Save to storage
-            essayStorage.saveEssay(collegeId, selectedPromptId!, result.perfectEssay);
+            essayStorage.saveEssay(collegeId, selectedPromptId!, result.ultimateEssay);
 
-            // Set high confidence
-            setConfidence(result.confidence || 98);
+            // Set the final confidence score from the iterative process
+            setConfidence(result.finalScore || 95);
 
-            // Clear previous feedback since this is a complete rewrite
-            setFeedback([{
+            // Show remaining improvements (if any)
+            const feedbackItems: Feedback[] = [{
                 type: 'strength',
-                text: '✨ Essay perfected! This version is optimized for authenticity and college fit.',
-            }]);
+                text: `🏆 Essay perfected in ${result.iterations} iteration(s)! Final score: ${result.finalScore}%`,
+            }];
+
+            if (result.remainingImprovements && result.remainingImprovements.length > 0) {
+                result.remainingImprovements.forEach((imp: string) => {
+                    feedbackItems.push({ type: 'suggestion', text: imp });
+                });
+            } else {
+                feedbackItems.push({
+                    type: 'strength',
+                    text: '✅ No more improvements needed - essay is ready to submit!',
+                });
+            }
+
+            setFeedback(feedbackItems);
             setPreviouslyAppliedFeedback([]);
             setOneThingToFix(null);
 
-            toast.success(`👑 Perfect essay created! (${result.perfectWordCount} words)`);
-
-            // Auto-review to show the new score
-            toast.info('🔍 Scoring the perfected essay...');
-            await handleReviewEssay(result.perfectEssay);
+            toast.success(`🏆 Ultimate essay complete! Score: ${result.finalScore}% (${result.wordCount} words)`);
 
         } catch (error) {
-            console.error('Perfect essay error:', error);
-            toast.error('❌ Failed to create perfect essay');
+            console.error('Ultimate essay error:', error);
+            toast.error('❌ Failed to create ultimate essay');
         } finally {
             setIsPerfecting(false);
         }
@@ -719,7 +729,7 @@ export default function CollegeEssayPage() {
                                                 border: 'none'
                                             }}
                                         >
-                                            {isPerfecting ? 'Perfecting...' : '✨ Perfect Essay'}
+                                            {isPerfecting ? 'Perfecting (may take ~30s)...' : '🏆 Ultimate Essay'}
                                         </Button>
                                     )}
                                     <Button
