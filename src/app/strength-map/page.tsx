@@ -573,7 +573,11 @@ export default function StrengthMapPage() {
                                                 {college.gaps.length > 0 ? college.gaps.slice(0, 2).map((g, i) => (
                                                     <li key={i} className="text-sm" style={{ color: 'var(--text-secondary)' }}>• {g}</li>
                                                 )) : college.isVerified ? (
-                                                    <li className="text-sm" style={{ color: 'var(--text-secondary)' }}>• Essay meets quality threshold!</li>
+                                                    college.score >= 95 ? (
+                                                        <li className="text-sm" style={{ color: 'var(--success)' }}>• ✨ Essay is excellent! Ready to submit.</li>
+                                                    ) : (
+                                                        <li className="text-sm" style={{ color: 'var(--text-secondary)' }}>• Score: {college.score}% — needs {95 - college.score}% more to reach excellence (95%+). Re-run analysis for specific feedback.</li>
+                                                    )
                                                 ) : (
                                                     <li className="text-sm" style={{ color: 'var(--text-muted)' }}>• Run AI Automate to get feedback</li>
                                                 )}

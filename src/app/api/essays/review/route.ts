@@ -182,28 +182,33 @@ export async function POST(request: NextRequest) {
 
         const systemPrompt = `${persona}
 
-You are reviewing a transfer student essay. Your goal is to HELP the student improve and get accepted.
+You are reviewing a transfer student essay. Your goal is to HELP the student reach EXCELLENCE (95%+).
 
-SCORING GUIDE (be FAIR, not unnecessarily harsh):
-- 90-100: Excellent - Ready to submit, minor polish only
-- 80-89: Strong - One or two specific improvements needed
-- 70-79: Good foundation - Needs 2-3 targeted improvements
-- 60-69: Needs work - Significant revisions required
-- Below 60: Major rewrite needed
+SCORING GUIDE (be STRICT - excellence requires 95%+):
+- 95-100: EXCELLENT - Ready to submit, only minor word choice tweaks
+- 90-94: VERY GOOD - One small improvement to reach excellence
+- 85-89: GOOD - 2-3 specific improvements needed to reach 95%
+- 80-84: SOLID - Several areas need attention
+- Below 80: Needs significant work
+
+CRITICAL: You must ALWAYS provide at least one improvement suggestion until the essay reaches 95%+.
+Even for good essays (85-94%), identify what would push it to excellence.
 
 REVIEW CRITERIA (score each 1-10, then calculate weighted average):
-1. AUTHENTICITY (20%): Is the voice genuine? Score 7+ if it sounds like a real person.
-2. SPECIFICITY (20%): Does it use concrete examples? Score 7+ if it has 2+ specific details.
-3. COLLEGE FIT (25%): Does it mention ${college.name} specifically? Score 7+ if it references the school.
-4. STRUCTURE (15%): Is it well-organized? Score 7+ if it has clear beginning/middle/end.
-5. IMPACT (20%): Does it leave an impression? Score 7+ if memorable.
+1. AUTHENTICITY (20%): Is the voice genuine and unique? Score 9+ only if truly distinctive.
+2. SPECIFICITY (20%): Does it use concrete, vivid examples? Score 9+ if exceptionally detailed.
+3. COLLEGE FIT (25%): Does it show deep ${college.name} research? Score 9+ if highly specific references.
+4. STRUCTURE (15%): Is it perfectly crafted? Score 9+ if flawless flow.
+5. IMPACT (20%): Does it leave a lasting impression? Score 9+ if truly memorable.
 
-IMPORTANT: If the essay is solid but just needs polish, score it 85+. 
-Don't penalize for things that are easy to fix. Focus on what's good.
+IMPORTANT: 
+- Essays under 95% MUST have at least 2 improvements listed.
+- Be specific about what needs to change.
+- Generic praise without actionable feedback is not acceptable.
 
 Return your review as VALID JSON only (no markdown, no code blocks):
 {
-    "overallScore": <number 0-100, be FAIR>,
+    "overallScore": <number 0-100, 95+ means excellent>,
     "categoryScores": {
         "authenticity": <1-10>,
         "specificity": <1-10>,
@@ -211,11 +216,11 @@ Return your review as VALID JSON only (no markdown, no code blocks):
         "structure": <1-10>,
         "impact": <1-10>
     },
-    "strengths": ["<what works well>", "<another strength>"],
-    "improvements": ["<ONE specific thing to improve>"],
-    "suggestions": ["<actionable suggestion>"],
+    "strengths": ["<what works well>", "<another strength>", "<third strength>"],
+    "improvements": ["<specific improvement 1>", "<specific improvement 2>"],
+    "suggestions": ["<actionable suggestion with example>"],
     "collegeSpecific": "<brief ${college.name}-specific note>",
-    "oneThingToFix": "<THE single most important improvement>"
+    "oneThingToFix": "<THE single most impactful change to boost the score>"
 }`;
 
         const userMessage = `ESSAY PROMPT:
