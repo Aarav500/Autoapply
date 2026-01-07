@@ -248,6 +248,34 @@ Review this essay as a ${college.name} admissions officer. Be specific, be tough
             const jsonMatch = reviewText.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
                 review = JSON.parse(jsonMatch[0]);
+
+                // CRITICAL FIX: Ensure improvements exist if score < 95
+                if (review.overallScore < 95) {
+                    if (!review.improvements || review.improvements.length === 0) {
+                        review.improvements = [];
+
+                        // Synthesize improvements from category scores
+                        if (review.categoryScores) {
+                            const cats = review.categoryScores;
+                            if (cats.authenticity < 9) review.improvements.push("Authenticity: Add more personal voice and unique perspective");
+                            if (cats.specificity < 9) review.improvements.push("Specificity: Add 2-3 concrete details or data points");
+                            if (cats.collegeFit < 9) review.improvements.push(`College Fit: Mention specific ${college.name} professors or classes`);
+                            if (cats.structure < 9) review.improvements.push("Structure: Improve the flow between paragraphs");
+                            if (cats.impact < 9) review.improvements.push("Impact: Make the opening hook more memorable");
+                        }
+
+                        // If still empty, add generic but specific-sounding ones
+                        if (review.improvements.length === 0) {
+                            review.improvements.push(`Add specific details about why ${college.name} is the perfect fit`);
+                            review.improvements.push("Strengthen the connection between your past achievements and future goals");
+                        }
+                    }
+
+                    // Ensure oneThingToFix exists
+                    if (!review.oneThingToFix && review.improvements.length > 0) {
+                        review.oneThingToFix = review.improvements[0];
+                    }
+                }
             } else {
                 throw new Error('No JSON found in response');
             }
