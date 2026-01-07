@@ -639,20 +639,61 @@ export function useAutomationEngine() {
                     // Update the essay in storage
                     essayStorage.saveEssay(college.id, essay.id, result.updatedEssay);
 
-                    // Clear old analysis for this college so Strength Map will re-analyze
-                    // This ensures the feedback reflects the updated essay
-                    matchAnalysisStorage.saveAnalysis(college.id, {
-                        overallScore: analysis?.overallScore || 0,
-                        categoryScores: analysis?.categoryScores || {},
-                        strengths: analysis?.strengths || [],
-                        improvements: [],  // Clear improvements - they've been applied
-                        suggestions: [],   // Clear suggestions - they've been applied
-                        collegeSpecific: analysis?.collegeSpecific || 'Feedback has been applied. Re-run analysis to see updated assessment.',
-                        oneThingToFix: '',  // Clear - it's been fixed
-                    });
+                    // Re-analyze the updated essay to get a new score
+                    toast.info(`📊 Re-analyzing ${college.name}...`);
+                    try {
+                        const reviewResponse = await fetch('/api/essays/review', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                essay: result.updatedEssay,
+                                prompt: essay.prompt,
+                                college: {
+                                    name: college.name,
+                                    fullName: college.fullName,
+                                    values: college.research.values,
+                                    whatTheyLookFor: college.research.whatTheyLookFor,
+                                    culture: college.research.culture,
+                                    notablePrograms: college.research.notablePrograms,
+                                },
+                                wordLimit: essay.wordLimit,
+                            }),
+                        });
+
+                        if (reviewResponse.ok) {
+                            const reviewResult = await reviewResponse.json();
+                            // Save the NEW analysis with updated score
+                            matchAnalysisStorage.saveAnalysis(college.id, {
+                                overallScore: reviewResult.overallScore,
+                                categoryScores: {},
+                                strengths: reviewResult.strengths || [],
+                                improvements: reviewResult.improvements || [],
+                                suggestions: reviewResult.suggestions || [],
+                                collegeSpecific: reviewResult.collegeSpecific || '',
+                                oneThingToFix: reviewResult.improvements?.[0] || '',
+                            });
+
+                            const oldScore = analysis?.overallScore || 0;
+                            const change = reviewResult.overallScore - oldScore;
+                            const changeText = change > 0 ? `+${change}%` : change < 0 ? `${change}%` : 'same';
+                            toast.success(`✅ ${college.name}: ${oldScore}% → ${reviewResult.overallScore}% (${changeText})`);
+                        } else {
+                            // If re-analysis fails, just clear the old improvements
+                            matchAnalysisStorage.saveAnalysis(college.id, {
+                                overallScore: analysis?.overallScore || 0,
+                                categoryScores: {},
+                                strengths: analysis?.strengths || [],
+                                improvements: [],
+                                suggestions: [],
+                                collegeSpecific: 'Feedback applied. Re-analysis failed.',
+                                oneThingToFix: '',
+                            });
+                        }
+                    } catch (reviewErr) {
+                        console.error(`Re-analysis failed for ${college.name}:`, reviewErr);
+                    }
 
                     applied++;
-                    toast.success(`✅ ${college.name}: Updated (${result.originalWordCount} → ${result.updatedWordCount} words)`);
                 } else {
                     errors++;
                     toast.error(`❌ Failed to update ${college.name}`);
@@ -668,7 +709,7 @@ export function useAutomationEngine() {
         setFeedbackProgress({ current: 0, total: 0 });
 
         if (applied > 0) {
-            toast.success(`✨ Applied feedback to ${applied} essays! Re-run "Analyze Essays" in Strength Map to see updated scores.`);
+            toast.success(`✨ Applied feedback and re-analyzed ${applied} essays! Refresh Strength Map to see updated scores.`);
         } else if (skipped > 0) {
             toast.info(`All ${skipped} essays already have great scores - no feedback to apply!`);
         } else {
