@@ -292,7 +292,7 @@ export default function LinkedInPage() {
                 </div>
 
                 <div className="flex gap-3">
-                    <a href="https://linkedin.com/in/your-profile" target="_blank" rel="noopener noreferrer">
+                    <a href="https://www.linkedin.com/in/aarav-shah-9b878329a/" target="_blank" rel="noopener noreferrer">
                         <Button variant="secondary" icon={<Globe className="w-4 h-4" />}>
                             View Profile
                         </Button>
