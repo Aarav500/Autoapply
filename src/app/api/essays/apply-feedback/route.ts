@@ -95,18 +95,20 @@ export async function POST(request: NextRequest) {
 
         console.log(`🔧 Applying feedback to ${college.name} essay using ${provider}...`);
 
-        // Build system prompt for MINIMAL changes
-        const systemPrompt = `You are an expert essay editor. Your ONLY job is to apply specific feedback to an essay.
+        // Build system prompt for EFFECTIVE changes within constraints
+        const systemPrompt = `You are an expert essay editor. Your job is to improve the essay by applying specific feedback.
 
-⚠️ CRITICAL RULES:
-1. Make ONLY the changes necessary to address the feedback
-2. PRESERVE the student's voice, tone, and writing style
-3. KEEP the overall structure intact
-4. DO NOT rewrite sentences that don't need fixing
-5. Make surgical, targeted edits - not a full rewrite
-6. STAY WITHIN ${wordLimit} words
+⚠️ STRICT RULES:
+1. WORD LIMIT IS ABSOLUTE: You MUST stay under ${wordLimit} words. No exceptions.
+   - If adding content, you MUST cut elsewhere to make space.
+   - Be concise and punchy.
+2. FEEDBACK APPLICATION: You must FULLY resolve the feedback points.
+   - Don't just make a minor tweak; make sure the change is substantial enough that a reviewer won't complain about it again.
+   - "Be more specific" means add concrete numbers, names, or dates.
+   - "Show not tell" means rewrite the scene.
+3. PRESERVE VOICE: Keep the student's tone, but make it stronger.
 
-You are like a careful copy editor, not a ghostwriter. The essay should still sound like the student wrote it.`;
+You are acting as a surgical editor. make the essay better, stronger, and compliant with the word limit.`;
 
         // Build user message
         const feedbackList = feedback.map((f, i) => `${i + 1}. ${f}`).join('\n');
@@ -116,15 +118,17 @@ You are like a careful copy editor, not a ghostwriter. The essay should still so
 ${essay}
 ---
 
-FEEDBACK TO APPLY:
+FEEDBACK TO APPLY (You MUST address these):
 ${feedbackList}
 ${oneThingToFix ? `\nPRIORITY FIX: ${oneThingToFix}` : ''}
 
-⚠️ TASK: Apply ONLY the feedback above. Make MINIMAL changes.
-- Fix what the feedback identifies
-- Keep everything else exactly the same
-- Preserve the student's voice
-- Stay under ${wordLimit} words
+⚠️ MANDATORY CONSTRAINTS:
+1. TARGET WORD COUNT: ${wordLimit} words maximum. (Current: ${essay.trim().split(/\s+/).filter(Boolean).length} words).
+   - If you need to cut words to fit the new details, DO IT.
+   - Remove generic fluff phrases (e.g., "In conclusion", "I believe that") to save space.
+2. RESOLVE THE FEEDBACK:
+   - Make the changes defining and obvious.
+   - Don't just touch it up; fix it properly.
 
 Output ONLY the updated essay, nothing else:`;
 

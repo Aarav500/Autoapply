@@ -315,17 +315,60 @@ export default function CollegeEssayPage() {
     };
 
     const handleApplyAllSuggestions = async () => {
+        if (!essayContent || feedback.length === 0) return;
+
         setIsGenerating(true);
-        await new Promise(resolve => setTimeout(resolve, 2500));
+        toast.info('🔧 AI is applying feedback and rewriting for impact...');
 
-        // Simulate improved essay
-        const improved = essayContent + '\n\n[Essay improved based on feedback - references to specific programs and deeper personal reflection added]';
-        setEssayContent(improved);
-        setConfidence(Math.min(confidence + 15, 95));
+        const changesToApply = feedback
+            .filter(f => !f.applied && (f.type === 'improvement' || f.type === 'suggestion'))
+            .map(f => f.text);
 
-        // Mark feedback as applied
-        setFeedback(feedback.map(f => ({ ...f, applied: true })));
-        setIsGenerating(false);
+        if (changesToApply.length === 0) {
+            toast.info('No new suggestions to apply!');
+            setIsGenerating(false);
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/essays/apply-feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    essay: essayContent,
+                    feedback: changesToApply,
+                    college: {
+                        name: college?.name,
+                        fullName: college?.fullName,
+                    },
+                    wordLimit: selectedPrompt?.wordLimit || 300,
+                }),
+            });
+
+            if (!response.ok) throw new Error('Failed to apply feedback');
+
+            const result = await response.json();
+
+            // Update essay content
+            setEssayContent(result.updatedEssay);
+
+            // Mark feedback as applied
+            setFeedback(feedback.map(f => ({ ...f, applied: true })));
+
+            const change = result.updatedWordCount - result.originalWordCount;
+            const changeText = change > 0 ? `+${change}` : change;
+            toast.success(`✨ Feedback applied! Words: ${result.updatedWordCount} (${changeText})`);
+
+            // Automatically re-review to see improved score
+            toast.info('🔍 Re-scoring updated essay...');
+            await handleReviewEssay(result.updatedEssay);
+
+        } catch (error) {
+            console.error('Apply feedback error:', error);
+            toast.error('❌ Failed to apply feedback');
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
     const handleSendChat = () => {
