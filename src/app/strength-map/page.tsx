@@ -322,7 +322,13 @@ export default function StrengthMapPage() {
                 } else if (aiMatch.oneThingToFix) {
                     finalGaps = [aiMatch.oneThingToFix];
                 } else {
-                    finalGaps = []; // No gaps found from AI
+                    // Fallback to local gaps if AI returns nothing but score is imperfect
+                    finalGaps = match.gaps.length > 0 ? match.gaps : [];
+
+                    // If absolutely no gaps found but score < 95, add a pointer
+                    if (finalGaps.length === 0 && finalScore < 95) {
+                        finalGaps = ["Review essay for more specific details and impact"];
+                    }
                 }
             }
 
