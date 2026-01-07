@@ -77,6 +77,47 @@ async function callAI(apiKey: string, provider: string, systemPrompt: string, us
     }
 }
 
+// College-specific review personas (copied from review API for consistency)
+const getCollegePersona = (collegeName: string, values: string[], whatTheyLookFor: string[]) => {
+    const personas: Record<string, string> = {
+        'MIT': `You are a senior MIT admissions officer with 15 years of experience. You've read thousands of essays and know exactly what makes an MIT applicant stand out. 
+MIT SPECIFIC PRIORITIES:
+- Genuine intellectual curiosity and "nerdiness"
+- Hands-on making and building
+- Collaborative spirit
+- Resilience and problem-solving mindset
+- Authentic voice`,
+
+        'Stanford': `You are a Stanford admissions officer known for identifying "intellectually curious, future leaders."
+STANFORD SPECIFIC PRIORITIES:
+- Intellectual vitality
+- Evidence of impact and leadership
+- Authenticity over perfection
+- Entrepreneurial mindset`,
+
+        'Harvard': `You are a Harvard admissions officer evaluating essays for the most selective university.
+HARVARD SPECIFIC PRIORITIES:
+- Character and integrity
+- Potential for future contribution to society
+- Genuine intellectual depth
+- Evidence of leadership and impact`,
+
+        'UMich': `You are a University of Michigan admissions officer, particularly focused on the "Community" essay.
+UMICH SPECIFIC PRIORITIES:
+- "Leaders and Best" - show leadership potential
+- Community contribution
+- Evidence of collaboration
+- Connection to Michigan values`,
+    };
+
+    return personas[collegeName] || `You are an experienced admissions officer at ${collegeName}.
+${collegeName} SPECIFIC PRIORITIES:
+- Alignment with core values: ${values.join(', ')}
+- Evidence of: ${whatTheyLookFor.join(', ')}
+- Genuine interest in ${collegeName}'s programs
+- Authentic voice and personal reflection`;
+};
+
 async function reviewEssay(
     apiKey: string,
     provider: string,
@@ -86,21 +127,35 @@ async function reviewEssay(
     wordLimit: number
 ): Promise<{ score: number; improvements: string[]; oneThingToFix: string | null }> {
 
-    const systemPrompt = `You are a ${college.name} admissions officer. Review this essay and score it 0-100.
+    const persona = getCollegePersona(college.name, college.values, college.whatTheyLookFor);
 
-SCORING:
-- 95-100: EXCELLENT - Ready to submit, no improvements needed
-- 90-94: VERY GOOD - One minor tweak at most
-- 85-89: GOOD - 2-3 improvements needed
-- Below 85: Needs more work
+    const systemPrompt = `${persona}
 
-IMPORTANT: Only give 95%+ if the essay is TRULY excellent with nothing to improve.
+You are reviewing a transfer student essay. Your goal is to HELP the student reach EXCELLENCE (95%+).
+
+SCORING GUIDE (be STRICT - excellence requires 95%+):
+- 95-100: EXCELLENT - Ready to submit, only minor word choice tweaks
+- 90-94: VERY GOOD - One small improvement to reach excellence
+- 85-89: GOOD - 2-3 specific improvements needed
+- 80-84: SOLID - Several areas need attention
+- Below 80: Needs significant work
+
+REVIEW CRITERIA (score each 1-10, then calculate weighted average):
+1. AUTHENTICITY (20%): Is the voice genuine and unique?
+2. SPECIFICITY (20%): Does it use concrete, vivid examples?
+3. COLLEGE FIT (25%): Does it show deep ${college.name} research?
+4. STRUCTURE (15%): Is it perfectly crafted?
+5. IMPACT (20%): Does it leave a lasting impression?
+
+IMPORTANT: 
+- Essays under 95% MUST have at least 2 improvements listed.
+- Be specific about what needs to change.
 
 Return ONLY valid JSON:
 {
-    "score": <number>,
-    "improvements": ["<specific improvement if any>"],
-    "oneThingToFix": "<most important fix or null if perfect>"
+    "score": <number 0-100>,
+    "improvements": ["<specific improvement 1>", "<specific improvement 2>"],
+    "oneThingToFix": "<most important fix or null>"
 }`;
 
     const userMessage = `PROMPT: ${prompt}
@@ -116,17 +171,29 @@ Review and return JSON only:`;
         const jsonMatch = response.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
-            return {
-                score: parsed.score || 50,
-                improvements: parsed.improvements || [],
-                oneThingToFix: parsed.oneThingToFix || null
-            };
+
+            // Standardize output
+            let score = parsed.score || parsed.overallScore || 50;
+            let improvements = parsed.improvements || [];
+            let oneThingToFix = parsed.oneThingToFix || null;
+
+            // Ensure improvements exist if score < 95
+            if (score < 95 && improvements.length === 0) {
+                improvements.push("Add more specific details to increase impact");
+                improvements.push("Strengthen the connection to the college's values");
+            }
+
+            if (!oneThingToFix && improvements.length > 0) {
+                oneThingToFix = improvements[0];
+            }
+
+            return { score, improvements, oneThingToFix };
         }
     } catch {
         // Fallback
     }
 
-    return { score: 80, improvements: ['Review parsing failed'], oneThingToFix: null };
+    return { score: 75, improvements: ['Review parsing failed'], oneThingToFix: null };
 }
 
 async function perfectEssay(
