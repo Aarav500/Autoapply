@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Button, StatusBadge, ProgressBar } from '@/components/ui';
 import {
     Linkedin, User, Briefcase, GraduationCap, Award, FileText,
     MessageSquare, Heart, Share2, Users, Eye, TrendingUp, Sparkles,
     CheckCircle2, Circle, Edit3, PlusCircle, Send, RefreshCw, Zap,
-    Calendar, Target, Globe, Rocket, Lightbulb
+    Calendar, Target, Globe, Rocket, Lightbulb, Play, Pause
 } from 'lucide-react';
 import { toast } from '@/lib/error-handling';
 
@@ -153,6 +153,7 @@ export default function LinkedInPage() {
     const [connections, setConnections] = useState(connectionTargets);
     const [isOptimizing, setIsOptimizing] = useState(false);
     const [isGeneratingPosts, setIsGeneratingPosts] = useState(false);
+    const [isAutonomous, setIsAutonomous] = useState(false); // Autonomous Mode State
     const [activeTab, setActiveTab] = useState<'profile' | 'posts' | 'network'>('profile');
 
     // Overall profile score
@@ -166,15 +167,15 @@ export default function LinkedInPage() {
         toast.info('🧠 AI is optimizing your LinkedIn profile...');
 
         const steps = [
-            'Analyzing current profile...',
-            'Generating optimized headline...',
-            'Writing compelling About section...',
-            'Adding keywords for SEO...',
-            'Suggesting skill endorsements...',
+            'Analyzing current profile (Gap Analysis)...',
+            'Rewriting Headline: "CS Student @ UCR | AI & ML Enthusiast | Building F1 Analytics"...',
+            'Crafting About Section: "Passionate developer bridging the gap between data and human experience..."',
+            'Injecting SEO Keywords: #React #NextJS #MachineLearning #AWS...',
+            'Identifying Skills: Adding "Prompt Engineering", "Full Stack Development"...',
         ];
 
         for (const step of steps) {
-            await new Promise(r => setTimeout(r, 1500));
+            await new Promise(r => setTimeout(r, 1200));
             toast.info(`✏️ ${step}`);
         }
 
@@ -237,6 +238,27 @@ export default function LinkedInPage() {
         toast.success('✅ Posted to LinkedIn!');
     };
 
+    // Autonomous Mode Logic (after dependencies are defined)
+    useEffect(() => {
+        if (!isAutonomous) return;
+
+        const runAutonomousSequence = async () => {
+            if (profileScore < 80) {
+                await handleOptimizeProfile();
+            }
+            if (posts.length === 0) {
+                await handleGeneratePosts();
+            }
+            // Auto schedule posts
+            setPosts(prev => prev.map(p =>
+                p.status === 'draft' ? { ...p, status: 'scheduled', scheduledDate: new Date() } : p
+            ));
+        };
+
+        const interval = setInterval(runAutonomousSequence, 5000); // Check every 5s
+        return () => clearInterval(interval);
+    }, [isAutonomous, profileScore, posts.length, handleOptimizeProfile, handleGeneratePosts]);
+
     // Send connection requests
     const handleSendConnections = async () => {
         toast.info('📨 Sending connection requests...');
@@ -285,26 +307,51 @@ export default function LinkedInPage() {
                 </div>
             </div>
 
-            {/* Profile Score */}
-            <Card style={{ background: 'linear-gradient(135deg, rgba(0,119,181,0.1) 0%, rgba(91,111,242,0.1) 100%)' }}>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h3 className="font-medium mb-1">Profile Strength</h3>
-                        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                            {profileScore >= 80 ? 'All-Star' : profileScore >= 60 ? 'Intermediate' : 'Beginner'} Profile
-                        </p>
+            {/* Profile Score & Connectivity */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card style={{ background: 'linear-gradient(135deg, rgba(0,119,181,0.1) 0%, rgba(91,111,242,0.1) 100%)' }}>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="font-medium mb-1">Profile Strength</h3>
+                            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                                {profileScore >= 80 ? 'All-Star' : profileScore >= 60 ? 'Intermediate' : 'Beginner'} Profile
+                            </p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-4xl font-bold" style={{ color: '#0077B5' }}>{profileScore}%</p>
+                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                                {100 - profileScore}% to All-Star
+                            </p>
+                        </div>
                     </div>
-                    <div className="text-right">
-                        <p className="text-4xl font-bold" style={{ color: '#0077B5' }}>{profileScore}%</p>
-                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            {100 - profileScore}% to All-Star
-                        </p>
+                    <div className="mt-3">
+                        <ProgressBar value={profileScore} />
                     </div>
-                </div>
-                <div className="mt-3">
-                    <ProgressBar value={profileScore} />
-                </div>
-            </Card>
+                </Card>
+
+                <Card className={`${isAutonomous ? 'ring-2 ring-green-500 bg-green-500/10' : ''}`}>
+                    <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-medium flex items-center gap-2">
+                            <Target className="w-5 h-5 text-red-500" />
+                            Autonomous Agent
+                        </h3>
+                        <div className={`px-2 py-0.5 rounded-full text-xs font-bold ${isAutonomous ? 'bg-green-500 text-white' : 'bg-gray-500/20 text-gray-500'}`}>
+                            {isAutonomous ? 'ACTIVE' : 'OFF'}
+                        </div>
+                    </div>
+                    <p className="text-sm text-gray-400 mb-4">
+                        Let the AI manage your profile, connection requests, and posts automatically.
+                    </p>
+                    <Button
+                        size="sm"
+                        className={`w-full ${isAutonomous ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
+                        onClick={() => setIsAutonomous(!isAutonomous)}
+                        icon={isAutonomous ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                    >
+                        {isAutonomous ? 'Stop Auto-Pilot' : 'Activate Auto-Pilot'}
+                    </Button>
+                </Card>
+            </div>
 
             {/* Tabs */}
             <div className="flex gap-2 p-1 rounded-xl" style={{ background: 'var(--bg-secondary)' }}>
@@ -349,10 +396,10 @@ export default function LinkedInPage() {
                                     <div className="flex items-start justify-between mb-3">
                                         <div className="flex items-center gap-3">
                                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${section.status === 'complete' ? 'bg-green-500/20' :
-                                                    section.status === 'needs_improvement' ? 'bg-yellow-500/20' : 'bg-red-500/20'
+                                                section.status === 'needs_improvement' ? 'bg-yellow-500/20' : 'bg-red-500/20'
                                                 }`}>
                                                 <section.icon className={`w-5 h-5 ${section.status === 'complete' ? 'text-green-500' :
-                                                        section.status === 'needs_improvement' ? 'text-yellow-500' : 'text-red-500'
+                                                    section.status === 'needs_improvement' ? 'text-yellow-500' : 'text-red-500'
                                                     }`} />
                                             </div>
                                             <div>
@@ -438,9 +485,9 @@ export default function LinkedInPage() {
                                         <Card>
                                             <div className="flex items-start justify-between mb-2">
                                                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${post.type === 'achievement' ? 'bg-green-500/20 text-green-500' :
-                                                        post.type === 'learning' ? 'bg-blue-500/20 text-blue-500' :
-                                                            post.type === 'insight' ? 'bg-purple-500/20 text-purple-500' :
-                                                                'bg-orange-500/20 text-orange-500'
+                                                    post.type === 'learning' ? 'bg-blue-500/20 text-blue-500' :
+                                                        post.type === 'insight' ? 'bg-purple-500/20 text-purple-500' :
+                                                            'bg-orange-500/20 text-orange-500'
                                                     }`}>
                                                     {post.type}
                                                 </span>

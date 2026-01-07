@@ -39,6 +39,8 @@ export default function JobHubPage() {
     const [appliedJobs, setAppliedJobs] = useState<Set<string>>(new Set());
     const [showFilters, setShowFilters] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
+    const [autoApplyQueue, setAutoApplyQueue] = useState<MatchResult[]>([]);
+    const [isAutoApplyRunning, setIsAutoApplyRunning] = useState(false);
 
     // Search filters
     const [filters, setFilters] = useState<SearchFilters>({
@@ -104,6 +106,36 @@ export default function JobHubPage() {
             if (interval) clearInterval(interval);
         };
     }, [isAutoSearching, searchJobs]);
+
+    // Auto-Apply Queue Processor
+    useEffect(() => {
+        if (!isAutoApplyRunning || autoApplyQueue.length === 0) return;
+
+        const processQueue = async () => {
+            const job = autoApplyQueue[0];
+            if (!job) return;
+
+            toast.info(`📝 Auto-applying to ${job.job.company}...`);
+            await new Promise(r => setTimeout(r, 2000)); // Simulate application
+
+            setAppliedJobs(prev => new Set(prev).add(job.job.id));
+            setAutoApplyQueue(prev => prev.slice(1));
+            toast.success(`✅ Applied to ${job.job.company}!`);
+        };
+
+        const interval = setInterval(processQueue, 3000);
+        return () => clearInterval(interval);
+    }, [isAutoApplyRunning, autoApplyQueue]);
+
+    // Auto-queue high-match jobs
+    useEffect(() => {
+        if (!isAutoSearching) return;
+        const highMatchJobs = jobs.filter(j => j.score >= 85 && !appliedJobs.has(j.job.id) && !autoApplyQueue.find(q => q.job.id === j.job.id));
+        if (highMatchJobs.length > 0) {
+            setAutoApplyQueue(prev => [...prev, ...highMatchJobs]);
+            toast.info(`🚀 Added ${highMatchJobs.length} high-match jobs to auto-apply queue!`);
+        }
+    }, [jobs, isAutoSearching]);
 
     // Toggle save job
     const toggleSaveJob = (jobId: string) => {
@@ -171,7 +203,7 @@ export default function JobHubPage() {
                             variant="secondary"
                             size="lg"
                             icon={<Pause className="w-4 h-4" />}
-                            onClick={() => setIsAutoSearching(false)}
+                            onClick={() => { setIsAutoSearching(false); setIsAutoApplyRunning(false); }}
                         >
                             Stop Auto-Search
                         </Button>
@@ -179,13 +211,46 @@ export default function JobHubPage() {
                         <Button
                             size="lg"
                             icon={<Zap className="w-4 h-4" />}
-                            onClick={() => setIsAutoSearching(true)}
+                            onClick={() => { setIsAutoSearching(true); setIsAutoApplyRunning(true); }}
                         >
-                            Auto-Search All
+                            Auto-Search & Apply
                         </Button>
                     )}
                 </div>
             </div>
+
+            {/* Auto-Apply Queue Panel */}
+            {autoApplyQueue.length > 0 && (
+                <Card className="border-2 border-yellow-500/50 bg-yellow-500/5">
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-semibold flex items-center gap-2">
+                            <Zap className="w-5 h-5 text-yellow-400" />
+                            Auto-Apply Queue ({autoApplyQueue.length} jobs pending)
+                        </h3>
+                        <Button
+                            size="sm"
+                            variant={isAutoApplyRunning ? "secondary" : "primary"}
+                            onClick={() => setIsAutoApplyRunning(!isAutoApplyRunning)}
+                            icon={isAutoApplyRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                        >
+                            {isAutoApplyRunning ? 'Pause' : 'Resume'}
+                        </Button>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                        {autoApplyQueue.slice(0, 5).map((match, i) => (
+                            <div key={match.job.id} className={`flex-shrink-0 px-3 py-2 rounded-lg text-sm ${i === 0 && isAutoApplyRunning ? 'bg-yellow-500/20 animate-pulse' : 'bg-slate-800'}`}>
+                                <p className="font-medium">{match.job.company}</p>
+                                <p className="text-xs text-gray-400">{match.job.title}</p>
+                            </div>
+                        ))}
+                        {autoApplyQueue.length > 5 && (
+                            <div className="flex-shrink-0 px-3 py-2 rounded-lg text-sm bg-slate-800 text-gray-400">
+                                +{autoApplyQueue.length - 5} more
+                            </div>
+                        )}
+                    </div>
+                </Card>
+            )}
 
             {/* Platform Settings */}
             <AnimatePresence>
