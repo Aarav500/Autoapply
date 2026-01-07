@@ -125,7 +125,12 @@ async function reviewEssay(
     prompt: string,
     college: UltimateEssayRequest['college'],
     wordLimit: number
-): Promise<{ score: number; improvements: string[]; oneThingToFix: string | null }> {
+): Promise<{
+    score: number;
+    improvements: string[];
+    oneThingToFix: string | null;
+    categoryScores?: Record<string, number>;
+}> {
 
     const persona = getCollegePersona(college.name, college.values, college.whatTheyLookFor);
 
@@ -156,6 +161,7 @@ IMPORTANT:
 Return ONLY valid JSON:
 {
     "score": <number 0-100>,
+    "categoryScores": { "authenticity": <number>, "specificity": <number>, "collegeFit": <number>, "structure": <number>, "impact": <number> },
     "improvements": ["<specific improvement 1>", "<specific improvement 2>"],
     "oneThingToFix": "<most important fix or null>"
 }`;
@@ -178,6 +184,7 @@ Review and return JSON only:`;
             let score = parsed.score || parsed.overallScore || 50;
             let improvements = parsed.improvements || [];
             let oneThingToFix = parsed.oneThingToFix || null;
+            let categoryScores = parsed.categoryScores || {};
 
             // Ensure improvements exist if score < 95
             if (score < 95 && improvements.length === 0) {
@@ -189,7 +196,7 @@ Review and return JSON only:`;
                 oneThingToFix = improvements[0];
             }
 
-            return { score, improvements, oneThingToFix };
+            return { score, improvements, oneThingToFix, categoryScores };
         }
     } catch {
         // Fallback
@@ -206,24 +213,44 @@ async function perfectEssay(
     college: UltimateEssayRequest['college'],
     wordLimit: number,
     feedbackToAddress: string[],
-    iteration: number
+    iteration: number,
+    categoryScores?: Record<string, number>
 ): Promise<string> {
+
+    // Dynamic strategy based on weak categories
+    let specificFocus = "";
+    if (categoryScores) {
+        const weakAreas = Object.entries(categoryScores)
+            .filter(([_, score]) => score < 9)
+            .map(([cat]) => cat.toUpperCase());
+
+        if (weakAreas.length > 0) {
+            specificFocus = `\nCRITICAL FOCUS AREAS (Score < 9/10): ${weakAreas.join(', ')}. You MUST improve these specifically.`;
+        }
+    }
 
     const systemPrompt = `You are a legendary essay consultant with 100% admission rate. 
 This is iteration ${iteration} of perfection. Your job is to make this essay FLAWLESS.
+
+RUBRIC YOU ARE GRADED ON (Aim for 10/10 in all):
+1. AUTHENTICITY: Unique voice, no AI-sounding phrases.
+2. SPECIFICITY: Vivid concrete details, numbers, names.
+3. COLLEGE FIT: Deep research, specific program mentions.
+4. STRUCTURE: Flawless flow, strong hook and conclusion.
+5. IMPACT: Emotional resonance, memorable story.
 
 RULES:
 1. Word limit: ${wordLimit} words MAX (Strictly enforced)
 2. Address ALL feedback completely - do not ignore anything.
 3. Make it sound authentically human (contractions, varied sentences, natural flow).
 4. Include specific details about ${college.name} programs.
-5. The goal is 95%+ score with NO remaining feedback.
+5. The goal is 97%+ score.${specificFocus}
 
 STRATEGY:
-- If feedback asks for "more specificity", CUT fluff words to make room for concrete details.
-- If feedback says "tone is off", rewrite the ENTIRE affected section, don't just tweak one word.
-- Be RUTHLESS. Better to be bold and specific than safe and generic.
-- Every sentence must earn its place.
+- If Specificity is low: Add concrete numbers, proper nouns, and sensory details.
+- If Authenticity is low: Rewrite to sound more conversational and less "polished".
+- If College Fit is low: Name drop specific professors, labs, or traditions.
+- cut fluff ruthlessly to make space for substance.
 
 Output ONLY the perfected essay, nothing else.`;
 
@@ -342,7 +369,8 @@ export async function POST(request: NextRequest) {
                 college,
                 wordLimit,
                 feedbackToAddress,
-                iterations
+                iterations,
+                review.categoryScores
             );
 
             // Ensure word limit
