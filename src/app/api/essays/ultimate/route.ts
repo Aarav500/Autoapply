@@ -131,25 +131,27 @@ async function reviewEssay(
 
     const systemPrompt = `${persona}
 
-You are reviewing a transfer student essay. Your goal is to HELP the student reach EXCELLENCE (95%+).
+You are reviewing a transfer student essay. Your goal is to HELP the student reach PERFECTION.
+You are the TOUGHEST, HARSHEST specialist in the office. You rarely give scores above 95.
 
-SCORING GUIDE (be STRICT - excellence requires 95%+):
-- 95-100: EXCELLENT - Ready to submit, only minor word choice tweaks
-- 90-94: VERY GOOD - One small improvement to reach excellence
-- 85-89: GOOD - 2-3 specific improvements needed
-- 80-84: SOLID - Several areas need attention
-- Below 80: Needs significant work
+SCORING GUIDE (RUTHLESS STANDARDS):
+- 98-100: TRANSCENDENT - A masterpiece. Flawless.
+- 95-97: EXCELLENT - Ready to submit, but could be 1% better.
+- 90-94: VERY GOOD - Still needs polish to be competitive at Ivy League.
+- 85-89: GOOD - Not memorable enough.
+- Below 85: Needs significant work.
 
 REVIEW CRITERIA (score each 1-10, then calculate weighted average):
-1. AUTHENTICITY (20%): Is the voice genuine and unique?
-2. SPECIFICITY (20%): Does it use concrete, vivid examples?
-3. COLLEGE FIT (25%): Does it show deep ${college.name} research?
-4. STRUCTURE (15%): Is it perfectly crafted?
-5. IMPACT (20%): Does it leave a lasting impression?
+1. AUTHENTICITY (20%): Is the voice unique? (If it sounds like AI, score < 5)
+2. SPECIFICITY (20%): vivid examples? (If generic, score < 6)
+3. COLLEGE FIT (25%): Deep research? (If vague, score < 5)
+4. STRUCTURE (15%): Flawless flow?
+5. IMPACT (20%): Does it make you FEEL?
 
 IMPORTANT: 
-- Essays under 95% MUST have at least 2 improvements listed.
-- Be specific about what needs to change.
+- Be extremely nitpicky. Find the smallest flaws.
+- Improvements must be ACTIONABLE (e.g., "Change the opening to...")
+- If the essay is "good" but not "amazing", max score is 92.
 
 Return ONLY valid JSON:
 {
@@ -306,15 +308,15 @@ export async function POST(request: NextRequest) {
             logs.push(`Review score: ${currentScore}%`);
             logs.push(`Improvements: ${review.improvements.length > 0 ? review.improvements.join('; ') : 'None'}`);
 
-            // If we've reached 95%+ with no improvements, we're done!
-            if (currentScore >= 95 && review.improvements.length === 0) {
-                logs.push(`✅ PERFECT! Score ${currentScore}% with no improvements needed.`);
+            // If we've reached 97%+ with no improvements, we're done! (Higher threshold for safety)
+            if (currentScore >= 97 && review.improvements.length === 0) {
+                logs.push(`✅ TRUE PERFECTION! Score ${currentScore}% with no improvements needed.`);
                 break;
             }
 
-            // If score is 95%+ but still has minor improvements, we're good
-            if (currentScore >= 95) {
-                logs.push(`✅ Excellent! Score ${currentScore}% - good enough to submit.`);
+            // If score is 97%+ but still has minor improvements, we're good
+            if (currentScore >= 97) {
+                logs.push(`✅ Excellent! Score ${currentScore}% - exceeds safety threshold.`);
                 break;
             }
 
