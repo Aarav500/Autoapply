@@ -211,11 +211,17 @@ async function perfectEssay(
 This is iteration ${iteration} of perfection. Your job is to make this essay FLAWLESS.
 
 RULES:
-1. Word limit: ${wordLimit} words MAX
-2. Address ALL feedback completely
-3. Make it sound authentically human (contractions, varied sentences, natural flow)
-4. Include specific details about ${college.name} programs
-5. The goal is 95%+ score with NO remaining feedback
+1. Word limit: ${wordLimit} words MAX (Strictly enforced)
+2. Address ALL feedback completely - do not ignore anything.
+3. Make it sound authentically human (contractions, varied sentences, natural flow).
+4. Include specific details about ${college.name} programs.
+5. The goal is 95%+ score with NO remaining feedback.
+
+STRATEGY:
+- If feedback asks for "more specificity", CUT fluff words to make room for concrete details.
+- If feedback says "tone is off", rewrite the ENTIRE affected section, don't just tweak one word.
+- Be RUTHLESS. Better to be bold and specific than safe and generic.
+- Every sentence must earn its place.
 
 Output ONLY the perfected essay, nothing else.`;
 
@@ -286,7 +292,7 @@ export async function POST(request: NextRequest) {
         let currentEssay = essay;
         let currentScore = 0;
         let iterations = 0;
-        const maxIterations = 3; // Prevent infinite loops
+        const maxIterations = 10; // Increased to ensure perfection
         const logs: string[] = [];
 
         // ITERATIVE PERFECTION LOOP
