@@ -311,9 +311,20 @@ export default function StrengthMapPage() {
             // Overlay AI insights if available
             const finalScore = aiMatch ? aiMatch.overallScore : match.score;
             const finalStrengths = aiMatch && aiMatch.strengths.length > 0 ? aiMatch.strengths : match.strengths;
-            const finalGaps = aiMatch
-                ? (aiMatch.improvements.length > 0 ? aiMatch.improvements : aiMatch.suggestions)
-                : match.gaps;
+
+            // Build gaps from AI feedback - use improvements first, then suggestions, then oneThingToFix
+            let finalGaps: string[] = match.gaps;
+            if (aiMatch) {
+                if (aiMatch.improvements && aiMatch.improvements.length > 0) {
+                    finalGaps = aiMatch.improvements;
+                } else if (aiMatch.suggestions && aiMatch.suggestions.length > 0) {
+                    finalGaps = aiMatch.suggestions;
+                } else if (aiMatch.oneThingToFix) {
+                    finalGaps = [aiMatch.oneThingToFix];
+                } else {
+                    finalGaps = []; // No gaps found from AI
+                }
+            }
 
             return {
                 ...college,
