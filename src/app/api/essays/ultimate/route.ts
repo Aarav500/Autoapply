@@ -130,13 +130,14 @@ async function reviewEssay(
     improvements: string[];
     oneThingToFix: string | null;
     categoryScores?: Record<string, number>;
+    spark?: string | null;
 }> {
 
     const persona = getCollegePersona(college.name, college.values, college.whatTheyLookFor);
 
     const systemPrompt = `${persona}
 
-You are reviewing a transfer student essay. Your goal is to HELP the student reach PERFECTION.
+You are reviewing a transfer student essay. Your goal is HELP the student reach PERFECTION.
 You are the TOUGHEST, HARSHEST specialist in the office. You rarely give scores above 95.
 
 SCORING GUIDE (RUTHLESS STANDARDS):
@@ -153,17 +154,20 @@ REVIEW CRITERIA (score each 1-10, then calculate weighted average):
 4. STRUCTURE (15%): Flawless flow?
 5. IMPACT (20%): Does it make you FEEL?
 
+
 IMPORTANT: 
 - Be extremely nitpicky. Find the smallest flaws.
 - Improvements must be ACTIONABLE (e.g., "Change the opening to...")
-- If the essay is "good" but not "amazing", max score is 92.
+- **THE SPARK REQUIREMENT**: To score > 93, the essay MUST have a "Spark" - a moment of raw vulnerability, a counter-intuitive insight, or a unique connection that makes it impossible to forget.
+- If "Spark" is missing, max score is 93.
 
 Return ONLY valid JSON:
 {
     "score": <number 0-100>,
     "categoryScores": { "authenticity": <number>, "specificity": <number>, "collegeFit": <number>, "structure": <number>, "impact": <number> },
     "improvements": ["<specific improvement 1>", "<specific improvement 2>"],
-    "oneThingToFix": "<most important fix or null>"
+    "oneThingToFix": "<most important fix or null>",
+    "spark": "<description of the spark or null if missing>"
 }`;
 
     const userMessage = `PROMPT: ${prompt}
@@ -185,6 +189,7 @@ Review and return JSON only:`;
             let improvements = parsed.improvements || [];
             let oneThingToFix = parsed.oneThingToFix || null;
             let categoryScores = parsed.categoryScores || {};
+            let spark = parsed.spark || null;
 
             // Ensure improvements exist if score < 95
             if (score < 95 && improvements.length === 0) {
@@ -192,11 +197,16 @@ Review and return JSON only:`;
                 improvements.push("Strengthen the connection to the college's values");
             }
 
+            // Force spark feedback if high score but no spark (safety net)
+            if (score > 90 && !spark) {
+                improvements.unshift("MISSING SPARK: Add a moment of raw vulnerability or unexpected insight.");
+            }
+
             if (!oneThingToFix && improvements.length > 0) {
                 oneThingToFix = improvements[0];
             }
 
-            return { score, improvements, oneThingToFix, categoryScores };
+            return { score, improvements, oneThingToFix, categoryScores, spark };
         }
     } catch {
         // Fallback
@@ -214,7 +224,8 @@ async function perfectEssay(
     wordLimit: number,
     feedbackToAddress: string[],
     iteration: number,
-    categoryScores?: Record<string, number>
+    categoryScores?: Record<string, number>,
+    missingSpark?: boolean
 ): Promise<string> {
 
     // Dynamic strategy based on weak categories
@@ -227,6 +238,10 @@ async function perfectEssay(
         if (weakAreas.length > 0) {
             specificFocus = `\nCRITICAL FOCUS AREAS (Score < 9/10): ${weakAreas.join(', ')}. You MUST improve these specifically.`;
         }
+    }
+
+    if (missingSpark) {
+        specificFocus += `\nCRITICAL: The essay lacks a "SPARK". You MUST take a risk. Add a moment of raw vulnerability, a counter-intuitive insight, or a unique connection. Do not be safe.`;
     }
 
     const systemPrompt = `You are a legendary essay consultant with 100% admission rate. 
@@ -370,7 +385,9 @@ export async function POST(request: NextRequest) {
                 wordLimit,
                 feedbackToAddress,
                 iterations,
-                review.categoryScores
+
+                review.categoryScores,
+                !review.spark && currentScore > 90 // Flag missing spark if score is decent but no spark
             );
 
             // Ensure word limit
