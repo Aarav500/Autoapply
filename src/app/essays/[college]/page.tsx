@@ -161,6 +161,19 @@ export default function CollegeEssayPage() {
                 impact: `${a.hoursPerWeek * a.weeksPerYear} total hours committed`,
             }));
 
+            // Collect existing essays for this college to prevent repetition
+            const existingEssays: string[] = [];
+            if (college) {
+                college.essays.forEach(prompt => {
+                    if (prompt.id !== selectedPromptId) {
+                        const saved = essayStorage.loadEssay(college.id, prompt.id);
+                        if (saved && saved.content && saved.content.length > 100) {
+                            existingEssays.push(saved.content);
+                        }
+                    }
+                });
+            }
+
             // Call SERVER-SIDE API (uses GitHub secrets - no client API key needed!)
             const response = await fetch('/api/essays/generate', {
                 method: 'POST',
@@ -177,6 +190,7 @@ export default function CollegeEssayPage() {
                     activities: formattedActivities.length > 0 ? formattedActivities : [
                         { name: 'Your Activity', description: 'Add activities in Documents page', impact: 'AI will personalize based on your experiences' }
                     ],
+                    existingEssays,
                     wordLimit: selectedPrompt.wordLimit,
                     tone: 'confident',
                 }),

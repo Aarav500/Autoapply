@@ -39,6 +39,7 @@ interface EssayRequest {
     // For improvement iterations
     previousFeedback?: string;
     previousDraft?: string;
+    existingEssays?: string[]; // New: List of other essays for the same college
 }
 
 // Call Claude API
@@ -117,7 +118,7 @@ async function callOpenAI(apiKey: string, systemPrompt: string, userMessage: str
 export async function POST(request: NextRequest) {
     try {
         const body: EssayRequest = await request.json();
-        const { prompt, essayTitle, college, activities, achievements, wordLimit, tone, major, goals, previousFeedback, previousDraft } = body;
+        const { prompt, essayTitle, college, activities, achievements, wordLimit, tone, major, goals, previousFeedback, previousDraft, existingEssays } = body;
 
         // Detect if this is an improvement iteration
         const isImprovement = previousFeedback && previousDraft;
@@ -157,6 +158,19 @@ export async function POST(request: NextRequest) {
         const activitiesContext = activities.map((a, i) =>
             `Activity ${i + 1}: ${a.name}\n- Description: ${a.description}\n- Impact: ${a.impact}`
         ).join('\n\n');
+
+        // Build existing essays context (ANTI-DUPLICATION)
+        let existingEssaysContext = '';
+        if (existingEssays && existingEssays.length > 0) {
+            existingEssaysContext = `
+⚠️ DO NOT REPEAT CONTENT FROM THESE EXISTING ESSAYS FOR ${college.name}:
+The student has ALREADY written about the following topics. You MUST choose DIFFERENT stories/angles/activities to show breadth.
+
+${existingEssays.map((essay, i) => `--- EXISTING ESSAY ${i + 1} ---\n${essay.slice(0, 300)}... (excerpt)\n---`).join('\n')}
+
+DO NOT REPEAT the same specific anecdotes used above.
+`;
+        }
 
         // Calculate target word count (aim for 90% of limit to leave buffer)
         const targetWords = Math.floor(wordLimit * 0.9);
@@ -236,6 +250,8 @@ ${goals ? `STUDENT'S GOALS: ${goals}\n` : ''}
 
 STUDENT'S ACTIVITIES AND EXPERIENCES (use these - do NOT ask for more):
 ${activitiesContext}
+
+${existingEssaysContext}
 
 ⚠️ WORD LIMIT: MAXIMUM ${wordLimit} words. Aim for ${targetWords} words.
 
