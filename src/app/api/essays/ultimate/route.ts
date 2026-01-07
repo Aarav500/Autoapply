@@ -228,7 +228,7 @@ async function perfectEssay(
     missingSpark?: boolean
 ): Promise<string> {
 
-    const isPanicMode = iteration > 5; // After 5 tries, stop being creative and just fix it.
+    const isPanicMode = true; // ALWAYS in strict obedience mode as requested ("no freedom")
 
     // Dynamic strategy based on weak categories
     let specificFocus = "";
@@ -247,7 +247,7 @@ async function perfectEssay(
     }
 
     const obedienceInstruction = isPanicMode
-        ? `\nCRITICAL INSTRUCTION (ITERATION ${iteration}): You are stuck. The reviewer is rejecting your changes. STOP being "creative". If the feedback suggests a specific phrase or example, USE IT EXACTLY. If it asks to remove a metaphor, DELETE IT. Do not paraphrase. Literal obedience is required now.`
+        ? `\nCRITICAL INSTRUCTION: STICK TO THE FEEDBACK. Do not be "creative". If the feedback suggests a specific phrase, example, or change, OPTIMIZE FOR THAT EXACTLY. Literal obedience is required.`
         : "";
 
     const systemPrompt = `You are a legendary essay consultant with 100% admission rate. 
@@ -342,7 +342,7 @@ export async function POST(request: NextRequest) {
         let currentEssay = essay;
         let currentScore = 0;
         let iterations = 0;
-        const maxIterations = 10; // Increased to ensure perfection
+        const maxIterations = 3; // Reduced to 3 to save costs & force efficiency
         const logs: string[] = [];
 
         // ITERATIVE PERFECTION LOOP
