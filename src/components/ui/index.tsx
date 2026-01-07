@@ -86,6 +86,7 @@ interface ButtonProps {
     disabled?: boolean;
     loading?: boolean;
     icon?: ReactNode;
+    style?: React.CSSProperties;
 }
 
 export function Button({
@@ -96,7 +97,8 @@ export function Button({
     onClick,
     disabled = false,
     loading = false,
-    icon
+    icon,
+    style
 }: ButtonProps) {
     const sizeClasses = {
         sm: 'px-3 py-1.5 text-xs',
@@ -113,7 +115,7 @@ export function Button({
             disabled={disabled || loading}
             whileHover={{ scale: disabled ? 1 : 1.02 }}
             whileTap={{ scale: disabled ? 1 : 0.98 }}
-            style={{ opacity: disabled ? 0.5 : 1 }}
+            style={{ opacity: disabled ? 0.5 : 1, ...style }}
         >
             {loading ? <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> : icon}
             {children}

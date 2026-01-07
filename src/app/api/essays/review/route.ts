@@ -24,6 +24,7 @@ interface ReviewRequest {
         notablePrograms: string[];
     };
     wordLimit: number;
+    previouslyAppliedFeedback?: string[];
 }
 
 // College-specific review personas
@@ -148,7 +149,7 @@ async function callGemini(apiKey: string, systemPrompt: string, userMessage: str
 export async function POST(request: NextRequest) {
     try {
         const body: ReviewRequest = await request.json();
-        const { essay, prompt, college, wordLimit } = body;
+        const { essay, prompt, college, wordLimit, previouslyAppliedFeedback } = body;
 
         const claudeKey = getClaudeKey();
         const geminiKey = getGeminiKey();
@@ -191,6 +192,17 @@ SCORING GUIDE (be STRICT - excellence requires 95%+):
 - 80-84: SOLID - Several areas need attention
 - Below 80: Needs significant work
 
+${previouslyAppliedFeedback && previouslyAppliedFeedback.length > 0 ? `
+🔄 PREVIOUSLY ADDRESSED FEEDBACK (the writer already fixed these - give credit if properly addressed):
+${previouslyAppliedFeedback.map((f, i) => `${i + 1}. ${f}`).join('\n')}
+
+IMPORTANT: If the essay now properly addresses any of the above previously given feedback, you MUST:
+1. Acknowledge this in the strengths section
+2. Give a HIGHER score than previous review (improvements should push score up by 3-8 points)
+3. Only suggest NEW improvements that are DIFFERENT from what was already addressed
+4. Do NOT repeat the same feedback that was already addressed
+
+` : ''}
 CRITICAL: You must ALWAYS provide at least one improvement suggestion until the essay reaches 95%+.
 Even for good essays (85-94%), identify what would push it to excellence.
 

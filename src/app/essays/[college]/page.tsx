@@ -33,7 +33,8 @@ import {
     ChevronDown,
     ChevronUp,
     Key,
-    X
+    X,
+    Crown
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -91,6 +92,9 @@ export default function CollegeEssayPage() {
     const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
     const [chatInput, setChatInput] = useState('');
     const [versions, setVersions] = useState<EssayVersion[]>([]);
+    const [oneThingToFix, setOneThingToFix] = useState<string | null>(null);
+    const [previouslyAppliedFeedback, setPreviouslyAppliedFeedback] = useState<string[]>([]);
+    const [isPerfecting, setIsPerfecting] = useState(false);
 
     // Load activities from storage (to pass to AI)
     const { data: activities } = useS3Storage<ActivityItem[]>('activities', { defaultValue: [] });
@@ -254,6 +258,7 @@ export default function CollegeEssayPage() {
                         notablePrograms: college.research.notablePrograms,
                     },
                     wordLimit: selectedPrompt.wordLimit,
+                    previouslyAppliedFeedback: previouslyAppliedFeedback,
                 }),
             });
 
@@ -299,10 +304,13 @@ export default function CollegeEssayPage() {
 
             // Add the one thing to fix
             if (review.oneThingToFix) {
+                setOneThingToFix(review.oneThingToFix);
                 aiFeedback.push({
                     type: 'improvement',
                     text: `Priority Fix: ${review.oneThingToFix}`
                 });
+            } else {
+                setOneThingToFix(null);
             }
 
             setFeedback(aiFeedback.slice(0, 8));
@@ -351,6 +359,7 @@ export default function CollegeEssayPage() {
                 body: JSON.stringify({
                     essay: essayContent,
                     feedback: changesToApply,
+                    oneThingToFix: oneThingToFix,
                     college: {
                         name: college?.name,
                         fullName: college?.fullName,
@@ -366,8 +375,11 @@ export default function CollegeEssayPage() {
             // Update essay content
             setEssayContent(result.updatedEssay);
 
-            // Mark feedback as applied
+            // Mark feedback as applied and track for future reviews
             setFeedback(feedback.map(f => ({ ...f, applied: true })));
+
+            // Track what feedback was applied so review knows not to repeat it
+            setPreviouslyAppliedFeedback(prev => [...prev, ...changesToApply]);
 
             const change = result.updatedWordCount - result.originalWordCount;
             const changeText = change > 0 ? `+${change}` : change;
@@ -384,6 +396,84 @@ export default function CollegeEssayPage() {
             setIsGenerating(false);
         }
     };
+
+    // ONE-CLICK PERFECT ESSAY - Creates the best possible version
+    const handlePerfectEssay = async () => {
+        if (!essayContent || !college || !selectedPrompt) return;
+
+        setIsPerfecting(true);
+        toast.info('👑 Creating the PERFECT version of your essay...');
+
+        try {
+            // Prepare activities for context
+            const formattedActivities = activities.slice(0, 5).map(a => ({
+                name: a.name,
+                description: `${a.role} at ${a.organization}. ${a.description}`,
+                impact: `${a.hoursPerWeek * a.weeksPerYear} total hours committed`,
+            }));
+
+            const response = await fetch('/api/essays/perfect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    essay: essayContent,
+                    prompt: selectedPrompt.prompt,
+                    college: {
+                        name: college.name,
+                        fullName: college.fullName,
+                        values: college.research.values,
+                        whatTheyLookFor: college.research.whatTheyLookFor,
+                        culture: college.research.culture,
+                        notablePrograms: college.research.notablePrograms,
+                    },
+                    wordLimit: selectedPrompt.wordLimit,
+                    activities: formattedActivities,
+                }),
+            });
+
+            if (!response.ok) throw new Error('Failed to create perfect essay');
+
+            const result = await response.json();
+
+            // Save current version to history before replacing
+            setVersions(prev => [...prev, {
+                id: prev.length + 1,
+                content: essayContent,
+                confidence: confidence,
+                timestamp: new Date(),
+            }]);
+
+            // Update essay content with perfect version
+            setEssayContent(result.perfectEssay);
+
+            // Save to storage
+            essayStorage.saveEssay(collegeId, selectedPromptId!, result.perfectEssay);
+
+            // Set high confidence
+            setConfidence(result.confidence || 98);
+
+            // Clear previous feedback since this is a complete rewrite
+            setFeedback([{
+                type: 'strength',
+                text: '✨ Essay perfected! This version is optimized for authenticity and college fit.',
+            }]);
+            setPreviouslyAppliedFeedback([]);
+            setOneThingToFix(null);
+
+            toast.success(`👑 Perfect essay created! (${result.perfectWordCount} words)`);
+
+            // Auto-review to show the new score
+            toast.info('🔍 Scoring the perfected essay...');
+            await handleReviewEssay(result.perfectEssay);
+
+        } catch (error) {
+            console.error('Perfect essay error:', error);
+            toast.error('❌ Failed to create perfect essay');
+        } finally {
+            setIsPerfecting(false);
+        }
+    };
+
 
     const handleSendChat = () => {
         if (!chatInput.trim()) return;
@@ -611,19 +701,32 @@ export default function CollegeEssayPage() {
                             />
 
                             <div className="flex items-center justify-between mt-4">
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 flex-wrap">
                                     <Button
                                         onClick={handleGenerateEssay}
                                         icon={isGenerating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                                        disabled={isGenerating}
+                                        disabled={isGenerating || isPerfecting}
                                     >
-                                        {isGenerating ? 'Generating...' : essayContent ? 'Regenerate with AI' : 'Generate with AI'}
+                                        {isGenerating ? 'Generating...' : essayContent ? 'Regenerate' : 'Generate with AI'}
                                     </Button>
+                                    {essayContent && (
+                                        <Button
+                                            onClick={handlePerfectEssay}
+                                            icon={isPerfecting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
+                                            disabled={isPerfecting || isGenerating || isReviewing}
+                                            style={{
+                                                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                                border: 'none'
+                                            }}
+                                        >
+                                            {isPerfecting ? 'Perfecting...' : '✨ Perfect Essay'}
+                                        </Button>
+                                    )}
                                     <Button
                                         variant="secondary"
                                         onClick={() => handleReviewEssay()}
                                         icon={isReviewing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
-                                        disabled={!essayContent || isReviewing}
+                                        disabled={!essayContent || isReviewing || isPerfecting}
                                     >
                                         {isReviewing ? 'Reviewing...' : 'Review Essay'}
                                     </Button>

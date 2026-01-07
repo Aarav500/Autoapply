@@ -102,13 +102,18 @@ export async function POST(request: NextRequest) {
 1. WORD LIMIT IS ABSOLUTE: You MUST stay under ${wordLimit} words. No exceptions.
    - If adding content, you MUST cut elsewhere to make space.
    - Be concise and punchy.
-2. FEEDBACK APPLICATION: You must FULLY resolve the feedback points.
-   - Don't just make a minor tweak; make sure the change is substantial enough that a reviewer won't complain about it again.
-   - "Be more specific" means add concrete numbers, names, or dates.
-   - "Show not tell" means rewrite the scene.
-3. PRESERVE VOICE: Keep the student's tone, but make it stronger.
+2. FEEDBACK APPLICATION: You must FULLY and SUBSTANTIALLY resolve the feedback points.
+   - GOAL: Each fix should be significant enough to boost the essay score by 5-10 points.
+   - Don't just make a minor tweak; make sure the change is DRAMATIC enough that a reviewer will clearly see improvement.
+   - "Be more specific" means add 2-3 concrete numbers, names, dates, or vivid details.
+   - "Show not tell" means completely rewrite the scene with sensory details.
+   - "Add college fit" means insert specific professor names, programs, or traditions.
+   - Every change should be VISIBLE and IMPACTFUL.
+3. PRESERVE VOICE: Keep the student's tone, but make it stronger and more memorable.
+4. PRIORITIZE THE PRIORITY FIX: If a priority fix is given, address it FIRST and MOST THOROUGHLY.
 
-You are acting as a surgical editor. make the essay better, stronger, and compliant with the word limit.`;
+You are acting as a surgical editor. Make changes that are OBVIOUS and SUBSTANTIAL, not subtle. The reviewer should immediately see that the feedback was addressed.`;
+
 
         // Build user message
         const feedbackList = feedback.map((f, i) => `${i + 1}. ${f}`).join('\n');
