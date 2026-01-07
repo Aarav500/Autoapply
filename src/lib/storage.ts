@@ -380,6 +380,75 @@ export const matchAnalysisStorage = {
 };
 
 // ============================================
+// 6B. ESSAY VERSION HISTORY STORAGE
+// ============================================
+
+export interface EssayVersion {
+    id: string;
+    collegeId: string;
+    essayId: string;
+    version: number;
+    originalContent: string;
+    updatedContent: string;
+    feedbackApplied: string[];
+    timestamp: string;
+    wordCountBefore: number;
+    wordCountAfter: number;
+}
+
+export const essayVersionStorage = {
+    saveVersion(
+        collegeId: string,
+        essayId: string,
+        original: string,
+        updated: string,
+        feedback: string[]
+    ): EssayVersion {
+        const versions = this.getVersions(collegeId, essayId);
+        const newVersion: EssayVersion = {
+            id: `${collegeId}-${essayId}-v${versions.length + 1}`,
+            collegeId,
+            essayId,
+            version: versions.length + 1,
+            originalContent: original,
+            updatedContent: updated,
+            feedbackApplied: feedback,
+            timestamp: new Date().toISOString(),
+            wordCountBefore: original.trim().split(/\s+/).filter(Boolean).length,
+            wordCountAfter: updated.trim().split(/\s+/).filter(Boolean).length,
+        };
+        const key = `essay_versions_${collegeId}_${essayId}`;
+        storage.save(key, [...versions, newVersion]);
+        return newVersion;
+    },
+
+    getVersions(collegeId: string, essayId: string): EssayVersion[] {
+        const key = `essay_versions_${collegeId}_${essayId}`;
+        return storage.load(key) || [];
+    },
+
+    getLatestVersion(collegeId: string, essayId: string): EssayVersion | null {
+        const versions = this.getVersions(collegeId, essayId);
+        return versions.length > 0 ? versions[versions.length - 1] : null;
+    },
+
+    getAllVersions(): EssayVersion[] {
+        const keys = storage.getAllKeys().filter(k => k.startsWith('essay_versions_'));
+        const allVersions: EssayVersion[] = [];
+        keys.forEach(k => {
+            const versions = storage.load<EssayVersion[]>(k);
+            if (versions) allVersions.push(...versions);
+        });
+        return allVersions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    },
+
+    clearVersions(collegeId: string, essayId: string) {
+        const key = `essay_versions_${collegeId}_${essayId}`;
+        storage.delete(key);
+    },
+};
+
+// ============================================
 // 7. AUTOMATION HISTORY STORAGE
 // ============================================
 

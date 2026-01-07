@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Brain, Play, Pause, CheckCircle2, Clock, AlertCircle,
-    Loader2, Zap, Settings, ChevronDown, ChevronUp
+    Loader2, Zap, Settings, ChevronDown, ChevronUp, Edit2, History
 } from 'lucide-react';
 import { toast } from '@/lib/error-handling';
-import { essayStorage, matchAnalysisStorage, automationHistoryStorage, AutomationLog } from '@/lib/storage';
+import { essayStorage, matchAnalysisStorage, automationHistoryStorage, AutomationLog, essayVersionStorage, EssayVersion } from '@/lib/storage';
 import { targetColleges } from '@/lib/colleges-data';
 import { getFromS3 } from '@/lib/useS3Storage';
 import { Button } from '@/components/ui';
@@ -95,6 +95,7 @@ export function useAutomationEngine() {
         totalTime: 0,
     });
     const [history, setHistory] = useState<AutomationLog[]>([]);
+    const [essayVersions, setEssayVersions] = useState<EssayVersion[]>([]);
 
     const runningRef = useRef(false);
     const tasksRef = useRef<AutomationTask[]>([]);
@@ -131,6 +132,7 @@ export function useAutomationEngine() {
     // Load history on mount
     useEffect(() => {
         setHistory(automationHistoryStorage.getHistory());
+        setEssayVersions(essayVersionStorage.getAllVersions());
     }, []);
 
     // Generate tasks for all colleges
@@ -556,6 +558,93 @@ export function useAutomationEngine() {
         setStats(prev => ({ ...prev, failed: 0 }));
     }, []);
 
+    // Apply feedback to all essays (minimal changes, preserves voice)
+    const [isApplyingFeedback, setIsApplyingFeedback] = useState(false);
+    const [feedbackProgress, setFeedbackProgress] = useState({ current: 0, total: 0 });
+
+    const applyFeedbackToEssays = useCallback(async () => {
+        setIsApplyingFeedback(true);
+        let applied = 0;
+        let errors = 0;
+        const essaysWithAnalysis: { college: typeof targetColleges[0]; analysis: ReturnType<typeof matchAnalysisStorage.loadAnalysis> }[] = [];
+
+        // Find essays that have analysis
+        for (const college of targetColleges) {
+            const analysis = matchAnalysisStorage.loadAnalysis(college.id);
+            if (analysis && (analysis.improvements.length > 0 || analysis.suggestions.length > 0 || analysis.oneThingToFix)) {
+                essaysWithAnalysis.push({ college, analysis });
+            }
+        }
+
+        setFeedbackProgress({ current: 0, total: essaysWithAnalysis.length });
+        toast.info(`🔧 Applying feedback to ${essaysWithAnalysis.length} essays...`);
+
+        for (let i = 0; i < essaysWithAnalysis.length; i++) {
+            const { college, analysis } = essaysWithAnalysis[i];
+            setFeedbackProgress({ current: i + 1, total: essaysWithAnalysis.length });
+
+            const essay = college.essays[0];
+            if (!essay) continue;
+
+            const essayDraft = essayStorage.loadEssay(college.id, essay.id);
+            if (!essayDraft) continue;
+
+            toast.info(`📝 Applying feedback to ${college.name}...`);
+
+            try {
+                const feedback = [...(analysis?.improvements || []), ...(analysis?.suggestions || [])];
+
+                const response = await fetch('/api/essays/apply-feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        essay: essayDraft.content,
+                        feedback,
+                        oneThingToFix: analysis?.oneThingToFix,
+                        college: {
+                            name: college.name,
+                            fullName: college.fullName,
+                        },
+                        wordLimit: essay.wordLimit,
+                    }),
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+
+                    // Save version history
+                    const newVersion = essayVersionStorage.saveVersion(
+                        college.id,
+                        essay.id,
+                        essayDraft.content,
+                        result.updatedEssay,
+                        feedback
+                    );
+
+                    // Update state to show new version immediately
+                    setEssayVersions(prev => [newVersion, ...prev]);
+
+                    // Update the essay in storage
+                    essayStorage.saveEssay(college.id, essay.id, result.updatedEssay);
+
+                    applied++;
+                    toast.success(`✅ ${college.name}: Updated (${result.originalWordCount} → ${result.updatedWordCount} words)`);
+                } else {
+                    errors++;
+                    toast.error(`❌ Failed to update ${college.name}`);
+                }
+            } catch (err) {
+                console.error(`Failed to apply feedback for ${college.name}:`, err);
+                toast.error(`❌ Error updating ${college.name}`);
+                errors++;
+            }
+        }
+
+        setIsApplyingFeedback(false);
+        setFeedbackProgress({ current: 0, total: 0 });
+        toast.success(`✨ Applied feedback to ${applied} essays (${errors} errors)`);
+    }, []);
+
     return {
         tasks,
         isRunning,
@@ -571,6 +660,10 @@ export function useAutomationEngine() {
         reset,
         retryFailed,
         generateAllTasks,
+        applyFeedbackToEssays,
+        isApplyingFeedback,
+        feedbackProgress,
+        essayVersions,
     };
 }
 
@@ -594,6 +687,10 @@ export function AutomationDashboard() {
         reset,
         retryFailed,
         generateAllTasks,
+        applyFeedbackToEssays,
+        isApplyingFeedback,
+        feedbackProgress,
+        essayVersions,
     } = useAutomationEngine();
 
     const [showSettings, setShowSettings] = useState(false);
@@ -686,6 +783,31 @@ export function AutomationDashboard() {
                             style={{ background: 'var(--bg-secondary)' }}
                         >
                             Reset
+                        </motion.button>
+
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={applyFeedbackToEssays}
+                            disabled={isApplyingFeedback}
+                            className="px-4 py-2 rounded-xl font-medium flex items-center gap-2"
+                            style={{
+                                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                                color: 'white',
+                                opacity: isApplyingFeedback ? 0.7 : 1,
+                            }}
+                        >
+                            {isApplyingFeedback ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Applying ({feedbackProgress.current}/{feedbackProgress.total})
+                                </>
+                            ) : (
+                                <>
+                                    <Zap className="w-4 h-4" />
+                                    Apply Feedback
+                                </>
+                            )}
                         </motion.button>
                     </div>
                 </div>
@@ -961,6 +1083,66 @@ export function AutomationDashboard() {
                                             </div>
                                         ))}
                                     </div>
+
+                                    {/* Version History Section */}
+                                    {essayVersions.length > 0 && (
+                                        <div className="mt-6 pt-6 border-t border-white/10">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-sm font-bold flex items-center gap-2">
+                                                    <History className="w-4 h-4" style={{ color: 'var(--primary-400)' }} />
+                                                    Essay Version History ({essayVersions.length})
+                                                </h3>
+                                            </div>
+                                            <div className="space-y-3">
+                                                {essayVersions.slice(0, 10).map((version) => {
+                                                    const college = targetColleges.find(c => c.id === version.collegeId);
+                                                    return (
+                                                        <div
+                                                            key={version.id}
+                                                            className="p-4 rounded-xl border bg-orange-500/5 border-orange-500/20"
+                                                        >
+                                                            <div className="flex items-center justify-between mb-3">
+                                                                <div className="flex items-center gap-2">
+                                                                    <Edit2 className="w-4 h-4 text-orange-400" />
+                                                                    <span className="font-bold text-sm">{college?.name || version.collegeId}</span>
+                                                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-bold">
+                                                                        v{version.version}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="text-[10px] text-right" style={{ color: 'var(--text-muted)' }}>
+                                                                    <div>{new Date(version.timestamp).toLocaleDateString()}</div>
+                                                                    <div>{new Date(version.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="grid grid-cols-2 gap-3 text-xs">
+                                                                <div className="p-2 rounded-lg bg-white/5">
+                                                                    <div className="text-[10px] font-bold mb-1 text-red-400">Before ({version.wordCountBefore} words)</div>
+                                                                    <p className="line-clamp-3" style={{ color: 'var(--text-muted)' }}>
+                                                                        {version.originalContent.slice(0, 150)}...
+                                                                    </p>
+                                                                </div>
+                                                                <div className="p-2 rounded-lg bg-white/5">
+                                                                    <div className="text-[10px] font-bold mb-1 text-green-400">After ({version.wordCountAfter} words)</div>
+                                                                    <p className="line-clamp-3" style={{ color: 'var(--text-muted)' }}>
+                                                                        {version.updatedContent.slice(0, 150)}...
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+
+                                                            {version.feedbackApplied.length > 0 && (
+                                                                <div className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                                                                    <span className="font-bold">Feedback applied:</span>{' '}
+                                                                    {version.feedbackApplied.slice(0, 2).join(', ')}
+                                                                    {version.feedbackApplied.length > 2 && ` +${version.feedbackApplied.length - 2} more`}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </div>
