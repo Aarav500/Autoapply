@@ -228,6 +228,8 @@ async function perfectEssay(
     missingSpark?: boolean
 ): Promise<string> {
 
+    const isPanicMode = iteration > 5; // After 5 tries, stop being creative and just fix it.
+
     // Dynamic strategy based on weak categories
     let specificFocus = "";
     if (categoryScores) {
@@ -243,6 +245,10 @@ async function perfectEssay(
     if (missingSpark) {
         specificFocus += `\nCRITICAL: The essay lacks a "SPARK". You MUST take a risk. Add a moment of raw vulnerability, a counter-intuitive insight, or a unique connection. Do not be safe.`;
     }
+
+    const obedienceInstruction = isPanicMode
+        ? `\nCRITICAL INSTRUCTION (ITERATION ${iteration}): You are stuck. The reviewer is rejecting your changes. STOP being "creative". If the feedback suggests a specific phrase or example, USE IT EXACTLY. If it asks to remove a metaphor, DELETE IT. Do not paraphrase. Literal obedience is required now.`
+        : "";
 
     const systemPrompt = `You are a legendary essay consultant with 100% admission rate. 
 This is iteration ${iteration} of perfection. Your job is to make this essay FLAWLESS.
@@ -265,7 +271,7 @@ STRATEGY:
 - If Specificity is low: Add concrete numbers, proper nouns, and sensory details.
 - If Authenticity is low: Rewrite to sound more conversational and less "polished".
 - If College Fit is low: Name drop specific professors, labs, or traditions.
-- cut fluff ruthlessly to make space for substance.
+- cut fluff ruthlessly to make space for substance.${obedienceInstruction}
 
 Output ONLY the perfected essay, nothing else.`;
 
