@@ -32,13 +32,21 @@ class BrowserManager {
         if (this.browser) return;
 
         this.log('Initializing browser...');
+
+        const isProduction = process.env.NODE_ENV === 'production';
+        const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+
         this.browser = await puppeteer.launch({
-            headless: false, // Set to true for production
+            headless: isProduction, // Headless in production, visible locally
+            executablePath: executablePath || undefined, // Use system Chromium if set
             defaultViewport: { width: 1280, height: 800 },
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-blink-features=AutomationControlled',
+                '--disable-dev-shm-usage', // Overcome limited resource problems in containers
+                '--disable-gpu', // GPU not needed for headless
+                '--single-process', // Reduce memory usage
             ],
         });
 
