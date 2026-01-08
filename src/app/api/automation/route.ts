@@ -1,35 +1,38 @@
 // ============================================
-// AUTOMATION API - Start/Stop/Status/OTP
+// AUTOMATION API - Universal Form Filler
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { browserManager } from '@/lib/automation/browser';
-import { runBoldOrgWorkflow } from '@/lib/automation/bold-org-bot';
+import { fillFormAtUrl, DEFAULT_PROFILE } from '@/lib/automation/form-filler';
 
 // Store active workflow promise
-let activeWorkflow: Promise<void> | null = null;
+let activeWorkflow: Promise<any> | null = null;
 
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { action, platform, otp } = body;
+        const { action, url, otp, profile } = body;
 
         switch (action) {
-            case 'start':
+            case 'fill-form':
+                if (!url) {
+                    return NextResponse.json({ error: 'URL required' }, { status: 400 });
+                }
+
                 if (browserManager.getState().status === 'running') {
                     return NextResponse.json({ error: 'Automation already running' }, { status: 400 });
                 }
 
-                // Start the workflow in background
-                if (platform === 'bold-org' || platform === 'scholarships') {
-                    activeWorkflow = runBoldOrgWorkflow();
-                } else {
-                    return NextResponse.json({ error: 'Unknown platform' }, { status: 400 });
-                }
+                // Start the form filler in background
+                activeWorkflow = fillFormAtUrl(url, profile || DEFAULT_PROFILE);
+
+                // Wait a bit for it to start
+                await new Promise(r => setTimeout(r, 500));
 
                 return NextResponse.json({
                     success: true,
-                    message: 'Automation started',
+                    message: 'Form filler started',
                     state: browserManager.getState()
                 });
 
