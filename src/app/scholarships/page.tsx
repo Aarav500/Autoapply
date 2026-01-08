@@ -246,7 +246,7 @@ export default function ScholarshipsPage() {
                         {hasProfile ? 'Edit Profile' : 'Setup Profile'}
                     </Button>
                     <Button
-                        variant="outline"
+                        variant="secondary"
                         onClick={handleScan}
                         disabled={isScanning}
                         icon={isScanning ? <Sparkles className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}

@@ -244,7 +244,7 @@ export default function OpportunitiesPage() {
                             <Link href="/automation">
                                 <Button>Go to Automation Dashboard</Button>
                             </Link>
-                            <Button variant="outline" onClick={addSampleData}>
+                            <Button variant="secondary" onClick={addSampleData}>
                                 Add Sample Data
                             </Button>
                         </div>
