@@ -139,14 +139,14 @@ export default function DocumentsPage() {
                         </p>
                     </div>
                     <div className="flex gap-3">
-                        <Button onClick={fetchDocuments} variant="outline" icon={<RefreshCw className="w-4 h-4" />}>
+                        <Button onClick={fetchDocuments} variant="secondary" icon={<RefreshCw className="w-4 h-4" />}>
                             Refresh
                         </Button>
                         <Button onClick={downloadAll} icon={<Download className="w-4 h-4" />}>
                             Export All
                         </Button>
                         <Link href="/automation">
-                            <Button variant="outline">Back to Dashboard</Button>
+                            <Button variant="secondary">Back to Dashboard</Button>
                         </Link>
                     </div>
                 </div>
