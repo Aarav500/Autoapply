@@ -52,17 +52,17 @@ export default function JobHubPage() {
     const handleScan = async () => {
         setIsScanning(true);
         try {
-            toast('Starting discovery scan...', 'info');
+            toast.info('Starting discovery scan...');
             const result = await runDiscoveryScan('jobs');
             if (result.success) {
-                toast(`Scan complete!`, 'success');
+                toast.success('Scan complete!');
                 refreshJobs();
             } else {
-                toast(`Scan failed: ${result.error}`, 'error');
+                toast.error(`Scan failed: ${result.error}`);
             }
         } catch (error) {
             console.error(error);
-            toast('Scan failed to execute', 'error');
+            toast.error('Scan failed to execute');
         } finally {
             setIsScanning(false);
         }
