@@ -6,10 +6,11 @@ import { Card, Button } from '@/components/ui';
 import {
     FileText, File, Download, ExternalLink, Copy, Check, Loader2,
     Briefcase, GraduationCap, Building, Filter, Search, Star,
-    ChevronDown, ChevronUp, RefreshCw, Trash2, Eye, FileCheck
+    ChevronDown, ChevronUp, RefreshCw, Trash2, Eye, FileCheck, Sparkles
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from '@/lib/error-handling';
+import { runDiscoveryScan } from '@/app/actions/discovery';
 
 interface StoredDocument {
     id: string;
@@ -57,6 +58,7 @@ export default function DocumentsPage() {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [viewingDoc, setViewingDoc] = useState<StoredDocument | null>(null);
     const [copied, setCopied] = useState<string | null>(null);
+    const [isScanning, setIsScanning] = useState(false);
 
     const fetchDocuments = useCallback(async () => {
         try {
@@ -102,6 +104,25 @@ export default function DocumentsPage() {
         toast.success('Downloading all documents...');
     };
 
+    const handleScan = async () => {
+        setIsScanning(true);
+        toast.info('🔍 Scanning 10 platforms for opportunities...');
+        try {
+            const result = await runDiscoveryScan('all');
+            if (result.success) {
+                toast.success('✅ Scan complete! Generating documents...');
+                // Wait a bit then refresh to get new docs
+                setTimeout(() => fetchDocuments(), 2000);
+            } else {
+                toast.error(`Scan failed: ${result.error}`);
+            }
+        } catch (error) {
+            toast.error('Scan failed');
+        } finally {
+            setIsScanning(false);
+        }
+    };
+
     const filteredDocs = documents.filter(d => {
         const matchesFilter =
             filter === 'all' ||
@@ -139,15 +160,19 @@ export default function DocumentsPage() {
                         </p>
                     </div>
                     <div className="flex gap-3">
+                        <Button
+                            onClick={handleScan}
+                            disabled={isScanning}
+                            icon={isScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                        >
+                            {isScanning ? 'Scanning...' : 'Scan for Opportunities'}
+                        </Button>
                         <Button onClick={fetchDocuments} variant="secondary" icon={<RefreshCw className="w-4 h-4" />}>
                             Refresh
                         </Button>
-                        <Button onClick={downloadAll} icon={<Download className="w-4 h-4" />}>
+                        <Button onClick={downloadAll} variant="secondary" icon={<Download className="w-4 h-4" />}>
                             Export All
                         </Button>
-                        <Link href="/automation">
-                            <Button variant="secondary">Back to Dashboard</Button>
-                        </Link>
                     </div>
                 </div>
 
