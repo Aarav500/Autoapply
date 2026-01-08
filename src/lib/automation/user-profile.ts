@@ -103,7 +103,7 @@ export const DEFAULT_PROFILE: UserProfile = {
     // Education
     school: 'University of California, Riverside',
     major: 'Computer Science',
-    gpa: 3.8,
+    gpa: 3.9,
     graduationYear: 2026,
     graduationMonth: 'June',
     degree: 'Bachelor of Science',
@@ -113,7 +113,7 @@ export const DEFAULT_PROFILE: UserProfile = {
             school: 'University of California, Riverside',
             degree: 'Bachelor of Science',
             major: 'Computer Science',
-            gpa: 3.8,
+            gpa: 3.9,
             graduationYear: 2026,
             graduationMonth: 'June',
         }

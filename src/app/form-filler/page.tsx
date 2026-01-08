@@ -28,7 +28,7 @@ const USER_PROFILE = {
     phone: '+1 (950) 906-2964',
     school: 'UC Riverside',
     major: 'Computer Science',
-    gpa: '3.8',
+    gpa: '3.9',
     graduationYear: '2026',
     linkedIn: 'linkedin.com/in/aarav-shah-9b878329a',
 };
@@ -199,10 +199,10 @@ export default function FormFillerPage() {
                 {/* Status Badge */}
                 <div className="flex items-center justify-center mt-4">
                     <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${state.status === 'running' ? 'bg-blue-500/20' :
-                            state.status === 'paused_for_otp' ? 'bg-yellow-500/20' :
-                                state.status === 'completed' ? 'bg-green-500/20' :
-                                    state.status === 'error' ? 'bg-red-500/20' :
-                                        'bg-gray-500/20'
+                        state.status === 'paused_for_otp' ? 'bg-yellow-500/20' :
+                            state.status === 'completed' ? 'bg-green-500/20' :
+                                state.status === 'error' ? 'bg-red-500/20' :
+                                    'bg-gray-500/20'
                         }`}>
                         <StatusIcon className={`w-5 h-5 ${statusColors[state.status]} ${state.status === 'running' ? 'animate-spin' : ''
                             }`} />
