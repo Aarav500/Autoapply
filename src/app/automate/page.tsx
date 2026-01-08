@@ -65,7 +65,28 @@ export default function AutoApplyDashboard() {
         }
     };
 
-    // Seed sample data
+    // Discover REAL opportunities from the web
+    const discoverReal = async () => {
+        try {
+            toast.info('🔍 Starting real discovery... This may take a minute.');
+            const res = await fetch('/api/discover', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'discover-all', keywords: 'software engineer intern' }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success('🚀 Discovery started! Scraping real scholarships & jobs...');
+                setIsPolling(true);
+            } else {
+                toast.error(data.error || 'Failed to start discovery');
+            }
+        } catch (err) {
+            toast.error('Failed to start discovery');
+        }
+    };
+
+    // Seed sample data (for testing)
     const seedData = async () => {
         try {
             await fetch('/api/opportunities?action=seed');
@@ -158,6 +179,9 @@ export default function AutoApplyDashboard() {
                 </div>
 
                 <div className="flex gap-3">
+                    <Button variant="secondary" onClick={discoverReal} icon={<Target className="w-4 h-4" />}>
+                        🔍 Discover Real
+                    </Button>
                     <Button variant="secondary" onClick={seedData} icon={<RefreshCw className="w-4 h-4" />}>
                         Load Samples
                     </Button>
@@ -199,8 +223,8 @@ export default function AutoApplyDashboard() {
                             {state.currentStep || 'Processing...'}
                         </span>
                         <span className={`px-2 py-1 rounded text-xs ${state.status === 'completed' ? 'bg-green-500/20 text-green-400' :
-                                state.status === 'error' ? 'bg-red-500/20 text-red-400' :
-                                    'bg-blue-500/20 text-blue-400'
+                            state.status === 'error' ? 'bg-red-500/20 text-red-400' :
+                                'bg-blue-500/20 text-blue-400'
                             }`}>
                             {state.status.toUpperCase()}
                         </span>
@@ -264,7 +288,7 @@ export default function AutoApplyDashboard() {
 
                             <div className="text-right">
                                 <div className={`text-2xl font-bold ${opp.matchScore >= 90 ? 'text-green-400' :
-                                        opp.matchScore >= 80 ? 'text-yellow-400' : 'text-gray-400'
+                                    opp.matchScore >= 80 ? 'text-yellow-400' : 'text-gray-400'
                                     }`}>
                                     {opp.matchScore}%
                                 </div>

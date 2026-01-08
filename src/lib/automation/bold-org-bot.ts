@@ -85,7 +85,7 @@ async function signUpOrLogin(page: any, bm: typeof browserManager): Promise<void
 
     if (signUpLink) {
         await signUpLink.click();
-        await page.waitForTimeout(2000);
+        await new Promise(r => setTimeout(r, 2000));
     }
 
     // Fill email
@@ -104,7 +104,7 @@ async function signUpOrLogin(page: any, bm: typeof browserManager): Promise<void
 
     if (continueBtn) {
         await continueBtn.click();
-        await page.waitForTimeout(3000);
+        await new Promise(r => setTimeout(r, 3000));
     }
 
     // Check if OTP/verification is needed
@@ -120,7 +120,7 @@ async function signUpOrLogin(page: any, bm: typeof browserManager): Promise<void
         const verifyBtn = await page.$('button[type="submit"]');
         if (verifyBtn) {
             await verifyBtn.click();
-            await page.waitForTimeout(3000);
+            await new Promise(r => setTimeout(r, 3000));
         }
     }
 
@@ -154,7 +154,7 @@ async function findAndApplyScholarships(page: any, bm: typeof browserManager): P
 
             if (cards[i]) {
                 await cards[i].click();
-                await page.waitForTimeout(2000);
+                await new Promise(r => setTimeout(r, 2000));
 
                 // Look for apply button
                 const applyBtn = await page.$('button:has-text("Apply")') ||
@@ -162,7 +162,7 @@ async function findAndApplyScholarships(page: any, bm: typeof browserManager): P
 
                 if (applyBtn) {
                     await applyBtn.click();
-                    await page.waitForTimeout(3000);
+                    await new Promise(r => setTimeout(r, 3000));
                     bm.log(`Applied to scholarship ${i + 1}`);
                 } else {
                     bm.log(`No apply button found for scholarship ${i + 1}`);
@@ -170,7 +170,7 @@ async function findAndApplyScholarships(page: any, bm: typeof browserManager): P
 
                 // Go back
                 await page.goBack();
-                await page.waitForTimeout(1000);
+                await new Promise(r => setTimeout(r, 1000));
             }
         } catch (err) {
             bm.log(`Error applying to scholarship ${i + 1}: ${err}`);
