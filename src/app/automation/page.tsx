@@ -1,323 +1,356 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card, Button, ProgressBar } from '@/components/ui';
+import { Card, Button } from '@/components/ui';
 import {
-    Zap, Play, Pause, RefreshCw, AlertCircle, CheckCircle,
-    Terminal, Clock, Rocket, KeyRound, Send, Loader2
+    Zap, Play, Square, RefreshCw, AlertCircle, CheckCircle,
+    Terminal, Rocket, Loader2, Settings, Search, Activity,
+    Briefcase, GraduationCap, Building, Power, List, ExternalLink, FileText
 } from 'lucide-react';
 import { toast } from '@/lib/error-handling';
+import Link from 'next/link';
 
-interface AutomationState {
-    status: 'idle' | 'running' | 'paused_for_otp' | 'completed' | 'error';
-    currentStep: string;
-    logs: string[];
-    progress: number;
-    totalSteps: number;
-    otpRequired?: boolean;
-    otpPlatform?: string;
-    error?: string;
+interface AutomationStatus {
+    running: boolean;
+    lastDiscoveryScan: string | null;
+    lastApplicationAttempt: string | null;
+    applicationsToday: number;
+    totalDiscovered: number;
+    totalApplied: number;
+    currentActivity: string;
+    errors: string[];
 }
 
-export default function AutomationDashboard() {
-    const [state, setState] = useState<AutomationState>({
-        status: 'idle',
-        currentStep: '',
-        logs: [],
-        progress: 0,
-        totalSteps: 0,
-    });
-    const [otp, setOtp] = useState('');
-    const [isPolling, setIsPolling] = useState(false);
+// All scrapers list - COMPLETE
+const ALL_SCRAPERS = [
+    { id: 'linkedin', name: 'LinkedIn', icon: Briefcase, type: 'job' },
+    { id: 'indeed', name: 'Indeed', icon: Briefcase, type: 'job' },
+    { id: 'glassdoor', name: 'Glassdoor', icon: Briefcase, type: 'job' },
+    { id: 'handshake', name: 'Handshake', icon: GraduationCap, type: 'job' },
+    { id: 'ziprecruiter', name: 'ZipRecruiter', icon: Briefcase, type: 'job' },
+    { id: 'companies', name: 'Tech Companies', icon: Building, type: 'job' },
+    { id: 'bold-org', name: 'Bold.org', icon: GraduationCap, type: 'scholarship' },
+    { id: 'fastweb', name: 'Fastweb', icon: GraduationCap, type: 'scholarship' },
+    { id: 'scholarships-com', name: 'Scholarships.com', icon: GraduationCap, type: 'scholarship' },
+    { id: 'chegg', name: 'Chegg Internships', icon: Briefcase, type: 'job' },
+];
 
-    // Poll for status updates
+export default function FullyAutomatedDashboard() {
+    const [status, setStatus] = useState<AutomationStatus | null>(null);
+    const [logs, setLogs] = useState<string[]>([]);
+    const [autoStarted, setAutoStarted] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const logsEndRef = useRef<HTMLDivElement>(null);
+
+    // Fetch status
+    const fetchStatus = useCallback(async () => {
+        try {
+            const res = await fetch('/api/automation/engine');
+            const data = await res.json();
+            if (data.success) {
+                setStatus(data.status);
+                setLogs(data.logs || []);
+            }
+        } catch {
+            // API may not be ready
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    // AUTO-START on page load - NO BUTTON NEEDED
     useEffect(() => {
-        let interval: NodeJS.Timeout;
+        const autoStart = async () => {
+            // Wait a bit for initial fetch
+            await new Promise(r => setTimeout(r, 500));
+            await fetchStatus();
 
-        if (isPolling) {
-            interval = setInterval(async () => {
+            // Auto-start if not already running
+            if (!autoStarted) {
                 try {
-                    const res = await fetch('/api/automation');
+                    const res = await fetch('/api/automation/engine?action=start', { method: 'POST' });
                     const data = await res.json();
-                    if (data.state) {
-                        setState(data.state);
-
-                        if (data.state.status === 'completed' || data.state.status === 'error') {
-                            setIsPolling(false);
-                        }
+                    if (data.success) {
+                        toast.success('🚀 Automation started automatically!');
+                        setAutoStarted(true);
                     }
                 } catch (err) {
-                    console.error('Polling error:', err);
+                    console.error('Auto-start failed:', err);
                 }
-            }, 1000);
-        }
-
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [isPolling]);
-
-    const startAutomation = async (platform: string) => {
-        try {
-            const res = await fetch('/api/automation', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'start', platform }),
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                toast.success('🚀 Automation started!');
-                setIsPolling(true);
-            } else {
-                toast.error(data.error || 'Failed to start');
             }
-        } catch (err) {
-            toast.error('Failed to start automation');
-        }
-    };
+        };
 
-    const stopAutomation = async () => {
+        autoStart();
+    }, [fetchStatus, autoStarted]);
+
+    // Poll for updates every 2 seconds
+    useEffect(() => {
+        const interval = setInterval(fetchStatus, 2000);
+        return () => clearInterval(interval);
+    }, [fetchStatus]);
+
+    // Auto-scroll logs
+    useEffect(() => {
+        logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [logs]);
+
+    // STOP automation
+    const handleStop = async () => {
         try {
-            await fetch('/api/automation', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'stop' }),
-            });
-            setIsPolling(false);
-            setState(prev => ({ ...prev, status: 'idle' }));
-            toast.info('Automation stopped');
-        } catch (err) {
+            await fetch('/api/automation/engine?action=stop', { method: 'POST' });
+            toast.success('Automation stopped');
+            setAutoStarted(false);
+            await fetchStatus();
+        } catch {
             toast.error('Failed to stop');
         }
     };
 
-    const submitOTP = async () => {
-        if (!otp.trim()) {
-            toast.error('Please enter the OTP');
-            return;
-        }
-
+    // RESTART automation
+    const handleRestart = async () => {
         try {
-            const res = await fetch('/api/automation', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'otp', otp: otp.trim() }),
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                toast.success('OTP submitted, continuing...');
-                setOtp('');
-            }
-        } catch (err) {
-            toast.error('Failed to submit OTP');
+            await fetch('/api/automation/engine?action=start', { method: 'POST' });
+            toast.success('🚀 Automation restarted!');
+            setAutoStarted(true);
+            await fetchStatus();
+        } catch {
+            toast.error('Failed to restart');
         }
     };
 
-    const statusColors = {
-        idle: 'text-gray-400',
-        running: 'text-blue-400',
-        paused_for_otp: 'text-yellow-400',
-        completed: 'text-green-400',
-        error: 'text-red-400',
+    // Trigger immediate scan
+    const handleScanNow = async () => {
+        try {
+            await fetch('/api/automation/engine?action=discover', { method: 'POST' });
+            toast.success('🔍 Full scan triggered!');
+        } catch {
+            toast.error('Failed to scan');
+        }
     };
 
-    const statusIcons = {
-        idle: Clock,
-        running: Loader2,
-        paused_for_otp: KeyRound,
-        completed: CheckCircle,
-        error: AlertCircle,
-    };
+    const isRunning = status?.running ?? false;
 
-    const StatusIcon = statusIcons[state.status];
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+                <div className="text-center">
+                    <Loader2 className="w-16 h-16 animate-spin text-purple-400 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-white">Starting Automation...</h2>
+                    <p className="text-gray-400 mt-2">The system is initializing automatically</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div className="max-w-4xl mx-auto p-6 space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold flex items-center gap-3">
-                        <Zap className="w-8 h-8 text-yellow-400" />
-                        Automation Control Center
-                    </h1>
-                    <p className="text-gray-400">
-                        Real browser automation for scholarships & jobs
-                    </p>
-                </div>
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
+            <div className="max-w-7xl mx-auto space-y-6">
 
-                <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${state.status === 'running' ? 'bg-blue-500/20' :
-                        state.status === 'paused_for_otp' ? 'bg-yellow-500/20' :
-                            state.status === 'completed' ? 'bg-green-500/20' :
-                                state.status === 'error' ? 'bg-red-500/20' :
-                                    'bg-gray-500/20'
-                    }`}>
-                    <StatusIcon className={`w-5 h-5 ${statusColors[state.status]} ${state.status === 'running' ? 'animate-spin' : ''
-                        }`} />
-                    <span className={`font-medium ${statusColors[state.status]}`}>
-                        {state.status.replace(/_/g, ' ').toUpperCase()}
-                    </span>
-                </div>
-            </div>
-
-            {/* OTP Modal */}
-            <AnimatePresence>
-                {state.status === 'paused_for_otp' && (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                    >
-                        <Card className="border-2 border-yellow-500 bg-yellow-500/10">
-                            <div className="flex items-center gap-3 mb-4">
-                                <KeyRound className="w-6 h-6 text-yellow-400" />
-                                <div>
-                                    <h3 className="font-bold text-lg">Verification Required</h3>
-                                    <p className="text-sm text-gray-400">
-                                        {state.otpPlatform} needs verification. Check your email/phone.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex gap-3">
-                                <input
-                                    type="text"
-                                    value={otp}
-                                    onChange={(e) => setOtp(e.target.value)}
-                                    placeholder="Enter OTP/verification code"
-                                    className="flex-1 px-4 py-3 rounded-xl bg-black/30 border border-yellow-500/30 focus:border-yellow-500 outline-none"
-                                />
-                                <Button
-                                    onClick={submitOTP}
-                                    icon={<Send className="w-4 h-4" />}
-                                    className="bg-yellow-500 hover:bg-yellow-600"
-                                >
-                                    Submit
-                                </Button>
-                            </div>
-                        </Card>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Control Buttons */}
-            <div className="grid grid-cols-3 gap-4">
-                <Card
-                    className="cursor-pointer hover:border-blue-500/50 transition-all"
-                    onClick={() => startAutomation('bold-org')}
-                >
-                    <div className="text-center">
-                        <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center mx-auto mb-3">
-                            <Rocket className="w-6 h-6 text-blue-400" />
-                        </div>
-                        <h3 className="font-bold">Bold.org</h3>
-                        <p className="text-xs text-gray-400">Scholarship Auto-Apply</p>
+                {/* Header with PROMINENT STOP button */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-4xl font-bold flex items-center gap-3 text-white">
+                            <Zap className="w-10 h-10 text-yellow-400" />
+                            FULLY AUTOMATED
+                        </h1>
+                        <p className="text-purple-300 text-lg">
+                            Applying to ALL jobs & scholarships automatically - no action needed
+                        </p>
                     </div>
-                </Card>
 
-                <Card
-                    className="cursor-pointer hover:border-green-500/50 transition-all opacity-50"
-                    onClick={() => toast.info('LinkedIn coming soon!')}
-                >
-                    <div className="text-center">
-                        <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center mx-auto mb-3">
-                            <Zap className="w-6 h-6 text-green-400" />
-                        </div>
-                        <h3 className="font-bold">LinkedIn</h3>
-                        <p className="text-xs text-gray-400">Easy Apply Jobs</p>
-                    </div>
-                </Card>
-
-                <Card
-                    className="cursor-pointer hover:border-red-500/50 transition-all"
-                    onClick={stopAutomation}
-                >
-                    <div className="text-center">
-                        <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center mx-auto mb-3">
-                            <Pause className="w-6 h-6 text-red-400" />
-                        </div>
-                        <h3 className="font-bold">Stop All</h3>
-                        <p className="text-xs text-gray-400">Kill automation</p>
-                    </div>
-                </Card>
-            </div>
-
-            {/* Progress */}
-            {state.status !== 'idle' && (
-                <Card>
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium">{state.currentStep || 'Initializing...'}</span>
-                        <span className="text-sm text-gray-400">
-                            {state.progress}/{state.totalSteps}
-                        </span>
-                    </div>
-                    <div className="h-3 bg-gray-800 rounded-full overflow-hidden">
-                        <motion.div
-                            className="h-full bg-gradient-to-r from-blue-500 to-cyan-400"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${(state.progress / Math.max(state.totalSteps, 1)) * 100}%` }}
-                        />
-                    </div>
-                </Card>
-            )}
-
-            {/* Live Logs */}
-            <Card>
-                <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-medium flex items-center gap-2">
-                        <Terminal className="w-4 h-4" />
-                        Live Logs
-                    </h3>
-                    {state.status === 'running' && (
-                        <span className="flex items-center gap-1 text-xs text-green-400">
-                            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                            LIVE
-                        </span>
-                    )}
-                </div>
-
-                <div className="bg-black/50 rounded-xl p-4 h-64 overflow-y-auto font-mono text-sm space-y-1">
-                    {state.logs.length === 0 ? (
-                        <p className="text-gray-500">No logs yet. Start an automation to see output.</p>
-                    ) : (
-                        state.logs.map((log, i) => (
-                            <motion.div
-                                key={i}
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                className="text-gray-300"
+                    {/* BIG STOP BUTTON - Always visible */}
+                    <div className="flex gap-3">
+                        <Link href="/opportunities">
+                            <button className="flex items-center gap-2 px-4 py-4 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-2xl shadow-lg shadow-purple-500/30 transition-all hover:scale-105">
+                                <List className="w-5 h-5" />
+                                Opportunities
+                            </button>
+                        </Link>
+                        <Link href="/documents">
+                            <button className="flex items-center gap-2 px-4 py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-2xl shadow-lg shadow-green-500/30 transition-all hover:scale-105">
+                                <FileText className="w-5 h-5" />
+                                Documents
+                            </button>
+                        </Link>
+                        {isRunning ? (
+                            <button
+                                onClick={handleStop}
+                                className="flex items-center gap-3 px-8 py-4 bg-red-600 hover:bg-red-700 text-white font-bold text-xl rounded-2xl shadow-lg shadow-red-500/30 transition-all hover:scale-105"
                             >
-                                {log}
-                            </motion.div>
-                        ))
-                    )}
+                                <Square className="w-6 h-6" />
+                                STOP
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleRestart}
+                                className="flex items-center gap-3 px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-bold text-xl rounded-2xl shadow-lg shadow-green-500/30 transition-all hover:scale-105"
+                            >
+                                <Play className="w-6 h-6" />
+                                START
+                            </button>
+                        )}
+                    </div>
                 </div>
-            </Card>
 
-            {/* User Info */}
-            <Card className="bg-slate-800/50">
-                <h3 className="font-medium mb-3">Profile Being Used</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                        <span className="text-gray-400">Email:</span>
-                        <span className="ml-2">ashah264@ucr.edu</span>
+                {/* Status Banner */}
+                <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`rounded-2xl p-6 ${isRunning
+                        ? 'bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30'
+                        : 'bg-gradient-to-r from-gray-600/20 to-slate-600/20 border border-gray-500/30'
+                        }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className={`w-4 h-4 rounded-full ${isRunning ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`} />
+                            <div>
+                                <span className={`text-2xl font-bold ${isRunning ? 'text-green-400' : 'text-gray-400'}`}>
+                                    {isRunning ? '● RUNNING' : '○ STOPPED'}
+                                </span>
+                                <p className="text-gray-300">{status?.currentActivity || 'Idle'}</p>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={handleScanNow}
+                            disabled={!isRunning}
+                            className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all"
+                        >
+                            <Search className="w-5 h-5" />
+                            Scan All Sources Now
+                        </button>
                     </div>
-                    <div>
-                        <span className="text-gray-400">Phone:</span>
-                        <span className="ml-2">+1 (950) 906-2964</span>
-                    </div>
-                    <div>
-                        <span className="text-gray-400">School:</span>
-                        <span className="ml-2">UC Riverside</span>
-                    </div>
-                    <div>
-                        <span className="text-gray-400">Major:</span>
-                        <span className="ml-2">Computer Science</span>
-                    </div>
+                </motion.div>
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <Card className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 border-blue-500/30">
+                        <div className="text-center p-4">
+                            <div className="text-4xl font-bold text-blue-400">{status?.totalDiscovered || 0}</div>
+                            <div className="text-blue-200 mt-1">Opportunities Found</div>
+                        </div>
+                    </Card>
+                    <Card className="bg-gradient-to-br from-green-600/20 to-green-800/20 border-green-500/30">
+                        <div className="text-center p-4">
+                            <div className="text-4xl font-bold text-green-400">{status?.totalApplied || 0}</div>
+                            <div className="text-green-200 mt-1">Applications Sent</div>
+                        </div>
+                    </Card>
+                    <Card className="bg-gradient-to-br from-yellow-600/20 to-yellow-800/20 border-yellow-500/30">
+                        <div className="text-center p-4">
+                            <div className="text-4xl font-bold text-yellow-400">{status?.applicationsToday || 0}</div>
+                            <div className="text-yellow-200 mt-1">Applied Today</div>
+                        </div>
+                    </Card>
+                    <Card className="bg-gradient-to-br from-purple-600/20 to-purple-800/20 border-purple-500/30">
+                        <div className="text-center p-4">
+                            <div className="text-4xl font-bold text-purple-400">{ALL_SCRAPERS.length}</div>
+                            <div className="text-purple-200 mt-1">Active Sources</div>
+                        </div>
+                    </Card>
                 </div>
-            </Card>
+
+                {/* Active Sources */}
+                <Card className="bg-slate-800/50 border-slate-700">
+                    <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                        <Activity className="w-5 h-5 text-purple-400" />
+                        Monitoring {ALL_SCRAPERS.length} Sources
+                    </h2>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {ALL_SCRAPERS.map((scraper) => {
+                            const Icon = scraper.icon;
+                            return (
+                                <div
+                                    key={scraper.id}
+                                    className={`flex items-center gap-2 p-3 rounded-xl ${scraper.type === 'job'
+                                        ? 'bg-blue-500/10 border border-blue-500/30'
+                                        : 'bg-green-500/10 border border-green-500/30'
+                                        }`}
+                                >
+                                    <Icon className={`w-5 h-5 ${scraper.type === 'job' ? 'text-blue-400' : 'text-green-400'}`} />
+                                    <span className="text-white font-medium">{scraper.name}</span>
+                                    {isRunning && <CheckCircle className="w-4 h-4 text-green-400 ml-auto" />}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </Card>
+
+                {/* Live Logs */}
+                <Card className="bg-slate-800/50 border-slate-700">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                            <Terminal className="w-5 h-5 text-gray-400" />
+                            Live Activity
+                        </h2>
+                        {isRunning && (
+                            <span className="flex items-center gap-2 text-sm text-green-400">
+                                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                                LIVE
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="bg-black/50 rounded-xl p-4 h-80 overflow-y-auto font-mono text-sm">
+                        {logs.length === 0 ? (
+                            <div className="text-gray-500 text-center py-8">
+                                <Rocket className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                <p>Automation starting...</p>
+                                <p className="text-xs mt-1">Logs will appear here</p>
+                            </div>
+                        ) : (
+                            logs.slice(-100).map((log, i) => (
+                                <motion.div
+                                    key={i}
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    className={`py-0.5 ${log.includes('✅') || log.includes('✓') ? 'text-green-400' :
+                                        log.includes('❌') || log.includes('error') ? 'text-red-400' :
+                                            log.includes('🔍') || log.includes('🚀') ? 'text-blue-400' :
+                                                log.includes('⚠️') ? 'text-yellow-400' :
+                                                    'text-gray-300'
+                                        }`}
+                                >
+                                    {log}
+                                </motion.div>
+                            ))
+                        )}
+                        <div ref={logsEndRef} />
+                    </div>
+                </Card>
+
+                {/* Errors */}
+                <AnimatePresence>
+                    {status?.errors && status.errors.length > 0 && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                        >
+                            <Card className="bg-red-900/20 border-red-500/30">
+                                <h3 className="font-bold text-red-400 mb-2 flex items-center gap-2">
+                                    <AlertCircle className="w-5 h-5" />
+                                    Errors ({status.errors.length})
+                                </h3>
+                                <ul className="text-sm space-y-1 text-red-300">
+                                    {status.errors.slice(-5).map((err, i) => (
+                                        <li key={i}>• {err}</li>
+                                    ))}
+                                </ul>
+                            </Card>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Info Footer */}
+                <div className="text-center text-gray-500 text-sm">
+                    <p>This system automatically discovers and applies to opportunities 24/7</p>
+                    <p>Jobs: LinkedIn, Indeed, Glassdoor, Handshake, ZipRecruiter, Tech Companies</p>
+                    <p>Scholarships: Bold.org, Fastweb</p>
+                </div>
+            </div>
         </div>
     );
 }

@@ -38,6 +38,12 @@ const emptyProfile: UserProfile = {
 
 type FilterType = 'all' | 'indian' | 'college' | 'autoapply' | 'stem';
 
+import { getAllOpportunities, Opportunity } from '@/lib/automation/opportunity-store';
+import { runDiscoveryScan } from '@/app/actions/discovery';
+import { RefreshCw } from 'lucide-react';
+
+// ... (UserProfile interface)
+
 export default function ScholarshipsPage() {
     const [filter, setFilter] = useState<FilterType>('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -45,6 +51,29 @@ export default function ScholarshipsPage() {
     const [appliedScholarships, setAppliedScholarships] = useState<Set<string>>(new Set());
     const [isAutoApplying, setIsAutoApplying] = useState(false);
     const [showProfileSetup, setShowProfileSetup] = useState(false);
+    const [isScanning, setIsScanning] = useState(false);
+    const [scannedScholarships, setScannedScholarships] = useState<Opportunity[]>([]);
+
+    const handleScan = async () => {
+        setIsScanning(true);
+        try {
+            toast('Starting discovery scan...', 'info');
+            const result = await runDiscoveryScan('scholarships');
+            if (result.success) {
+                toast(`Scan complete!`, 'success');
+                // Refresh list using store
+                const allOpps = getAllOpportunities();
+                setScannedScholarships(allOpps.filter(o => o.type === 'scholarship'));
+            } else {
+                toast(`Scan failed: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error(error);
+            toast('Scan failed to execute', 'error');
+        } finally {
+            setIsScanning(false);
+        }
+    };
 
     // Load user profile from persistent storage (replaces hardcoded mock data)
     const { data: userProfile, setData: setUserProfile, isLoading: profileLoading } = useS3Storage<UserProfile | null>(
@@ -87,22 +116,43 @@ export default function ScholarshipsPage() {
 
         let scholarships = getScholarshipsForProfile(userProfile);
 
+        // Merge static and scanned
+        const allScholarships = [...scholarships];
+
+        // Map scanned opportunities to Scholarship interface format if needed
+        scannedScholarships.forEach(s => {
+            allScholarships.push({
+                id: s.id,
+                name: s.title,
+                provider: s.organization,
+                amount: typeof s.amount === 'number' ? `$${s.amount}` : (s.amount || 'Unknown'),
+                deadline: new Date(s.deadline || Date.now() + 30 * 24 * 60 * 60 * 1000),
+                description: s.description,
+                requirements: { essays: 0, lors: 0, transcript: false, financialDocs: false }, // Default
+                eligibility: s.requirements || [],
+                autoApplySupported: true,
+                applicationUrl: s.url
+            } as any);
+        });
+
         // Apply filter
         switch (filter) {
             case 'indian':
-                scholarships = scholarships.filter(s => s.forIndian);
+                scholarships = allScholarships.filter(s => s.forIndian);
                 break;
             case 'college':
-                scholarships = scholarships.filter(s => s.colleges && s.colleges.length > 0);
+                scholarships = allScholarships.filter(s => s.colleges && s.colleges.length > 0);
                 break;
             case 'autoapply':
-                scholarships = scholarships.filter(s => s.autoApplySupported);
+                scholarships = allScholarships.filter(s => s.autoApplySupported);
                 break;
             case 'stem':
-                scholarships = scholarships.filter(s =>
+                scholarships = allScholarships.filter(s =>
                     s.majors?.some(m => ['Computer Science', 'Engineering', 'Math', 'STEM'].includes(m))
                 );
                 break;
+            default:
+                scholarships = allScholarships;
         }
 
         // Apply search
@@ -116,7 +166,7 @@ export default function ScholarshipsPage() {
         }
 
         return scholarships;
-    }, [filter, searchQuery, hasProfile, userProfile]);
+    }, [filter, searchQuery, hasProfile, userProfile, scannedScholarships]);
 
     // Stats
     const stats = useMemo(() => ({
@@ -194,6 +244,14 @@ export default function ScholarshipsPage() {
                         onClick={() => setShowProfileSetup(true)}
                     >
                         {hasProfile ? 'Edit Profile' : 'Setup Profile'}
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={handleScan}
+                        disabled={isScanning}
+                        icon={isScanning ? <Sparkles className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    >
+                        {isScanning ? 'Scanning...' : 'Scan New'}
                     </Button>
                     <Button
                         size="lg"

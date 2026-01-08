@@ -189,11 +189,23 @@ export async function discoverJobs(keywords = 'software engineer intern'): Promi
     const jobs = await scrapeLinkedInJobs(keywords, 20);
     let addedCount = 0;
 
-    for (const job of jobs) {
-        const matchScore = calculateJobMatchScore(job);
+    // Dynamically import MatchEngine to avoid circular dependencies if any
+    const { MatchEngine } = await import('../../intelligence/match-engine');
 
-        // Only add if score is above threshold
-        if (matchScore >= 50) {
+    for (const job of jobs) {
+        // Create temp opportunity object for analysis
+        const tempOpp: any = {
+            title: job.title,
+            description: job.description,
+            requirements: job.requirements,
+            organization: job.company,
+            // ... other fields
+        };
+
+        const analysis = MatchEngine.analyze(tempOpp as any);
+
+        // Only add if it's at least a Reach (not "Not Eligible")
+        if (analysis.category !== 'Not Eligible') {
             addOpportunity({
                 type: 'job',
                 title: job.title,
@@ -203,12 +215,12 @@ export async function discoverJobs(keywords = 'software engineer intern'): Promi
                 salary: job.salary,
                 requirements: job.requirements,
                 description: job.description,
-                matchScore,
+                matchScore: analysis.score,
             });
             addedCount++;
-            bm.log(`➕ Added: ${job.title} at ${job.company} (${matchScore}% match)`);
+            bm.log(`➕ Added: ${job.title} at ${job.company} (${analysis.category} - ${analysis.score}%)`);
         } else {
-            bm.log(`⏭ Skipped: ${job.title} (${matchScore}% match - too low)`);
+            bm.log(`⏭ Skipped: ${job.title} (Not Eligible: ${analysis.missingRequirements.join(', ')})`);
         }
     }
 

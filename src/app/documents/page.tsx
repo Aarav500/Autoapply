@@ -1,1142 +1,438 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card, Button, StatusBadge, Input, Tag } from '@/components/ui';
-import { useS3Storage } from '@/lib/useS3Storage';
-import { toast } from '@/lib/error-handling';
-import { getAIConfig, extractFromDocument, ExtractedActivity, ExtractedAchievement } from '@/lib/ai-providers';
+import { Card, Button } from '@/components/ui';
 import {
-    FolderOpen,
-    Upload,
-    FileText,
-    File,
-    Trash2,
-    Eye,
-    Download,
-    Plus,
-    Search,
-    GraduationCap,
-    Briefcase,
-    Award,
-    BookOpen,
-    Activity,
-    CheckCircle2,
-    X,
-    Loader2,
-    Save,
-    RefreshCw,
-    AlertCircle,
-    Sparkles,
-    Brain,
-    Link,
-    ExternalLink,
-    Target
+    FileText, File, Download, ExternalLink, Copy, Check, Loader2,
+    Briefcase, GraduationCap, Building, Filter, Search, Star,
+    ChevronDown, ChevronUp, RefreshCw, Trash2, Eye, FileCheck
 } from 'lucide-react';
+import Link from 'next/link';
+import { toast } from '@/lib/error-handling';
 
-interface Document {
+interface StoredDocument {
     id: string;
-    name: string;
-    type: 'resume' | 'paper' | 'transcript' | 'certificate' | 'other';
-    size: string;
-    uploadedAt: string;
-    status: 'analyzed' | 'processing' | 'pending';
-}
-
-interface ActivityItem {
-    id: string;
-    name: string;
-    role: string;
+    opportunityId: string;
+    opportunityTitle: string;
     organization: string;
-    startDate: string;
-    endDate: string;
-    description: string;
-    hoursPerWeek: number;
-    weeksPerYear: number;
+    type: 'cv' | 'essay' | 'cover_letter';
+    content: string;
+    createdAt: string;
+    opportunityType: 'job' | 'scholarship';
+    opportunityUrl: string;
+    matchScore: number;
 }
 
-interface Achievement {
-    id: string;
-    title: string;
-    org: string;
-    date: string;
+interface OpportunityDocuments {
+    opportunity: {
+        id: string;
+        type: 'job' | 'scholarship';
+        title: string;
+        organization: string;
+        url: string;
+        matchScore: number;
+    };
+    cv: StoredDocument | null;
+    essay: StoredDocument | null;
+    coverLetter: StoredDocument | null;
+    generatedAt: string;
 }
 
-interface UserProfile {
-    gpa: string;
-    major: string;
-    targetMajor: string;
-    values: string[];
-    interests: string[];
-    goals: string;
+interface DocumentStats {
+    totalOpportunities: number;
+    totalCVs: number;
+    totalEssays: number;
+    totalCoverLetters: number;
+    jobDocuments: number;
+    scholarshipDocuments: number;
 }
-
-type TabType = 'documents' | 'activities' | 'achievements' | 'profile';
-
-const emptyActivity: Partial<ActivityItem> = {
-    name: '',
-    role: '',
-    organization: '',
-    startDate: '',
-    endDate: '',
-    description: '',
-    hoursPerWeek: 0,
-    weeksPerYear: 0,
-};
 
 export default function DocumentsPage() {
-    const [activeTab, setActiveTab] = useState<TabType>('documents');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [isDragging, setIsDragging] = useState(false);
-    const [showActivityModal, setShowActivityModal] = useState(false);
-    const [editingActivity, setEditingActivity] = useState<ActivityItem | null>(null);
-    const [newActivity, setNewActivity] = useState<Partial<ActivityItem>>(emptyActivity);
-    const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
-    const [isUploading, setIsUploading] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [documents, setDocuments] = useState<OpportunityDocuments[]>([]);
+    const [stats, setStats] = useState<DocumentStats | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [filter, setFilter] = useState<'all' | 'jobs' | 'scholarships'>('all');
+    const [search, setSearch] = useState('');
+    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [viewingDoc, setViewingDoc] = useState<StoredDocument | null>(null);
+    const [copied, setCopied] = useState<string | null>(null);
 
-    // S3 Storage hooks for persistent data
-    const {
-        data: documents,
-        setData: setDocuments,
-        isLoading: docsLoading,
-        isSaving: docsSaving,
-        lastSaved: docsLastSaved,
-    } = useS3Storage<Document[]>('documents', { defaultValue: [] });
-
-    const {
-        data: activities,
-        setData: setActivities,
-        isLoading: activitiesLoading,
-        isSaving: activitiesSaving,
-        lastSaved: activitiesLastSaved,
-        save: saveActivities,
-    } = useS3Storage<ActivityItem[]>('activities', { defaultValue: [] });
-
-    const {
-        data: achievements,
-        setData: setAchievements,
-        isLoading: achievementsLoading,
-        isSaving: achievementsSaving,
-    } = useS3Storage<Achievement[]>('achievements', { defaultValue: [] });
-
-    // Research and Application Links
-    interface LinksData {
-        researchPaperUrl: string;
-        applicationUrl: string;
-        portfolioUrl: string;
-        otherLinks: string[];
-    }
-    const defaultLinks: LinksData = {
-        researchPaperUrl: '',
-        applicationUrl: '',
-        portfolioUrl: '',
-        otherLinks: [],
-    };
-    const {
-        data: links,
-        setData: setLinks,
-    } = useS3Storage<LinksData>('user-links', { defaultValue: defaultLinks });
-
-    const defaultProfile: UserProfile = {
-        gpa: '3.90',
-        major: 'Computer Science',
-        targetMajor: '',
-        values: ['Innovation', 'Technical Excellence', 'Design', 'Impact'],
-        interests: ['Artificial Intelligence', 'Software Engineering', 'Robotics'],
-        goals: 'I want to transfer to a top university to deepen my knowledge in Computer Science and work on cutting-edge research.',
-    };
-
-    const {
-        data: profile,
-        setData: setProfile,
-        isLoading: profileLoading,
-        isSaving: profileSaving,
-    } = useS3Storage<UserProfile>('profile', { defaultValue: defaultProfile });
-
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: { staggerChildren: 0.05 },
-        },
-    };
-
-    const itemVariants = {
-        hidden: { opacity: 0, y: 20 },
-        visible: { opacity: 1, y: 0 },
-    };
-
-    const handleDragOver = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragging(true);
-    }, []);
-
-    const handleDragLeave = useCallback(() => {
-        setIsDragging(false);
-    }, []);
-
-    // Detect document type from file name/extension
-    const detectDocumentType = (fileName: string): Document['type'] => {
-        const lower = fileName.toLowerCase();
-        if (lower.includes('resume') || lower.includes('cv')) return 'resume';
-        if (lower.includes('paper') || lower.includes('research')) return 'paper';
-        if (lower.includes('transcript') || lower.includes('grade')) return 'transcript';
-        if (lower.includes('certificate') || lower.includes('award')) return 'certificate';
-        return 'other';
-    };
-
-    // Format file size for display
-    const formatFileSize = (bytes: number): string => {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-    };
-
-    // Process and upload files
-    const uploadFiles = useCallback(async (files: File[]) => {
-        if (files.length === 0) return;
-
-        // Validate files
-        const validExtensions = ['.pdf', '.doc', '.docx', '.txt'];
-        const maxSize = 10 * 1024 * 1024; // 10MB
-
-        const validFiles = files.filter(file => {
-            const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-            if (!validExtensions.includes(ext)) {
-                toast.error(`${file.name}: Invalid file type. Supports PDF, DOC, DOCX, TXT`);
-                return false;
-            }
-            if (file.size > maxSize) {
-                toast.error(`${file.name}: File too large (max 10MB)`);
-                return false;
-            }
-            return true;
-        });
-
-        if (validFiles.length === 0) return;
-
-        setIsUploading(true);
-        toast.info(`📁 Processing ${validFiles.length} file(s)...`);
-
+    const fetchDocuments = useCallback(async () => {
         try {
-            for (const file of validFiles) {
-                const docId = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
-                const docType = detectDocumentType(file.name);
-
-                // Add document with pending status
-                const newDoc: Document = {
-                    id: docId,
-                    name: file.name,
-                    type: docType,
-                    size: formatFileSize(file.size),
-                    uploadedAt: new Date().toLocaleDateString('en-US', {
-                        month: 'short', day: 'numeric', year: 'numeric'
-                    }),
-                    status: 'pending' as const,
-                };
-                setDocuments(prev => [...prev, newDoc]);
-
-                // Parse document to extract text
-                toast.info(`🔍 Parsing ${file.name}...`);
-                const formData = new FormData();
-                formData.append('file', file);
-
-                try {
-                    const parseResponse = await fetch('/api/documents/parse', {
-                        method: 'POST',
-                        body: formData,
-                    });
-
-                    if (!parseResponse.ok) {
-                        throw new Error('Failed to parse document');
-                    }
-
-                    const parseResult = await parseResponse.json();
-
-                    // Check if AI is configured for extraction
-                    if (parseResult.text && parseResult.text.length > 100) {
-                        toast.info(`🧠 AI extracting activities from ${file.name}...`);
-
-                        // Call server-side AI extraction API (uses runtime CLAUDE_API_KEY)
-                        const extractResponse = await fetch('/api/documents/extract', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                text: parseResult.text,
-                                documentType: docType,
-                            }),
-                        });
-
-                        const extraction = await extractResponse.json();
-
-                        if (extraction.error === 'AI not configured') {
-                            // AI not configured on server - fallback to local config
-                            const aiConfig = getAIConfig();
-                            if (aiConfig) {
-                                const clientExtraction = await extractFromDocument(
-                                    aiConfig,
-                                    parseResult.text,
-                                    docType as 'resume' | 'paper' | 'transcript' | 'certificate' | 'other'
-                                );
-                                extraction.activities = clientExtraction.activities;
-                                extraction.achievements = clientExtraction.achievements;
-                                extraction.summary = clientExtraction.summary;
-                            } else {
-                                setDocuments(prev => prev.map(doc =>
-                                    doc.id === docId ? { ...doc, status: 'analyzed' as const } : doc
-                                ));
-                                toast.info(`📄 ${file.name} processed. Set up AI API key for auto-extraction.`);
-                                continue;
-                            }
-                        }
-
-                        // Add extracted activities
-                        if (extraction.activities && extraction.activities.length > 0) {
-                            const newActivities: ActivityItem[] = extraction.activities.map((a: ExtractedActivity) => ({
-                                id: Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9),
-                                name: a.name,
-                                role: a.role,
-                                organization: a.organization,
-                                startDate: a.startDate,
-                                endDate: a.endDate,
-                                description: a.description,
-                                hoursPerWeek: a.hoursPerWeek,
-                                weeksPerYear: a.weeksPerYear,
-                            }));
-                            setActivities(prev => [...prev, ...newActivities]);
-                            toast.success(`✨ Extracted ${extraction.activities.length} activities from ${file.name}`);
-                        }
-
-                        // Add extracted achievements
-                        if (extraction.achievements && extraction.achievements.length > 0) {
-                            const newAchievements: Achievement[] = extraction.achievements.map((a: ExtractedAchievement) => ({
-                                id: Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9),
-                                title: a.title,
-                                org: a.description, // Map description to org field
-                                date: a.date,
-                            }));
-                            setAchievements(prev => [...prev, ...newAchievements]);
-                            toast.success(`🏆 Extracted ${extraction.achievements.length} achievements from ${file.name}`);
-                        }
-
-                        // Add extracted profile info
-                        if (extraction.major || extraction.gpa) {
-                            setProfile(prev => ({
-                                ...prev,
-                                major: extraction.major || prev.major,
-                                gpa: extraction.gpa || prev.gpa,
-                            }));
-                            if (extraction.major && extraction.gpa) {
-                                toast.success(`🎓 Extracted Profile: ${extraction.major} (GPA: ${extraction.gpa})`);
-                            } else if (extraction.major) {
-                                toast.success(`🎓 Extracted Major: ${extraction.major}`);
-                            } else if (extraction.gpa) {
-                                toast.success(`📈 Extracted GPA: ${extraction.gpa}`);
-                            }
-                        }
-
-                        // Update document status to analyzed
-                        setDocuments(prev => prev.map(doc =>
-                            doc.id === docId ? { ...doc, status: 'analyzed' as const } : doc
-                        ));
-
-                        if (extraction.summary) {
-                            toast.success(`📄 ${extraction.summary}`);
-                        }
-                    } else {
-                        // Document too short
-                        setDocuments(prev => prev.map(doc =>
-                            doc.id === docId ? { ...doc, status: 'analyzed' as const } : doc
-                        ));
-                        toast.info(`📄 ${file.name} processed.`);
-                    }
-                } catch (parseError) {
-                    console.error('Parse error:', parseError);
-                    setDocuments(prev => prev.map(doc =>
-                        doc.id === docId ? { ...doc, status: 'pending' as const } : doc
-                    ));
-                    toast.error(`Failed to process ${file.name}`);
-                }
+            const res = await fetch('/api/automation/documents');
+            const data = await res.json();
+            if (data.success) {
+                setDocuments(data.documents || []);
+                setStats(data.stats);
             }
-
-            toast.success(`✅ All documents processed!`);
-
-        } catch (error) {
-            console.error('Upload error:', error);
-            toast.error('Failed to process files. Please try again.');
+        } catch (err) {
+            console.error('Failed to fetch documents:', err);
         } finally {
-            setIsUploading(false);
+            setLoading(false);
         }
-    }, [setDocuments, setActivities, setAchievements]);
+    }, []);
 
-    const handleDrop = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragging(false);
-        const files = Array.from(e.dataTransfer.files);
-        uploadFiles(files);
-    }, [uploadFiles]);
+    useEffect(() => {
+        fetchDocuments();
+        const interval = setInterval(fetchDocuments, 5000);
+        return () => clearInterval(interval);
+    }, [fetchDocuments]);
 
-    const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files ? Array.from(e.target.files) : [];
-        uploadFiles(files);
-        // Reset input so same file can be selected again
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
-    }, [uploadFiles]);
-
-    const getTypeIcon = (type: string) => {
-        switch (type) {
-            case 'resume': return <Briefcase className="w-5 h-5" />;
-            case 'paper': return <BookOpen className="w-5 h-5" />;
-            case 'transcript': return <GraduationCap className="w-5 h-5" />;
-            case 'certificate': return <Award className="w-5 h-5" />;
-            default: return <File className="w-5 h-5" />;
-        }
+    const copyToClipboard = async (content: string, docId: string) => {
+        await navigator.clipboard.writeText(content);
+        setCopied(docId);
+        toast.success('Copied to clipboard!');
+        setTimeout(() => setCopied(null), 2000);
     };
 
-    const getTypeColor = (type: string) => {
-        switch (type) {
-            case 'resume': return 'var(--accent-teal)';
-            case 'paper': return 'var(--primary-400)';
-            case 'transcript': return 'var(--accent-purple)';
-            case 'certificate': return 'var(--accent-gold)';
-            default: return 'var(--text-muted)';
-        }
+    const downloadDocument = (doc: StoredDocument) => {
+        const blob = new Blob([doc.content], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${doc.opportunityTitle.replace(/[^a-z0-9]/gi, '_')}_${doc.type}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success('Downloaded!');
     };
 
-    // Activity CRUD operations with validation
-    const validateActivity = () => {
-        const errors: Record<string, string> = {};
-        if (!newActivity.name?.trim()) errors.name = 'Activity name is required';
-        if (!newActivity.role?.trim()) errors.role = 'Your role is required';
-        if (newActivity.hoursPerWeek && (newActivity.hoursPerWeek < 0 || newActivity.hoursPerWeek > 168)) {
-            errors.hoursPerWeek = 'Hours must be between 0-168';
-        }
-        setFormErrors(errors);
-        return Object.keys(errors).length === 0;
+    const downloadAll = async () => {
+        window.open('/api/automation/documents?format=json', '_blank');
+        toast.success('Downloading all documents...');
     };
 
-    const handleAddActivity = () => {
-        if (!validateActivity()) {
-            toast.error('Please fix the errors in the form');
-            return;
-        }
+    const filteredDocs = documents.filter(d => {
+        const matchesFilter =
+            filter === 'all' ||
+            (filter === 'jobs' && d.opportunity.type === 'job') ||
+            (filter === 'scholarships' && d.opportunity.type === 'scholarship');
 
-        const activity: ActivityItem = {
-            id: Date.now().toString(),
-            name: newActivity.name?.trim() || '',
-            role: newActivity.role?.trim() || '',
-            organization: newActivity.organization?.trim() || '',
-            startDate: newActivity.startDate || '',
-            endDate: newActivity.endDate || 'Present',
-            description: newActivity.description?.trim() || '',
-            hoursPerWeek: newActivity.hoursPerWeek || 0,
-            weeksPerYear: newActivity.weeksPerYear || 0,
-        };
+        const matchesSearch = search === '' ||
+            d.opportunity.title.toLowerCase().includes(search.toLowerCase()) ||
+            d.opportunity.organization.toLowerCase().includes(search.toLowerCase());
 
-        setActivities(prev => [...prev, activity]);
-        setNewActivity(emptyActivity);
-        setFormErrors({});
-        setShowActivityModal(false);
-        toast.success('Activity added successfully!');
-    };
+        return matchesFilter && matchesSearch;
+    });
 
-    const handleEditActivity = (activity: ActivityItem) => {
-        setEditingActivity(activity);
-        setNewActivity(activity);
-        setShowActivityModal(true);
-    };
-
-    const handleUpdateActivity = () => {
-        if (!editingActivity) return;
-        if (!validateActivity()) {
-            toast.error('Please fix the errors in the form');
-            return;
-        }
-
-        setActivities(prev =>
-            prev.map(a => a.id === editingActivity.id
-                ? { ...a, ...newActivity } as ActivityItem
-                : a
-            )
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+                <Loader2 className="w-16 h-16 animate-spin text-purple-400" />
+            </div>
         );
-        setEditingActivity(null);
-        setNewActivity(emptyActivity);
-        setFormErrors({});
-        setShowActivityModal(false);
-        toast.success('Activity updated successfully!');
-    };
-
-    const handleDeleteActivity = (id: string) => {
-        setActivities(prev => prev.filter(a => a.id !== id));
-        setShowDeleteConfirm(null);
-        toast.success('Activity deleted');
-    };
-
-    const handleAddAchievement = () => {
-        const title = prompt('Achievement title:');
-        const org = prompt('Organization:');
-        const date = prompt('Date (e.g., 2025):');
-
-        if (title && org && date) {
-            setAchievements(prev => [...prev, {
-                id: Date.now().toString(),
-                title,
-                org,
-                date,
-            }]);
-        }
-    };
-
-    const handleDeleteAchievement = (id: string) => {
-        setAchievements(prev => prev.filter(a => a.id !== id));
-        setShowDeleteConfirm(null);
-        toast.success('Achievement deleted');
-    };
-
-    const filteredDocuments = documents.filter(doc =>
-        doc.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    const isLoading = docsLoading || activitiesLoading || achievementsLoading || profileLoading;
-    const isSaving = docsSaving || activitiesSaving || achievementsSaving || profileSaving;
+    }
 
     return (
-        <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="space-y-6"
-        >
-            {/* Header */}
-            <motion.div variants={itemVariants} className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-                        Document Hub
-                    </h1>
-                    <p style={{ color: 'var(--text-secondary)' }}>
-                        Manage your documents, activities, and achievements for applications
-                    </p>
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
+            <div className="max-w-7xl mx-auto space-y-6">
+
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-4xl font-bold text-white flex items-center gap-3">
+                            <FileCheck className="w-10 h-10 text-green-400" />
+                            Generated Documents
+                        </h1>
+                        <p className="text-purple-300 text-lg">
+                            CVs, Cover Letters & Essays tailored for each opportunity
+                        </p>
+                    </div>
+                    <div className="flex gap-3">
+                        <Button onClick={fetchDocuments} variant="outline" icon={<RefreshCw className="w-4 h-4" />}>
+                            Refresh
+                        </Button>
+                        <Button onClick={downloadAll} icon={<Download className="w-4 h-4" />}>
+                            Export All
+                        </Button>
+                        <Link href="/automation">
+                            <Button variant="outline">Back to Dashboard</Button>
+                        </Link>
+                    </div>
                 </div>
-                <div className="flex items-center gap-3">
-                    {isSaving && (
-                        <span className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Saving...
-                        </span>
-                    )}
-                    {!isSaving && activitiesLastSaved && (
-                        <span className="flex items-center gap-2 text-sm" style={{ color: 'var(--success)' }}>
-                            <CheckCircle2 className="w-4 h-4" />
-                            Saved
-                        </span>
-                    )}
+
+                {/* Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                    <Card className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 border-blue-500/30 p-4">
+                        <div className="text-center">
+                            <div className="text-3xl font-bold text-blue-400">{stats?.totalOpportunities || 0}</div>
+                            <div className="text-blue-200 text-sm">Total</div>
+                        </div>
+                    </Card>
+                    <Card className="bg-gradient-to-br from-green-600/20 to-green-800/20 border-green-500/30 p-4">
+                        <div className="text-center">
+                            <FileText className="w-5 h-5 mx-auto text-green-400 mb-1" />
+                            <div className="text-2xl font-bold text-green-400">{stats?.totalCVs || 0}</div>
+                            <div className="text-green-200 text-sm">CVs</div>
+                        </div>
+                    </Card>
+                    <Card className="bg-gradient-to-br from-purple-600/20 to-purple-800/20 border-purple-500/30 p-4">
+                        <div className="text-center">
+                            <File className="w-5 h-5 mx-auto text-purple-400 mb-1" />
+                            <div className="text-2xl font-bold text-purple-400">{stats?.totalCoverLetters || 0}</div>
+                            <div className="text-purple-200 text-sm">Cover Letters</div>
+                        </div>
+                    </Card>
+                    <Card className="bg-gradient-to-br from-yellow-600/20 to-yellow-800/20 border-yellow-500/30 p-4">
+                        <div className="text-center">
+                            <GraduationCap className="w-5 h-5 mx-auto text-yellow-400 mb-1" />
+                            <div className="text-2xl font-bold text-yellow-400">{stats?.totalEssays || 0}</div>
+                            <div className="text-yellow-200 text-sm">Essays</div>
+                        </div>
+                    </Card>
+                    <Card className="bg-gradient-to-br from-indigo-600/20 to-indigo-800/20 border-indigo-500/30 p-4">
+                        <div className="text-center">
+                            <Briefcase className="w-5 h-5 mx-auto text-indigo-400 mb-1" />
+                            <div className="text-2xl font-bold text-indigo-400">{stats?.jobDocuments || 0}</div>
+                            <div className="text-indigo-200 text-sm">Jobs</div>
+                        </div>
+                    </Card>
+                    <Card className="bg-gradient-to-br from-emerald-600/20 to-emerald-800/20 border-emerald-500/30 p-4">
+                        <div className="text-center">
+                            <GraduationCap className="w-5 h-5 mx-auto text-emerald-400 mb-1" />
+                            <div className="text-2xl font-bold text-emerald-400">{stats?.scholarshipDocuments || 0}</div>
+                            <div className="text-emerald-200 text-sm">Scholarships</div>
+                        </div>
+                    </Card>
                 </div>
-            </motion.div>
 
-            {/* Loading State */}
-            {isLoading && (
-                <Card className="flex items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--primary-400)' }} />
-                    <span className="ml-3">Loading your data...</span>
-                </Card>
-            )}
+                {/* Filters */}
+                <div className="flex flex-col md:flex-row gap-4">
+                    <div className="flex gap-2 bg-slate-800/50 p-1 rounded-xl">
+                        <button
+                            onClick={() => setFilter('all')}
+                            className={`px-4 py-2 rounded-lg font-medium transition-all ${filter === 'all' ? 'bg-purple-500 text-white' : 'text-gray-400 hover:text-white'
+                                }`}
+                        >
+                            All
+                        </button>
+                        <button
+                            onClick={() => setFilter('jobs')}
+                            className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${filter === 'jobs' ? 'bg-blue-500 text-white' : 'text-gray-400 hover:text-white'
+                                }`}
+                        >
+                            <Briefcase className="w-4 h-4" />
+                            Jobs
+                        </button>
+                        <button
+                            onClick={() => setFilter('scholarships')}
+                            className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${filter === 'scholarships' ? 'bg-green-500 text-white' : 'text-gray-400 hover:text-white'
+                                }`}
+                        >
+                            <GraduationCap className="w-4 h-4" />
+                            Scholarships
+                        </button>
+                    </div>
 
-            {!isLoading && (
-                <>
-                    {/* Stats */}
-                    <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <Card className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(20, 184, 166, 0.15)' }}>
-                                <FileText className="w-6 h-6" style={{ color: 'var(--accent-teal)' }} />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">{documents.length}</p>
-                                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Documents</p>
-                            </div>
-                        </Card>
-                        <Card className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(168, 85, 247, 0.15)' }}>
-                                <Activity className="w-6 h-6" style={{ color: 'var(--accent-purple)' }} />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">{activities.length}</p>
-                                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Activities</p>
-                            </div>
-                        </Card>
-                        <Card className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(245, 158, 11, 0.15)' }}>
-                                <Award className="w-6 h-6" style={{ color: 'var(--accent-gold)' }} />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">{achievements.length}</p>
-                                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Achievements</p>
-                            </div>
-                        </Card>
-                        <Card className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(34, 197, 94, 0.15)' }}>
-                                <CheckCircle2 className="w-6 h-6" style={{ color: 'var(--success)' }} />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">{documents.filter(d => d.status === 'analyzed').length}</p>
-                                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>AI Analyzed</p>
-                            </div>
-                        </Card>
-                    </motion.div>
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="Search by title or organization..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-gray-400 focus:border-purple-500 outline-none"
+                        />
+                    </div>
+                </div>
 
-                    {/* Tabs */}
-                    <motion.div variants={itemVariants} className="flex flex-wrap gap-2">
-                        {(['documents', 'activities', 'achievements', 'profile'] as TabType[]).map((tab) => (
-                            <Button
-                                key={tab}
-                                variant={activeTab === tab ? 'primary' : 'secondary'}
-                                onClick={() => setActiveTab(tab)}
-                                icon={
-                                    tab === 'documents' ? <FolderOpen className="w-4 h-4" /> :
-                                        tab === 'activities' ? <Activity className="w-4 h-4" /> :
-                                            tab === 'achievements' ? <Award className="w-4 h-4" /> :
-                                                <GraduationCap className="w-4 h-4" />
-                                }
+                {/* Empty State */}
+                {filteredDocs.length === 0 && (
+                    <Card className="text-center py-16">
+                        <FileText className="w-16 h-16 mx-auto text-gray-500 mb-4" />
+                        <h3 className="text-2xl font-bold text-white mb-2">No Documents Generated Yet</h3>
+                        <p className="text-gray-400 mb-6">
+                            The automation system will generate CVs, essays, and cover letters for each discovered opportunity.
+                        </p>
+                        <Link href="/automation">
+                            <Button>Go to Automation Dashboard</Button>
+                        </Link>
+                    </Card>
+                )}
+
+                {/* Documents List */}
+                <div className="space-y-4">
+                    <AnimatePresence>
+                        {filteredDocs.map((docSet, index) => (
+                            <motion.div
+                                key={docSet.opportunity.id}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                transition={{ delay: index * 0.05 }}
                             >
-                                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                            </Button>
-                        ))}
-                    </motion.div>
-
-                    {/* Documents Tab */}
-                    {activeTab === 'documents' && (
-                        <>
-                            {/* Upload Area */}
-                            <motion.div variants={itemVariants}>
-                                {/* Hidden file input - outside Card to prevent double-trigger */}
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    multiple
-                                    accept=".pdf,.doc,.docx,.txt"
-                                    onChange={handleFileInputChange}
-                                    className="hidden"
-                                    style={{ display: 'none' }}
-                                />
-                                <Card
-                                    className={`border-2 border-dashed transition-colors cursor-pointer ${isDragging ? 'border-primary-500' : ''}`}
-                                    style={{ borderColor: isDragging ? 'var(--primary-500)' : 'var(--glass-border)' }}
-                                    onClick={() => !isUploading && fileInputRef.current?.click()}
-                                    onDragOver={handleDragOver}
-                                    onDragLeave={handleDragLeave}
-                                    onDrop={handleDrop}
-                                >
-                                    <div className="py-8 text-center">
-                                        <Upload className="w-12 h-12 mx-auto mb-4" style={{ color: isUploading ? 'var(--primary-400)' : 'var(--text-muted)' }} />
-                                        <h3 className="font-semibold mb-2">
-                                            {isUploading ? 'Uploading...' : 'Drop files here or click to upload'}
-                                        </h3>
-                                        <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
-                                            Supports PDF, DOC, DOCX, TXT (Max 10MB)
-                                        </p>
-                                        <div
-                                            className="inline-block"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            <Button
-                                                icon={<Plus className="w-4 h-4" />}
-                                                disabled={isUploading}
-                                                onClick={() => fileInputRef.current?.click()}
-                                            >
-                                                Choose Files
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </Card>
-                            </motion.div>
-
-                            {/* Important Links Section */}
-                            <motion.div variants={itemVariants}>
-                                <Card>
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(139, 92, 246, 0.15)' }}>
-                                            <Link className="w-5 h-5" style={{ color: 'var(--accent-primary)' }} />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-semibold">Important Links</h3>
-                                            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Share your research papers, applications, and portfolio</p>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1">Research Paper / Preprint</label>
-                                            <div className="flex gap-2">
-                                                <Input
-                                                    placeholder="https://arxiv.org/your-paper"
-                                                    value={links.researchPaperUrl}
-                                                    onChange={(e) => setLinks(prev => ({ ...prev, researchPaperUrl: e.target.value }))}
-                                                    icon={<BookOpen className="w-4 h-4" />}
-                                                    className="flex-1"
-                                                />
-                                                {links.researchPaperUrl && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => window.open(links.researchPaperUrl, '_blank')}
-                                                        icon={<ExternalLink className="w-4 h-4" />}
-                                                    />
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1">Application Link</label>
-                                            <div className="flex gap-2">
-                                                <Input
-                                                    placeholder="https://commonapp.org/your-application"
-                                                    value={links.applicationUrl}
-                                                    onChange={(e) => setLinks(prev => ({ ...prev, applicationUrl: e.target.value }))}
-                                                    icon={<GraduationCap className="w-4 h-4" />}
-                                                    className="flex-1"
-                                                />
-                                                {links.applicationUrl && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => window.open(links.applicationUrl, '_blank')}
-                                                        icon={<ExternalLink className="w-4 h-4" />}
-                                                    />
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1">Portfolio</label>
-                                            <div className="flex gap-2">
-                                                <Input
-                                                    placeholder="https://your-portfolio.com"
-                                                    value={links.portfolioUrl}
-                                                    onChange={(e) => setLinks(prev => ({ ...prev, portfolioUrl: e.target.value }))}
-                                                    icon={<Briefcase className="w-4 h-4" />}
-                                                    className="flex-1"
-                                                />
-                                                {links.portfolioUrl && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => window.open(links.portfolioUrl, '_blank')}
-                                                        icon={<ExternalLink className="w-4 h-4" />}
-                                                    />
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </Card>
-                            </motion.div>
-
-                            {/* Search */}
-                            <motion.div variants={itemVariants}>
-                                <Input
-                                    placeholder="Search documents..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    icon={<Search className="w-4 h-4" />}
-                                    className="max-w-md"
-                                />
-                            </motion.div>
-
-                            {/* Documents List */}
-                            {filteredDocuments.length === 0 ? (
-                                <Card className="text-center py-12">
-                                    <FileText className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
-                                    <h3 className="font-semibold mb-2">No documents yet</h3>
-                                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                                        Upload your first document to get started
-                                    </p>
-                                </Card>
-                            ) : (
-                                <motion.div variants={containerVariants} className="space-y-3">
-                                    {filteredDocuments.map((doc) => (
-                                        <motion.div key={doc.id} variants={itemVariants}>
-                                            <Card className="flex items-center gap-4">
-                                                <div
-                                                    className="w-12 h-12 rounded-xl flex items-center justify-center"
-                                                    style={{ background: `${getTypeColor(doc.type)}20` }}
-                                                >
-                                                    <span style={{ color: getTypeColor(doc.type) }}>
-                                                        {getTypeIcon(doc.type)}
-                                                    </span>
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h3 className="font-medium truncate">{doc.name}</h3>
-                                                    <div className="flex items-center gap-3 text-sm" style={{ color: 'var(--text-muted)' }}>
-                                                        <span>{doc.size}</span>
-                                                        <span>•</span>
-                                                        <span className="capitalize">{doc.type}</span>
-                                                        <span>•</span>
-                                                        <span>{doc.uploadedAt}</span>
-                                                    </div>
-                                                </div>
-                                                <StatusBadge
-                                                    status={doc.status === 'analyzed' ? 'success' : doc.status === 'processing' ? 'warning' : 'neutral'}
-                                                >
-                                                    {doc.status}
-                                                </StatusBadge>
-                                                <div className="flex gap-2">
-                                                    <Button variant="ghost" size="sm" icon={<Eye className="w-4 h-4" />} />
-                                                    <Button variant="ghost" size="sm" icon={<Download className="w-4 h-4" />} />
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        icon={<Trash2 className="w-4 h-4" style={{ color: 'var(--error)' }} />}
-                                                        onClick={() => setDocuments(prev => prev.filter(d => d.id !== doc.id))}
-                                                    />
-                                                </div>
-                                            </Card>
-                                        </motion.div>
-                                    ))}
-                                </motion.div>
-                            )}
-                        </>
-                    )}
-
-                    {/* Activities Tab */}
-                    {activeTab === 'activities' && (
-                        <>
-                            <motion.div variants={itemVariants} className="flex justify-between items-center">
-                                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                                    {activities.length} activities • Data saves automatically
-                                </p>
-                                <Button
-                                    icon={<Plus className="w-4 h-4" />}
-                                    onClick={() => {
-                                        setEditingActivity(null);
-                                        setNewActivity(emptyActivity);
-                                        setShowActivityModal(true);
-                                    }}
-                                >
-                                    Add Activity
-                                </Button>
-                            </motion.div>
-
-                            {activities.length === 0 ? (
-                                <Card className="text-center py-12">
-                                    <Activity className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
-                                    <h3 className="font-semibold mb-2">No activities yet</h3>
-                                    <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
-                                        Add your extracurricular activities, work experience, and involvement
-                                    </p>
-                                    <Button
-                                        icon={<Plus className="w-4 h-4" />}
-                                        onClick={() => setShowActivityModal(true)}
+                                <Card className={`hover:border-purple-500/50 transition-all ${docSet.opportunity.type === 'scholarship' ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-blue-500'
+                                    }`}>
+                                    {/* Header */}
+                                    <div
+                                        className="flex items-center justify-between cursor-pointer"
+                                        onClick={() => setExpandedId(expandedId === docSet.opportunity.id ? null : docSet.opportunity.id)}
                                     >
-                                        Add Your First Activity
-                                    </Button>
-                                </Card>
-                            ) : (
-                                <motion.div variants={containerVariants} className="space-y-4">
-                                    {activities.map((activity, index) => (
-                                        <motion.div key={activity.id} variants={itemVariants}>
-                                            <Card>
-                                                <div className="flex items-start gap-4">
-                                                    <div
-                                                        className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                                                        style={{ background: 'var(--gradient-primary)' }}
-                                                    >
-                                                        <span className="text-xl font-bold text-white">{index + 1}</span>
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <div className="flex items-start justify-between mb-2">
-                                                            <div>
-                                                                <h3 className="font-semibold text-lg">{activity.name}</h3>
-                                                                <p className="text-sm" style={{ color: 'var(--primary-400)' }}>
-                                                                    {activity.role} • {activity.organization}
-                                                                </p>
-                                                            </div>
-                                                            <Tag variant="primary">
-                                                                {activity.startDate} - {activity.endDate}
-                                                            </Tag>
-                                                        </div>
-                                                        <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>
-                                                            {activity.description}
-                                                        </p>
-                                                        <div className="flex gap-4 text-sm" style={{ color: 'var(--text-muted)' }}>
-                                                            <span>{activity.hoursPerWeek} hrs/week</span>
-                                                            <span>•</span>
-                                                            <span>{activity.weeksPerYear} weeks/year</span>
-                                                            <span>•</span>
-                                                            <span className="font-medium" style={{ color: 'var(--accent-teal)' }}>
-                                                                {activity.hoursPerWeek * activity.weeksPerYear} total hours
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex flex-col gap-2">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            icon={<FileText className="w-4 h-4" />}
-                                                            onClick={() => handleEditActivity(activity)}
-                                                        >
-                                                            Edit
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            icon={<Trash2 className="w-4 h-4" style={{ color: 'var(--error)' }} />}
-                                                            onClick={() => handleDeleteActivity(activity.id)}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </Card>
-                                        </motion.div>
-                                    ))}
-                                </motion.div>
-                            )}
-
-                            <motion.div variants={itemVariants}>
-                                <Card className="text-center py-6" style={{ background: 'var(--bg-secondary)' }}>
-                                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                                        💡 Tip: Activities are shared with the essay AI to create personalized content
-                                    </p>
-                                </Card>
-                            </motion.div>
-                        </>
-                    )}
-
-                    {/* Achievements Tab */}
-                    {activeTab === 'achievements' && (
-                        <motion.div variants={containerVariants} className="card-grid">
-                            {achievements.map((achievement) => (
-                                <motion.div key={achievement.id} variants={itemVariants}>
-                                    <Card className="relative">
-                                        <button
-                                            className="absolute top-2 right-2 p-1 rounded hover:bg-red-500/20"
-                                            onClick={() => handleDeleteAchievement(achievement.id)}
-                                        >
-                                            <X className="w-4 h-4" style={{ color: 'var(--error)' }} />
-                                        </button>
-                                        <div className="flex items-center gap-4 mb-4">
-                                            <div
-                                                className="w-14 h-14 rounded-2xl flex items-center justify-center"
-                                                style={{ background: 'var(--gradient-warm)' }}
-                                            >
-                                                <Award className="w-6 h-6 text-white" />
+                                        <div className="flex items-center gap-4">
+                                            <div className={`p-3 rounded-xl ${docSet.opportunity.type === 'scholarship' ? 'bg-green-500/20' : 'bg-blue-500/20'
+                                                }`}>
+                                                {docSet.opportunity.type === 'scholarship'
+                                                    ? <GraduationCap className="w-6 h-6 text-green-400" />
+                                                    : <Briefcase className="w-6 h-6 text-blue-400" />
+                                                }
                                             </div>
                                             <div>
-                                                <h3 className="font-semibold">{achievement.title}</h3>
-                                                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{achievement.org}</p>
+                                                <h3 className="text-xl font-bold text-white">{docSet.opportunity.title}</h3>
+                                                <p className="text-gray-400 flex items-center gap-2">
+                                                    <Building className="w-4 h-4" />
+                                                    {docSet.opportunity.organization}
+                                                </p>
                                             </div>
                                         </div>
-                                        <Tag variant="primary">{achievement.date}</Tag>
-                                    </Card>
-                                </motion.div>
-                            ))}
 
-                            <motion.div variants={itemVariants}>
-                                <Card
-                                    className="flex items-center justify-center h-full min-h-[150px] border-2 border-dashed cursor-pointer hover:border-primary-500 transition-colors"
-                                    style={{ borderColor: 'var(--glass-border)' }}
-                                    onClick={handleAddAchievement}
-                                >
-                                    <div className="text-center">
-                                        <Plus className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-muted)' }} />
-                                        <p style={{ color: 'var(--text-muted)' }}>Add Achievement</p>
+                                        <div className="flex items-center gap-4">
+                                            <div className="flex items-center gap-2">
+                                                <Star className="w-4 h-4 text-yellow-400" />
+                                                <span className="text-xl font-bold text-white">{docSet.opportunity.matchScore}%</span>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {docSet.cv && <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full">CV</span>}
+                                                {docSet.coverLetter && <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs rounded-full">Cover</span>}
+                                                {docSet.essay && <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded-full">Essay</span>}
+                                            </div>
+                                            {expandedId === docSet.opportunity.id
+                                                ? <ChevronUp className="w-5 h-5 text-gray-400" />
+                                                : <ChevronDown className="w-5 h-5 text-gray-400" />
+                                            }
+                                        </div>
                                     </div>
+
+                                    {/* Expanded Content */}
+                                    <AnimatePresence>
+                                        {expandedId === docSet.opportunity.id && (
+                                            <motion.div
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: 'auto', opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                className="mt-4 pt-4 border-t border-slate-700"
+                                            >
+                                                <div className="grid md:grid-cols-3 gap-4">
+                                                    {/* CV */}
+                                                    {docSet.cv && (
+                                                        <div className="bg-slate-800/50 rounded-xl p-4">
+                                                            <div className="flex items-center justify-between mb-3">
+                                                                <h4 className="font-bold text-green-400 flex items-center gap-2">
+                                                                    <FileText className="w-4 h-4" />
+                                                                    Tailored CV
+                                                                </h4>
+                                                                <div className="flex gap-1">
+                                                                    <button
+                                                                        onClick={() => copyToClipboard(docSet.cv!.content, docSet.cv!.id)}
+                                                                        className="p-1 hover:bg-slate-700 rounded"
+                                                                        title="Copy"
+                                                                    >
+                                                                        {copied === docSet.cv.id ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-gray-400" />}
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => downloadDocument(docSet.cv!)}
+                                                                        className="p-1 hover:bg-slate-700 rounded"
+                                                                        title="Download"
+                                                                    >
+                                                                        <Download className="w-4 h-4 text-gray-400" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                            <pre className="text-xs text-gray-300 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                                                                {docSet.cv.content.slice(0, 500)}...
+                                                            </pre>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Cover Letter */}
+                                                    {docSet.coverLetter && (
+                                                        <div className="bg-slate-800/50 rounded-xl p-4">
+                                                            <div className="flex items-center justify-between mb-3">
+                                                                <h4 className="font-bold text-purple-400 flex items-center gap-2">
+                                                                    <File className="w-4 h-4" />
+                                                                    Cover Letter
+                                                                </h4>
+                                                                <div className="flex gap-1">
+                                                                    <button
+                                                                        onClick={() => copyToClipboard(docSet.coverLetter!.content, docSet.coverLetter!.id)}
+                                                                        className="p-1 hover:bg-slate-700 rounded"
+                                                                        title="Copy"
+                                                                    >
+                                                                        {copied === docSet.coverLetter.id ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-gray-400" />}
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => downloadDocument(docSet.coverLetter!)}
+                                                                        className="p-1 hover:bg-slate-700 rounded"
+                                                                        title="Download"
+                                                                    >
+                                                                        <Download className="w-4 h-4 text-gray-400" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                            <pre className="text-xs text-gray-300 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                                                                {docSet.coverLetter.content.slice(0, 500)}...
+                                                            </pre>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Essay */}
+                                                    {docSet.essay && (
+                                                        <div className="bg-slate-800/50 rounded-xl p-4">
+                                                            <div className="flex items-center justify-between mb-3">
+                                                                <h4 className="font-bold text-yellow-400 flex items-center gap-2">
+                                                                    <GraduationCap className="w-4 h-4" />
+                                                                    Essay
+                                                                </h4>
+                                                                <div className="flex gap-1">
+                                                                    <button
+                                                                        onClick={() => copyToClipboard(docSet.essay!.content, docSet.essay!.id)}
+                                                                        className="p-1 hover:bg-slate-700 rounded"
+                                                                        title="Copy"
+                                                                    >
+                                                                        {copied === docSet.essay.id ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-gray-400" />}
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => downloadDocument(docSet.essay!)}
+                                                                        className="p-1 hover:bg-slate-700 rounded"
+                                                                        title="Download"
+                                                                    >
+                                                                        <Download className="w-4 h-4 text-gray-400" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                            <pre className="text-xs text-gray-300 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                                                                {docSet.essay.content.slice(0, 500)}...
+                                                            </pre>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Action Buttons */}
+                                                <div className="flex gap-3 mt-4">
+                                                    <a
+                                                        href={docSet.opportunity.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-all"
+                                                    >
+                                                        <ExternalLink className="w-4 h-4" />
+                                                        Apply Now
+                                                    </a>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </Card>
                             </motion.div>
-                        </motion.div>
-                    )}
-                    {/* Profile Tab */}
-                    {activeTab === 'profile' && (
-                        <motion.div variants={containerVariants} className="space-y-6">
-                            <Card>
-                                <div className="flex items-center gap-3 mb-6">
-                                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(20, 184, 166, 0.15)' }}>
-                                        <GraduationCap className="w-6 h-6" style={{ color: 'var(--accent-teal)' }} />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xl font-bold">Academic Profile</h3>
-                                        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>This information is used to personalize your essays and match you with colleges</p>
-                                    </div>
-                                </div>
+                        ))}
+                    </AnimatePresence>
+                </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1">Cumulative GPA</label>
-                                            <Input
-                                                placeholder="e.g. 3.95"
-                                                value={profile.gpa}
-                                                onChange={(e) => setProfile(prev => ({ ...prev, gpa: e.target.value }))}
-                                                icon={<Award className="w-4 h-4" />}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1">Current/Intended Major</label>
-                                            <Input
-                                                placeholder="e.g. Computer Science"
-                                                value={profile.major}
-                                                onChange={(e) => setProfile(prev => ({ ...prev, major: e.target.value }))}
-                                                icon={<BookOpen className="w-4 h-4" />}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1">Target Transfer Major (if different)</label>
-                                            <Input
-                                                placeholder="e.g. Artificial Intelligence"
-                                                value={profile.targetMajor}
-                                                onChange={(e) => setProfile(prev => ({ ...prev, targetMajor: e.target.value }))}
-                                                icon={<Target className="w-4 h-4" />}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1">Personal Goals & Aspirations</label>
-                                            <textarea
-                                                className="input-field w-full"
-                                                rows={8}
-                                                placeholder="What do you hope to achieve by transferring? What are your long-term career goals?"
-                                                value={profile.goals}
-                                                onChange={(e) => setProfile(prev => ({ ...prev, goals: e.target.value }))}
-                                            />
-                                            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                                                💡 Mention specific research interests or career paths to help the AI write more authentically.
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </Card>
-
-                            <Card className="bg-primary-500/5 border-primary-500/20">
-                                <h4 className="font-semibold mb-2 flex items-center gap-2">
-                                    <Sparkles className="w-4 h-4 text-primary-400" />
-                                    AI Personalization Tip
-                                </h4>
-                                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                                    Your GPA and Major help the AI understand your academic standing, but your **Goals** are what make your essays truly unique.
-                                    The more specific you are about your "Why", the better the AI can weave your activities into a compelling narrative for {profile.major || 'your field'}.
-                                </p>
-                            </Card>
-                        </motion.div>
-                    )}
-                </>
-            )}
-
-            {/* Activity Modal */}
-            <AnimatePresence>
-                {showActivityModal && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="modal-overlay"
-                        onClick={() => setShowActivityModal(false)}
-                    >
-                        <motion.div
-                            initial={{ scale: 0.95, y: 20 }}
-                            animate={{ scale: 1, y: 0 }}
-                            exit={{ scale: 0.95, y: 20 }}
-                            className="modal-content glass-card p-6 w-full max-w-lg"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <div className="flex items-center justify-between mb-6">
-                                <h2 className="text-xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-                                    {editingActivity ? 'Edit Activity' : 'Add New Activity'}
-                                </h2>
-                                <Button variant="ghost" size="sm" onClick={() => setShowActivityModal(false)}>
-                                    <X className="w-5 h-5" />
-                                </Button>
-                            </div>
-                            <div className="space-y-4">
-                                <div>
-                                    <Input
-                                        placeholder="Activity Name *"
-                                        value={newActivity.name || ''}
-                                        onChange={(e) => {
-                                            setNewActivity(prev => ({ ...prev, name: e.target.value }));
-                                            if (formErrors.name) setFormErrors(prev => ({ ...prev, name: '' }));
-                                        }}
-                                        className={formErrors.name ? 'border-red-500' : ''}
-                                    />
-                                    {formErrors.name && (
-                                        <p className="text-xs mt-1 flex items-center gap-1" style={{ color: 'var(--error)' }}>
-                                            <AlertCircle className="w-3 h-3" /> {formErrors.name}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <Input
-                                            placeholder="Your Role *"
-                                            value={newActivity.role || ''}
-                                            onChange={(e) => {
-                                                setNewActivity(prev => ({ ...prev, role: e.target.value }));
-                                                if (formErrors.role) setFormErrors(prev => ({ ...prev, role: '' }));
-                                            }}
-                                            className={formErrors.role ? 'border-red-500' : ''}
-                                        />
-                                        {formErrors.role && (
-                                            <p className="text-xs mt-1 flex items-center gap-1" style={{ color: 'var(--error)' }}>
-                                                <AlertCircle className="w-3 h-3" /> {formErrors.role}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <Input
-                                        placeholder="Organization"
-                                        value={newActivity.organization || ''}
-                                        onChange={(e) => setNewActivity(prev => ({ ...prev, organization: e.target.value }))}
-                                    />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <Input
-                                        placeholder="Start Date"
-                                        type="month"
-                                        value={newActivity.startDate || ''}
-                                        onChange={(e) => setNewActivity(prev => ({ ...prev, startDate: e.target.value }))}
-                                    />
-                                    <Input
-                                        placeholder="End Date"
-                                        type="month"
-                                        value={newActivity.endDate || ''}
-                                        onChange={(e) => setNewActivity(prev => ({ ...prev, endDate: e.target.value }))}
-                                    />
-                                </div>
-                                <textarea
-                                    className="input-field w-full"
-                                    rows={4}
-                                    placeholder="Describe your involvement and achievements..."
-                                    value={newActivity.description || ''}
-                                    onChange={(e) => setNewActivity(prev => ({ ...prev, description: e.target.value }))}
-                                />
-                                <div className="grid grid-cols-2 gap-4">
-                                    <Input
-                                        placeholder="Hours per week"
-                                        type="number"
-                                        value={newActivity.hoursPerWeek?.toString() || ''}
-                                        onChange={(e) => setNewActivity(prev => ({ ...prev, hoursPerWeek: parseInt(e.target.value) || 0 }))}
-                                    />
-                                    <Input
-                                        placeholder="Weeks per year"
-                                        type="number"
-                                        value={newActivity.weeksPerYear?.toString() || ''}
-                                        onChange={(e) => setNewActivity(prev => ({ ...prev, weeksPerYear: parseInt(e.target.value) || 0 }))}
-                                    />
-                                </div>
-                                <div className="flex gap-3 pt-4">
-                                    <Button
-                                        className="flex-1"
-                                        onClick={editingActivity ? handleUpdateActivity : handleAddActivity}
-                                        icon={<Save className="w-4 h-4" />}
-                                    >
-                                        {editingActivity ? 'Update Activity' : 'Save Activity'}
-                                    </Button>
-                                    <Button variant="secondary" onClick={() => setShowActivityModal(false)}>
-                                        Cancel
-                                    </Button>
-                                </div>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </motion.div>
+                {/* Footer */}
+                <div className="text-center text-gray-500 text-sm pt-8">
+                    <p>Documents auto-generated for each discovered opportunity</p>
+                    <p>Copy or download to use when applying manually</p>
+                </div>
+            </div>
+        </div>
     );
 }

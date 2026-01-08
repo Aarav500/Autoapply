@@ -1,174 +1,99 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card, Button, StatusBadge, ProgressBar } from '@/components/ui';
+import { Card, Button } from '@/components/ui';
 import {
     Briefcase, Search, Filter, MapPin, DollarSign, Building2,
-    ExternalLink, Heart, Check, Clock, Sparkles, Zap, RefreshCw,
-    ChevronDown, Star, Globe, GraduationCap, Play, Pause, Settings,
-    Bookmark, Send, Target, TrendingUp, AlertTriangle, X
+    ExternalLink, Heart, Check, RefreshCw,
+    Pause, Settings, Star, TrendingUp, X, Loader2, Zap, Play
 } from 'lucide-react';
 import {
-    Job, JobPlatform, SearchFilters, jobPlatforms, PlatformConfig
+    Job, JobPlatform, SearchFilters, PlatformConfig
 } from '@/lib/job-platforms';
-import {
-    aggregateJobs, calculateJobMatch, MatchResult, defaultProfile, UserProfile
-} from '@/lib/job-matcher';
 import { toast } from '@/lib/error-handling';
+import { getAllOpportunities, Opportunity } from '@/lib/automation/opportunity-store';
+import { runDiscoveryScan } from '@/app/actions/discovery';
 
 // Platform icons and colors
-const platformInfo: Record<JobPlatform, { icon: string; color: string; name: string }> = {
+const platformInfo: Record<string, { icon: string; color: string; name: string }> = {
     handshake: { icon: '🎓', color: '#FF7043', name: 'Handshake' },
     linkedin: { icon: '💼', color: '#0077B5', name: 'LinkedIn' },
     indeed: { icon: '📋', color: '#2164F3', name: 'Indeed' },
     glassdoor: { icon: '🏢', color: '#0CAA41', name: 'Glassdoor' },
     google_jobs: { icon: '🔍', color: '#4285F4', name: 'Google Jobs' },
     company_direct: { icon: '🏗️', color: '#6B7280', name: 'Company' },
-    greenhouse: { icon: '🌱', color: '#3AB06E', name: 'Greenhouse' },
-    lever: { icon: '⚡', color: '#6366F1', name: 'Lever' },
-    workday: { icon: '☀️', color: '#F59E0B', name: 'Workday' },
+    bold: { icon: '🎓', color: '#000000', name: 'Bold.org' }
 };
 
 export default function JobHubPage() {
-    const [jobs, setJobs] = useState<MatchResult[]>([]);
+    const [jobs, setJobs] = useState<Opportunity[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [isAutoSearching, setIsAutoSearching] = useState(false);
-    const [selectedJob, setSelectedJob] = useState<MatchResult | null>(null);
+    const [selectedJob, setSelectedJob] = useState<Opportunity | null>(null);
+    const [isScanning, setIsScanning] = useState(false);
     const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set());
     const [appliedJobs, setAppliedJobs] = useState<Set<string>>(new Set());
     const [showFilters, setShowFilters] = useState(false);
-    const [showSettings, setShowSettings] = useState(false);
-    const [autoApplyQueue, setAutoApplyQueue] = useState<MatchResult[]>([]);
-    const [isAutoApplyRunning, setIsAutoApplyRunning] = useState(false);
 
     // Search filters
-    const [filters, setFilters] = useState<SearchFilters>({
-        query: 'software engineer intern',
-        location: '',
-        remote: false,
-        jobType: ['internship'],
-        sponsorsVisa: true,
-        postedWithin: 30,
-    });
+    const [query, setQuery] = useState('');
+    const [location, setLocation] = useState('');
 
-    // Platform configuration
-    const [platformConfig, setPlatformConfig] = useState<Record<JobPlatform, PlatformConfig>>({
-        handshake: { enabled: true, rateLimit: 10 },
-        linkedin: { enabled: true, rateLimit: 10 },
-        indeed: { enabled: true, rateLimit: 10 },
-        glassdoor: { enabled: false, rateLimit: 5 },
-        google_jobs: { enabled: true, rateLimit: 20 },
-        company_direct: { enabled: true, rateLimit: 10 },
-        greenhouse: { enabled: false, rateLimit: 10 },
-        lever: { enabled: false, rateLimit: 10 },
-        workday: { enabled: false, rateLimit: 10 },
-    });
+    // Initial load
+    useEffect(() => {
+        refreshJobs();
+    }, []);
 
-    // User profile (would come from settings)
-    const [profile] = useState<UserProfile>(defaultProfile);
+    const refreshJobs = () => {
+        const allOpps = getAllOpportunities();
+        setJobs(allOpps.filter(o => o.type === 'job'));
+    };
 
-    // Search jobs
-    const searchJobs = useCallback(async () => {
-        setIsLoading(true);
-        toast.info('🔍 Searching across all platforms...');
-
+    const handleScan = async () => {
+        setIsScanning(true);
         try {
-            const results = await aggregateJobs(filters, profile, {
-                platforms: platformConfig,
-                maxJobsPerPlatform: 20,
-                deduplicateByTitle: true,
-                sortBy: 'matchScore',
-            });
-
-            setJobs(results);
-            toast.success(`✅ Found ${results.length} jobs matching your profile!`);
+            toast('Starting discovery scan...', 'info');
+            const result = await runDiscoveryScan('jobs');
+            if (result.success) {
+                toast(`Scan complete!`, 'success');
+                refreshJobs();
+            } else {
+                toast(`Scan failed: ${result.error}`, 'error');
+            }
         } catch (error) {
-            toast.error('Failed to search jobs');
             console.error(error);
+            toast('Scan failed to execute', 'error');
         } finally {
-            setIsLoading(false);
+            setIsScanning(false);
         }
-    }, [filters, profile, platformConfig]);
+    };
 
-    // Auto-search loop
-    useEffect(() => {
-        let interval: NodeJS.Timeout;
+    // Filter jobs
+    const filteredJobs = useMemo(() => {
+        return jobs.filter(job => {
+            const matchesQuery = !query ||
+                job.title.toLowerCase().includes(query.toLowerCase()) ||
+                job.organization.toLowerCase().includes(query.toLowerCase());
+            const matchesLocation = !location ||
+                (job.location && job.location.toLowerCase().includes(location.toLowerCase()));
+            return matchesQuery && matchesLocation;
+        }).sort((a, b) => b.matchScore - a.matchScore);
+    }, [jobs, query, location]);
 
-        if (isAutoSearching) {
-            // Initial search
-            searchJobs();
-            // Then every 30 minutes
-            interval = setInterval(searchJobs, 30 * 60 * 1000);
-        }
-
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [isAutoSearching, searchJobs]);
-
-    // Auto-Apply Queue Processor
-    useEffect(() => {
-        if (!isAutoApplyRunning || autoApplyQueue.length === 0) return;
-
-        const processQueue = async () => {
-            const job = autoApplyQueue[0];
-            if (!job) return;
-
-            toast.info(`📝 Auto-applying to ${job.job.company}...`);
-            await new Promise(r => setTimeout(r, 2000)); // Simulate application
-
-            setAppliedJobs(prev => new Set(prev).add(job.job.id));
-            setAutoApplyQueue(prev => prev.slice(1));
-            toast.success(`✅ Applied to ${job.job.company}!`);
-        };
-
-        const interval = setInterval(processQueue, 3000);
-        return () => clearInterval(interval);
-    }, [isAutoApplyRunning, autoApplyQueue]);
-
-    // Auto-queue high-match jobs
-    useEffect(() => {
-        if (!isAutoSearching) return;
-        const highMatchJobs = jobs.filter(j => j.score >= 85 && !appliedJobs.has(j.job.id) && !autoApplyQueue.find(q => q.job.id === j.job.id));
-        if (highMatchJobs.length > 0) {
-            setAutoApplyQueue(prev => [...prev, ...highMatchJobs]);
-            toast.info(`🚀 Added ${highMatchJobs.length} high-match jobs to auto-apply queue!`);
-        }
-    }, [jobs, isAutoSearching]);
-
-    // Toggle save job
     const toggleSaveJob = (jobId: string) => {
         setSavedJobs(prev => {
             const newSet = new Set(prev);
-            if (newSet.has(jobId)) {
-                newSet.delete(jobId);
-                toast.info('Removed from saved');
-            } else {
-                newSet.add(jobId);
-                toast.success('💾 Saved to your list');
-            }
+            if (newSet.has(jobId)) newSet.delete(jobId);
+            else newSet.add(jobId);
             return newSet;
         });
     };
 
-    // Apply to job
-    const applyToJob = async (job: Job) => {
-        toast.info(`📝 Preparing application for ${job.company}...`);
-        // In production, this would trigger the auto-apply flow
-        await new Promise(r => setTimeout(r, 1500));
+    const applyToJob = async (job: Opportunity) => {
+        if (!job.url) return;
+        window.open(job.url, '_blank');
         setAppliedJobs(prev => new Set(prev).add(job.id));
-        toast.success(`✅ Application submitted to ${job.company}!`);
     };
-
-    // Stats
-    const stats = useMemo(() => ({
-        total: jobs.length,
-        highMatch: jobs.filter(j => j.score >= 80).length,
-        sponsorsVisa: jobs.filter(j => j.job.sponsorsVisa).length,
-        saved: savedJobs.size,
-        applied: appliedJobs.size,
-    }), [jobs, savedJobs, appliedJobs]);
 
     return (
         <motion.div
@@ -184,120 +109,22 @@ export default function JobHubPage() {
                         Job Hub
                     </h1>
                     <p style={{ color: 'var(--text-secondary)' }}>
-                        AI-powered job search across Handshake, LinkedIn, Indeed & more
+                        AI-powered job search across LinkedIn & more
                     </p>
                 </div>
 
                 <div className="flex items-center gap-3">
                     <Button
-                        variant="secondary"
-                        size="sm"
-                        icon={<Settings className="w-4 h-4" />}
-                        onClick={() => setShowSettings(!showSettings)}
+                        variant="primary"
+                        onClick={handleScan}
+                        disabled={isScanning}
+                        icon={isScanning ? Loader2 : RefreshCw}
+                        className={isScanning ? 'animate-spin-slow' : ''}
                     >
-                        Platforms
+                        {isScanning ? 'Scanning...' : 'Scan New Jobs'}
                     </Button>
-
-                    {isAutoSearching ? (
-                        <Button
-                            variant="secondary"
-                            size="lg"
-                            icon={<Pause className="w-4 h-4" />}
-                            onClick={() => { setIsAutoSearching(false); setIsAutoApplyRunning(false); }}
-                        >
-                            Stop Auto-Search
-                        </Button>
-                    ) : (
-                        <Button
-                            size="lg"
-                            icon={<Zap className="w-4 h-4" />}
-                            onClick={() => { setIsAutoSearching(true); setIsAutoApplyRunning(true); }}
-                        >
-                            Auto-Search & Apply
-                        </Button>
-                    )}
                 </div>
             </div>
-
-            {/* Auto-Apply Queue Panel */}
-            {autoApplyQueue.length > 0 && (
-                <Card className="border-2 border-yellow-500/50 bg-yellow-500/5">
-                    <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-semibold flex items-center gap-2">
-                            <Zap className="w-5 h-5 text-yellow-400" />
-                            Auto-Apply Queue ({autoApplyQueue.length} jobs pending)
-                        </h3>
-                        <Button
-                            size="sm"
-                            variant={isAutoApplyRunning ? "secondary" : "primary"}
-                            onClick={() => setIsAutoApplyRunning(!isAutoApplyRunning)}
-                            icon={isAutoApplyRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-                        >
-                            {isAutoApplyRunning ? 'Pause' : 'Resume'}
-                        </Button>
-                    </div>
-                    <div className="flex gap-2 overflow-x-auto pb-2">
-                        {autoApplyQueue.slice(0, 5).map((match, i) => (
-                            <div key={match.job.id} className={`flex-shrink-0 px-3 py-2 rounded-lg text-sm ${i === 0 && isAutoApplyRunning ? 'bg-yellow-500/20 animate-pulse' : 'bg-slate-800'}`}>
-                                <p className="font-medium">{match.job.company}</p>
-                                <p className="text-xs text-gray-400">{match.job.title}</p>
-                            </div>
-                        ))}
-                        {autoApplyQueue.length > 5 && (
-                            <div className="flex-shrink-0 px-3 py-2 rounded-lg text-sm bg-slate-800 text-gray-400">
-                                +{autoApplyQueue.length - 5} more
-                            </div>
-                        )}
-                    </div>
-                </Card>
-            )}
-
-            {/* Platform Settings */}
-            <AnimatePresence>
-                {showSettings && (
-                    <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                    >
-                        <Card>
-                            <h3 className="font-semibold mb-4 flex items-center gap-2">
-                                <Globe className="w-5 h-5" />
-                                Job Platforms
-                            </h3>
-                            <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-                                {Object.entries(platformConfig).map(([platform, config]) => {
-                                    const info = platformInfo[platform as JobPlatform];
-                                    return (
-                                        <button
-                                            key={platform}
-                                            onClick={() => setPlatformConfig(prev => ({
-                                                ...prev,
-                                                [platform]: { ...config, enabled: !config.enabled }
-                                            }))}
-                                            className={`p-3 rounded-xl text-left transition-all ${config.enabled ? 'ring-2' : ''
-                                                }`}
-                                            style={{
-                                                background: config.enabled
-                                                    ? `${info.color}15`
-                                                    : 'var(--bg-secondary)',
-                                            }}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xl">{info.icon}</span>
-                                                <span className="font-medium text-sm">{info.name}</span>
-                                            </div>
-                                            <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                                                {config.enabled ? '✓ Enabled' : 'Disabled'}
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </Card>
-                    </motion.div>
-                )}
-            </AnimatePresence>
 
             {/* Search Bar */}
             <Card>
@@ -306,171 +133,70 @@ export default function JobHubPage() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: 'var(--text-muted)' }} />
                         <input
                             type="text"
-                            value={filters.query}
-                            onChange={e => setFilters({ ...filters, query: e.target.value })}
+                            value={query}
+                            onChange={e => setQuery(e.target.value)}
                             placeholder="Job title, skills, or company..."
                             className="w-full pl-10 pr-4 py-3 rounded-xl"
                             style={{ background: 'var(--bg-secondary)', border: 'none' }}
                         />
                     </div>
-
                     <div className="relative">
                         <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: 'var(--text-muted)' }} />
                         <input
                             type="text"
-                            value={filters.location || ''}
-                            onChange={e => setFilters({ ...filters, location: e.target.value })}
+                            value={location}
+                            onChange={e => setLocation(e.target.value)}
                             placeholder="Location..."
                             className="w-48 pl-10 pr-4 py-3 rounded-xl"
                             style={{ background: 'var(--bg-secondary)', border: 'none' }}
                         />
                     </div>
-
-                    <Button
-                        variant="secondary"
-                        icon={<Filter className="w-4 h-4" />}
-                        onClick={() => setShowFilters(!showFilters)}
-                    >
-                        Filters
-                    </Button>
-
-                    <Button
-                        icon={isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                        onClick={searchJobs}
-                        disabled={isLoading}
-                    >
-                        Search
-                    </Button>
                 </div>
-
-                {/* Filter Tags */}
-                <AnimatePresence>
-                    {showFilters && (
-                        <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            className="mt-4 pt-4 border-t"
-                            style={{ borderColor: 'var(--glass-border)' }}
-                        >
-                            <div className="flex flex-wrap gap-3">
-                                <label className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer" style={{ background: 'var(--bg-secondary)' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={filters.remote}
-                                        onChange={e => setFilters({ ...filters, remote: e.target.checked })}
-                                    />
-                                    <span className="text-sm">Remote Only</span>
-                                </label>
-
-                                <label className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer" style={{ background: filters.sponsorsVisa ? 'rgba(34, 197, 94, 0.15)' : 'var(--bg-secondary)' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={filters.sponsorsVisa}
-                                        onChange={e => setFilters({ ...filters, sponsorsVisa: e.target.checked })}
-                                    />
-                                    <span className="text-sm">Sponsors Visa</span>
-                                </label>
-
-                                <select
-                                    value={filters.postedWithin || 30}
-                                    onChange={e => setFilters({ ...filters, postedWithin: Number(e.target.value) })}
-                                    className="px-3 py-2 rounded-lg text-sm"
-                                    style={{ background: 'var(--bg-secondary)', border: 'none' }}
-                                >
-                                    <option value={1}>Past 24 hours</option>
-                                    <option value={7}>Past week</option>
-                                    <option value={14}>Past 2 weeks</option>
-                                    <option value={30}>Past month</option>
-                                </select>
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
             </Card>
 
-            {/* Stats */}
-            <div className="grid grid-cols-5 gap-4">
-                <Card className="text-center">
-                    <p className="text-2xl font-bold">{stats.total}</p>
-                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Total Jobs</p>
-                </Card>
-                <Card className="text-center" style={{ background: 'rgba(34, 197, 94, 0.1)' }}>
-                    <p className="text-2xl font-bold" style={{ color: 'var(--success)' }}>{stats.highMatch}</p>
-                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>High Match (80%+)</p>
-                </Card>
-                <Card className="text-center" style={{ background: 'rgba(91, 111, 242, 0.1)' }}>
-                    <p className="text-2xl font-bold" style={{ color: 'var(--primary-400)' }}>{stats.sponsorsVisa}</p>
-                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Sponsors Visa</p>
-                </Card>
-                <Card className="text-center">
-                    <p className="text-2xl font-bold">{stats.saved}</p>
-                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Saved</p>
-                </Card>
-                <Card className="text-center" style={{ background: 'rgba(234, 179, 8, 0.1)' }}>
-                    <p className="text-2xl font-bold" style={{ color: 'var(--warning)' }}>{stats.applied}</p>
-                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Applied</p>
-                </Card>
-            </div>
-
-            {/* Job List */}
+            {/* Content */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="space-y-3">
                     <h3 className="font-semibold flex items-center gap-2">
                         <TrendingUp className="w-5 h-5" style={{ color: 'var(--primary-400)' }} />
-                        Jobs Ranked by Match Score
+                        Found Opportunities ({filteredJobs.length})
                     </h3>
 
-                    {jobs.length === 0 && !isLoading && (
-                        <Card className="text-center py-12">
-                            <Briefcase className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                            <p style={{ color: 'var(--text-muted)' }}>
-                                Click "Search" or "Auto-Search All" to find jobs
-                            </p>
-                        </Card>
-                    )}
-
-                    {isLoading && (
-                        <Card className="text-center py-12">
-                            <RefreshCw className="w-8 h-8 mx-auto mb-4 animate-spin" style={{ color: 'var(--primary-400)' }} />
-                            <p>Searching across all platforms...</p>
-                        </Card>
-                    )}
-
                     <AnimatePresence>
-                        {jobs.map((match, index) => (
+                        {filteredJobs.map((job, index) => (
                             <JobCard
-                                key={match.job.id}
-                                match={match}
+                                key={job.id}
+                                job={job}
                                 index={index}
-                                isSelected={selectedJob?.job.id === match.job.id}
-                                isSaved={savedJobs.has(match.job.id)}
-                                isApplied={appliedJobs.has(match.job.id)}
-                                onSelect={() => setSelectedJob(match)}
-                                onSave={() => toggleSaveJob(match.job.id)}
-                                onApply={() => applyToJob(match.job)}
+                                isSelected={selectedJob?.id === job.id}
+                                isSaved={savedJobs.has(job.id)}
+                                isApplied={appliedJobs.has(job.id)}
+                                onSelect={() => setSelectedJob(job)}
+                                onSave={() => toggleSaveJob(job.id)}
+                                onApply={() => applyToJob(job)}
                             />
                         ))}
+                        {filteredJobs.length === 0 && (
+                            <div className="text-center py-10 opacity-50">
+                                No jobs found. Try scanning!
+                            </div>
+                        )}
                     </AnimatePresence>
                 </div>
 
-                {/* Job Details Panel */}
                 <div className="lg:sticky lg:top-8 h-fit">
                     {selectedJob ? (
                         <JobDetailsPanel
-                            match={selectedJob}
-                            isSaved={savedJobs.has(selectedJob.job.id)}
-                            isApplied={appliedJobs.has(selectedJob.job.id)}
-                            onSave={() => toggleSaveJob(selectedJob.job.id)}
-                            onApply={() => applyToJob(selectedJob.job)}
+                            job={selectedJob}
+                            isSaved={savedJobs.has(selectedJob.id)}
+                            isApplied={appliedJobs.has(selectedJob.id)}
+                            onSave={() => toggleSaveJob(selectedJob.id)}
+                            onApply={() => applyToJob(selectedJob)}
                             onClose={() => setSelectedJob(null)}
                         />
                     ) : (
                         <Card className="text-center py-16">
-                            <Target className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                            <p style={{ color: 'var(--text-muted)' }}>
-                                Select a job to see details
-                            </p>
+                            <p style={{ color: 'var(--text-muted)' }}>Select a job to see details</p>
                         </Card>
                     )}
                 </div>
@@ -479,281 +205,62 @@ export default function JobHubPage() {
     );
 }
 
-// ============================================
-// JOB CARD COMPONENT
-// ============================================
-
-interface JobCardProps {
-    match: MatchResult;
-    index: number;
-    isSelected: boolean;
-    isSaved: boolean;
-    isApplied: boolean;
-    onSelect: () => void;
-    onSave: () => void;
-    onApply: () => void;
-}
-
-function JobCard({ match, index, isSelected, isSaved, isApplied, onSelect, onSave, onApply }: JobCardProps) {
-    const { job, score, matchedSkills } = match;
-    const platform = platformInfo[job.platform];
-
-    const scoreColor = score >= 80 ? 'var(--success)' : score >= 60 ? 'var(--warning)' : 'var(--text-muted)';
-
+// Sub-components adapted for Opportunity schema
+function JobCard({ job, index, isSelected, isSaved, isApplied, onSelect, onSave, onApply }: any) {
+    const scoreColor = job.matchScore >= 80 ? 'var(--success)' : job.matchScore >= 60 ? 'var(--warning)' : 'var(--text-muted)';
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ delay: index * 0.03 }}
-            className={`p-4 rounded-xl cursor-pointer transition-all ${isSelected ? 'ring-2' : ''}`}
-            style={{
-                background: 'var(--glass-bg)',
-                border: '1px solid var(--glass-border)',
-            }}
             onClick={onSelect}
+            className={`p-4 rounded-xl cursor-pointer transition-all ${isSelected ? 'ring-2' : ''}`}
+            style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}
         >
-            <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3">
-                    {job.companyLogo ? (
-                        <img src={job.companyLogo} alt={job.company} className="w-12 h-12 rounded-xl object-cover" />
-                    ) : (
-                        <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl" style={{ background: 'var(--bg-secondary)' }}>
-                            <Building2 className="w-6 h-6" />
-                        </div>
-                    )}
-                    <div>
-                        <h4 className="font-semibold">{job.title}</h4>
-                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{job.company}</p>
-                        <div className="flex items-center gap-2 mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                            <span className="flex items-center gap-1">
-                                <MapPin className="w-3 h-3" />
-                                {job.location}
-                            </span>
-                            <span>•</span>
-                            <span>{platform.icon} {platform.name}</span>
-                        </div>
-                    </div>
+            <div className="flex justify-between">
+                <div>
+                    <h4 className="font-semibold">{job.title}</h4>
+                    <p className="text-sm opacity-70">{job.organization}</p>
                 </div>
-
                 <div className="text-right">
                     <div className="flex items-center gap-1 font-bold text-lg" style={{ color: scoreColor }}>
                         <Star className="w-4 h-4" />
-                        {score}%
+                        {job.matchScore}%
                     </div>
-                    {job.sponsorsVisa && (
-                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(34, 197, 94, 0.15)', color: 'var(--success)' }}>
-                            Sponsors Visa ✓
-                        </span>
-                    )}
                 </div>
-            </div>
-
-            {/* Salary & Skills */}
-            <div className="mt-3 flex items-center justify-between">
-                {job.salary && (
-                    <div className="flex items-center gap-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                        <DollarSign className="w-4 h-4" />
-                        ${job.salary.min.toLocaleString()}-${job.salary.max.toLocaleString()}/{job.salary.period === 'monthly' ? 'mo' : 'yr'}
-                    </div>
-                )}
-                <div className="flex gap-1">
-                    {matchedSkills.slice(0, 3).map(skill => (
-                        <span key={skill} className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(91, 111, 242, 0.15)', color: 'var(--primary-400)' }}>
-                            {skill}
-                        </span>
-                    ))}
-                    {matchedSkills.length > 3 && (
-                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--bg-secondary)' }}>
-                            +{matchedSkills.length - 3}
-                        </span>
-                    )}
-                </div>
-            </div>
-
-            {/* Action buttons */}
-            <div className="mt-3 flex gap-2">
-                <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={e => { e.stopPropagation(); onSave(); }}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm"
-                    style={{
-                        background: isSaved ? 'rgba(91, 111, 242, 0.15)' : 'var(--bg-secondary)',
-                        color: isSaved ? 'var(--primary-400)' : 'inherit'
-                    }}
-                >
-                    <Heart className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
-                    {isSaved ? 'Saved' : 'Save'}
-                </motion.button>
-
-                <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={e => { e.stopPropagation(); onApply(); }}
-                    disabled={isApplied}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm flex-1 justify-center font-medium"
-                    style={{
-                        background: isApplied ? 'rgba(34, 197, 94, 0.15)' : 'var(--gradient-primary)',
-                        color: isApplied ? 'var(--success)' : 'white'
-                    }}
-                >
-                    {isApplied ? (
-                        <><Check className="w-4 h-4" /> Applied</>
-                    ) : (
-                        <><Send className="w-4 h-4" /> Quick Apply</>
-                    )}
-                </motion.button>
             </div>
         </motion.div>
     );
 }
 
-// ============================================
-// JOB DETAILS PANEL
-// ============================================
-
-interface JobDetailsPanelProps {
-    match: MatchResult;
-    isSaved: boolean;
-    isApplied: boolean;
-    onSave: () => void;
-    onApply: () => void;
-    onClose: () => void;
-}
-
-function JobDetailsPanel({ match, isSaved, isApplied, onSave, onApply, onClose }: JobDetailsPanelProps) {
-    const { job, score, matchedSkills, missingSkills, reasons } = match;
-    const platform = platformInfo[job.platform];
+function JobDetailsPanel({ job, isSaved, isApplied, onSave, onApply, onClose }: any) {
+    // Determine category based on score for display
+    const category = job.matchScore >= 90 ? 'Safety' : job.matchScore >= 70 ? 'Target' : 'Reach';
 
     return (
         <Card>
-            <div className="flex items-start justify-between mb-4">
-                <div className="flex items-start gap-3">
-                    {job.companyLogo ? (
-                        <img src={job.companyLogo} alt={job.company} className="w-16 h-16 rounded-xl object-cover" />
-                    ) : (
-                        <div className="w-16 h-16 rounded-xl flex items-center justify-center text-2xl" style={{ background: 'var(--bg-secondary)' }}>
-                            <Building2 className="w-8 h-8" />
-                        </div>
-                    )}
-                    <div>
-                        <h3 className="text-xl font-bold">{job.title}</h3>
-                        <p style={{ color: 'var(--text-secondary)' }}>{job.company}</p>
-                        <div className="flex items-center gap-2 mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-                            <MapPin className="w-4 h-4" />
-                            {job.location}
-                            {job.locationType !== 'onsite' && (
-                                <span className="px-2 py-0.5 rounded-full text-xs" style={{ background: 'rgba(34, 197, 94, 0.15)', color: 'var(--success)' }}>
-                                    {job.locationType}
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                </div>
-                <button onClick={onClose}>
-                    <X className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
-                </button>
+            <div className="flex justify-between mb-4">
+                <h3 className="text-xl font-bold">{job.title}</h3>
+                <button onClick={onClose}><X className="w-5 h-5" /></button>
             </div>
-
-            {/* Match Score */}
-            <div className="p-4 rounded-xl mb-4" style={{ background: 'var(--bg-secondary)' }}>
-                <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium">Match Score</span>
-                    <span className="text-2xl font-bold" style={{ color: score >= 80 ? 'var(--success)' : score >= 60 ? 'var(--warning)' : 'var(--text-muted)' }}>
-                        {score}%
-                    </span>
-                </div>
-                <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-tertiary)' }}>
-                    <motion.div
-                        className="h-full rounded-full"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${score}%` }}
-                        style={{ background: score >= 80 ? 'var(--success)' : score >= 60 ? 'var(--warning)' : 'var(--text-muted)' }}
-                    />
-                </div>
-                <div className="mt-3 space-y-1">
-                    {reasons.map((reason, i) => (
-                        <p key={i} className="text-xs flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                            <Check className="w-3 h-3" style={{ color: 'var(--success)' }} />
-                            {reason}
-                        </p>
-                    ))}
-                </div>
-            </div>
-
-            {/* Skills Match */}
             <div className="mb-4">
-                <h4 className="font-medium mb-2">Skills</h4>
-                <div className="flex flex-wrap gap-1">
-                    {matchedSkills.map(skill => (
-                        <span key={skill} className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(34, 197, 94, 0.15)', color: 'var(--success)' }}>
-                            ✓ {skill}
-                        </span>
-                    ))}
-                    {missingSkills.slice(0, 5).map(skill => (
-                        <span key={skill} className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--error)' }}>
-                            {skill}
-                        </span>
-                    ))}
-                </div>
-            </div>
-
-            {/* Salary */}
-            {job.salary && (
-                <div className="p-3 rounded-xl mb-4" style={{ background: 'rgba(34, 197, 94, 0.1)' }}>
-                    <div className="flex items-center gap-2">
-                        <DollarSign className="w-5 h-5" style={{ color: 'var(--success)' }} />
-                        <span className="font-semibold">
-                            ${job.salary.min.toLocaleString()} - ${job.salary.max.toLocaleString()}
-                        </span>
-                        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                            /{job.salary.period}
-                        </span>
-                    </div>
-                </div>
-            )}
-
-            {/* Visa Sponsorship */}
-            {job.sponsorsVisa && (
-                <div className="p-3 rounded-xl mb-4 flex items-center gap-2" style={{ background: 'rgba(91, 111, 242, 0.1)' }}>
-                    <GraduationCap className="w-5 h-5" style={{ color: 'var(--primary-400)' }} />
-                    <span className="font-medium" style={{ color: 'var(--primary-400)' }}>
-                        ✓ Sponsors Visa (H1B/OPT Friendly)
+                <h4 className="font-semibold">Match Analysis</h4>
+                <div className="flex items-center gap-2 mt-1">
+                    <span className={`px-2 py-1 rounded text-sm ${category === 'Safety' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                        {category} ({job.matchScore}%)
                     </span>
                 </div>
-            )}
-
-            {/* Platform */}
-            <div className="flex items-center gap-2 mb-4 text-sm" style={{ color: 'var(--text-muted)' }}>
-                <span>Found on {platform.icon} {platform.name}</span>
-                <span>•</span>
-                <span>Posted {Math.floor((Date.now() - job.postedDate.getTime()) / (1000 * 60 * 60 * 24))} days ago</span>
             </div>
-
-            {/* Actions */}
+            <div className="mb-4">
+                <h4 className="font-semibold">Description</h4>
+                <p className="text-sm opacity-80 max-h-60 overflow-y-auto whitespace-pre-wrap">{job.description}</p>
+            </div>
             <div className="flex gap-3">
-                <Button
-                    variant="secondary"
-                    className="flex-1"
-                    icon={<Heart className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />}
-                    onClick={onSave}
-                >
+                <Button onClick={onApply} disabled={isApplied} variant="primary">
+                    {isApplied ? 'Applied' : 'Apply Now'}
+                </Button>
+                <Button onClick={onSave} variant="secondary">
                     {isSaved ? 'Saved' : 'Save'}
                 </Button>
-                <Button
-                    className="flex-2"
-                    icon={isApplied ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-                    onClick={onApply}
-                    disabled={isApplied}
-                >
-                    {isApplied ? 'Applied' : 'Quick Apply'}
-                </Button>
-                <a href={job.applicationUrl} target="_blank" rel="noopener noreferrer">
-                    <Button variant="secondary" icon={<ExternalLink className="w-4 h-4" />}>
-                        View Original
-                    </Button>
-                </a>
             </div>
         </Card>
     );

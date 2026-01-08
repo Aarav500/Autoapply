@@ -180,11 +180,23 @@ export async function discoverScholarships(): Promise<number> {
     const scholarships = await scrapeBoldOrg(20);
     let addedCount = 0;
 
-    for (const scholarship of scholarships) {
-        const matchScore = calculateMatchScore(scholarship);
+    // Dynamically import MatchEngine
+    const { MatchEngine } = await import('../../intelligence/match-engine');
 
-        // Only add if score is above threshold
-        if (matchScore >= 50) {
+    for (const scholarship of scholarships) {
+        // Create temp opportunity object for analysis
+        const tempOpp: any = {
+            title: scholarship.title,
+            description: scholarship.description,
+            requirements: scholarship.requirements,
+            organization: scholarship.organization,
+            // ... other fields
+        };
+
+        const analysis = MatchEngine.analyze(tempOpp as any);
+
+        // Only add if it's at least a Reach
+        if (analysis.category !== 'Not Eligible') {
             addOpportunity({
                 type: 'scholarship',
                 title: scholarship.title,
@@ -194,12 +206,12 @@ export async function discoverScholarships(): Promise<number> {
                 deadline: scholarship.deadline,
                 requirements: scholarship.requirements,
                 description: scholarship.description,
-                matchScore,
+                matchScore: analysis.score,
             });
             addedCount++;
-            bm.log(`➕ Added: ${scholarship.title} (${matchScore}% match)`);
+            bm.log(`➕ Added: ${scholarship.title} (${analysis.category} - ${analysis.score}%)`);
         } else {
-            bm.log(`⏭ Skipped: ${scholarship.title} (${matchScore}% match - too low)`);
+            bm.log(`⏭ Skipped: ${scholarship.title} (Not Eligible: ${analysis.missingRequirements.join(', ')})`);
         }
     }
 
