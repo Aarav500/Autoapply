@@ -47,6 +47,9 @@ class BrowserManager {
                 '--disable-dev-shm-usage', // Overcome limited resource problems in containers
                 '--disable-gpu', // GPU not needed for headless
                 '--single-process', // Reduce memory usage
+                '--disable-crash-reporter', // Disable crash reporting
+                '--disable-breakpad', // Disable breakpad crash handler
+                '--no-zygote', // Disable zygote process
             ],
         });
 

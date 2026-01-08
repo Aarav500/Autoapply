@@ -50,6 +50,10 @@ RUN apt-get update && apt-get install -y \
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
+# Set writable directories for Chromium (fixes crashpad errors)
+ENV XDG_CONFIG_HOME=/tmp/.chromium
+ENV XDG_CACHE_HOME=/tmp/.chromium
+
 # Create non-root user
 RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 --gid nodejs nextjs
@@ -58,6 +62,9 @@ RUN groupadd --system --gid 1001 nodejs && \
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+
+# Create and set ownership for temp chromium directory
+RUN mkdir -p /tmp/.chromium && chown -R nextjs:nodejs /tmp/.chromium
 
 # Set ownership
 RUN chown -R nextjs:nodejs /app
