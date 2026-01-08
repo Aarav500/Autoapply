@@ -118,8 +118,7 @@ export default function JobHubPage() {
                         variant="primary"
                         onClick={handleScan}
                         disabled={isScanning}
-                        icon={isScanning ? Loader2 : RefreshCw}
-                        className={isScanning ? 'animate-spin-slow' : ''}
+                        icon={isScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                     >
                         {isScanning ? 'Scanning...' : 'Scan New Jobs'}
                     </Button>
