@@ -52,6 +52,79 @@ export class MatchEngine {
             }
         }
 
+        // LOCATION/STATE CHECK
+        const statePatterns = [
+            { state: 'Florida', patterns: ['florida resident', 'florida students', 'florida scholarship'] },
+            { state: 'Texas', patterns: ['texas resident', 'texas students'] },
+            { state: 'California', patterns: ['california resident', 'california students'] },
+            { state: 'New York', patterns: ['new york resident', 'new york students'] },
+        ];
+        for (const { state, patterns } of statePatterns) {
+            if (profile.state !== state && patterns.some(p => oppText.includes(p))) {
+                analysis.score = 0;
+                analysis.category = 'Not Eligible';
+                analysis.missingRequirements.push(`${state} residency required`);
+                return analysis;
+            }
+        }
+
+        // DEGREE LEVEL CHECK (Undergrad vs Graduate/Law/Medical)
+        const degreeLevel = profile.degree.toLowerCase();
+        const isUndergrad = degreeLevel.includes('bachelor') || degreeLevel.includes('undergraduate');
+        if (isUndergrad) {
+            const gradPatterns = ['law school', 'law student', 'graduate student', 'phd student',
+                'masters student', 'medical school', 'mba student', 'jd student'];
+            if (gradPatterns.some(p => oppText.includes(p))) {
+                analysis.score = 0;
+                analysis.category = 'Not Eligible';
+                analysis.missingRequirements.push('Graduate/Professional degree required');
+                return analysis;
+            }
+        }
+
+        // FIELD RESTRICTION CHECK (Art, Nursing, Law, Medical majors)
+        const userMajor = profile.major.toLowerCase();
+        const fieldRestrictions = [
+            { field: 'art', keywords: ['art student', 'art major', 'fine arts', 'art scholarship'] },
+            { field: 'nursing', keywords: ['nursing student', 'nursing major', 'nursing scholarship'] },
+            { field: 'law', keywords: ['law student', 'pre-law', 'legal studies'] },
+            { field: 'medical', keywords: ['medical student', 'pre-med', 'healthcare'] },
+            { field: 'music', keywords: ['music student', 'music major', 'music scholarship'] },
+            { field: 'education', keywords: ['education major', 'teaching scholarship'] },
+        ];
+        for (const { field, keywords } of fieldRestrictions) {
+            if (!userMajor.includes(field) && keywords.some(k => oppText.includes(k))) {
+                // Check if it's specifically FOR that major (not just mentioning it)
+                const isRestricted = oppText.includes(`for ${field}`) ||
+                    oppText.includes(`${field} majors only`) ||
+                    keywords.some(k => opportunity.title.toLowerCase().includes(k));
+                if (isRestricted) {
+                    analysis.score = 0;
+                    analysis.category = 'Not Eligible';
+                    analysis.missingRequirements.push(`${field.charAt(0).toUpperCase() + field.slice(1)} major required`);
+                    return analysis;
+                }
+            }
+        }
+
+        // YEAR IN SCHOOL CHECK
+        const gradYear = profile.graduationYear;
+        const currentYear = new Date().getFullYear();
+        const yearsUntilGrad = gradYear - currentYear;
+
+        if (yearsUntilGrad > 3 && oppText.includes('senior')) {
+            analysis.score = 0;
+            analysis.category = 'Not Eligible';
+            analysis.missingRequirements.push('Senior year required');
+            return analysis;
+        }
+        if (yearsUntilGrad <= 0 && (oppText.includes('current student') || oppText.includes('enrolled'))) {
+            analysis.score = 0;
+            analysis.category = 'Not Eligible';
+            analysis.missingRequirements.push('Must be currently enrolled');
+            return analysis;
+        }
+
         // 2. SCORING FACTORS
         // ----------------------------------------------------
         let score = 50; // Base score for being eligible
