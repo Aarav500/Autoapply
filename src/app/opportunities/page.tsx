@@ -142,7 +142,7 @@ export default function OpportunitiesPage() {
                     <div className="flex gap-3">
                         <Button
                             onClick={fetchOpportunities}
-                            variant="outline"
+                            variant="secondary"
                             icon={<RefreshCw className="w-4 h-4" />}
                         >
                             Refresh
@@ -267,8 +267,8 @@ export default function OpportunitiesPage() {
                                     <div className="flex items-start justify-between">
                                         <div className="flex items-start gap-4">
                                             <div className={`p-3 rounded-xl ${opp.type === 'scholarship'
-                                                    ? 'bg-green-500/20'
-                                                    : 'bg-blue-500/20'
+                                                ? 'bg-green-500/20'
+                                                : 'bg-blue-500/20'
                                                 }`}>
                                                 {opp.type === 'scholarship'
                                                     ? <GraduationCap className="w-6 h-6 text-green-400" />
