@@ -7,11 +7,15 @@ export async function runDiscoveryScan(type: 'jobs' | 'scholarships' | 'all') {
     try {
         console.log(`Starting discovery scan for: ${type}`);
 
+        // Use ALL available scrapers for comprehensive coverage
+        const jobScrapers = ['linkedin', 'indeed', 'glassdoor', 'handshake', 'ziprecruiter', 'chegg', 'companies'];
+        const scholarshipScrapers = ['bold-org', 'fastweb', 'scholarships-com'];
+
         const platforms = type === 'all'
-            ? ['linkedin', 'bold-org']
+            ? [...jobScrapers, ...scholarshipScrapers]
             : type === 'jobs'
-                ? ['linkedin']
-                : ['bold-org'];
+                ? jobScrapers
+                : scholarshipScrapers;
 
         // We can't return the full complex object easily, so we return a summary
         // The service updates the OpportunityStore which the UI should poll or read
