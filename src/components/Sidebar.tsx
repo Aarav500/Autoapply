@@ -27,8 +27,11 @@ import {
   Linkedin,
   BookOpen,
   ScrollText,
-  FileCheck
+  FileCheck,
+  BarChart3,
+  Clock
 } from 'lucide-react';
+
 
 const mainNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
@@ -44,6 +47,8 @@ const aiToolsItems = [
   { icon: Brain, label: 'AI Automate', href: '/automate', badge: 'NEW' },
   { icon: Search, label: 'Job Hub', href: '/job-hub', badge: 'NEW' },
   { icon: FileCheck, label: 'Documents', href: '/documents', badge: 'NEW' },
+  { icon: BarChart3, label: 'Analytics', href: '/analytics', badge: 'NEW' },
+  { icon: Clock, label: 'Deadlines', href: '/opportunity-deadlines', badge: 'NEW' },
   { icon: Linkedin, label: 'LinkedIn', href: '/linkedin', badge: 'NEW' },
   { icon: BookOpen, label: 'My Grades', href: '/grades' },
   { icon: Calendar, label: 'Calendar', href: '/calendar' },
@@ -51,6 +56,7 @@ const aiToolsItems = [
   { icon: Recycle, label: 'Recycler', href: '/recycler' },
   { icon: Focus, label: 'Focus Mode', href: '/focus' },
 ];
+
 
 export default function Sidebar() {
   const pathname = usePathname();
