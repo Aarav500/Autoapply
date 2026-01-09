@@ -182,6 +182,10 @@ export const STORAGE_KEYS = {
     SAVED_SCHOLARSHIPS: 'scholarships/saved',
     APPLIED_SCHOLARSHIPS: 'scholarships/applied',
 
+    // Discovered Opportunities (from scrapers)
+    DISCOVERED_OPPORTUNITIES: 'automation/opportunities',
+    GENERATED_DOCUMENTS: 'automation/documents',
+
     // Applications
     APPLICATION_STATUS: 'applications/status',
     DOCUMENT_CHECKLIST: 'applications/checklist',
@@ -382,6 +386,61 @@ export async function getActivities(): Promise<any[]> {
 
 export async function saveActivities(activities: any[]): Promise<boolean> {
     return s3Storage.set(STORAGE_KEYS.ACTIVITIES, activities);
+}
+
+// ============================================
+// OPPORTUNITIES & DOCUMENTS (Automation)
+// ============================================
+
+export interface DiscoveredOpportunity {
+    id: string;
+    type: 'job' | 'scholarship';
+    title: string;
+    organization: string;
+    url: string;
+    deadline?: string;
+    amount?: number;
+    salary?: string;
+    location?: string;
+    requirements: string[];
+    description: string;
+    status: string;
+    matchScore: number;
+    discoveredAt: string;
+    appliedAt?: string;
+}
+
+export interface GeneratedDocument {
+    opportunityId: string;
+    opportunityTitle: string;
+    organization: string;
+    opportunityType: 'job' | 'scholarship';
+    opportunityUrl: string;
+    matchScore: number;
+    cv: { id: string; content: string; createdAt: string } | null;
+    essay: { id: string; content: string; createdAt: string } | null;
+    coverLetter: { id: string; content: string; createdAt: string } | null;
+    generatedAt: string;
+}
+
+// Get all discovered opportunities from S3
+export async function getDiscoveredOpportunities(): Promise<DiscoveredOpportunity[]> {
+    return s3Storage.get(STORAGE_KEYS.DISCOVERED_OPPORTUNITIES, []);
+}
+
+// Save all discovered opportunities to S3
+export async function saveDiscoveredOpportunities(opportunities: DiscoveredOpportunity[]): Promise<boolean> {
+    return s3Storage.set(STORAGE_KEYS.DISCOVERED_OPPORTUNITIES, opportunities);
+}
+
+// Get all generated documents from S3
+export async function getGeneratedDocuments(): Promise<GeneratedDocument[]> {
+    return s3Storage.get(STORAGE_KEYS.GENERATED_DOCUMENTS, []);
+}
+
+// Save all generated documents to S3
+export async function saveGeneratedDocuments(documents: GeneratedDocument[]): Promise<boolean> {
+    return s3Storage.set(STORAGE_KEYS.GENERATED_DOCUMENTS, documents);
 }
 
 // ============================================

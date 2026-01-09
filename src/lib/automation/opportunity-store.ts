@@ -32,8 +32,98 @@ export interface Opportunity {
     error?: string;
 }
 
-// In-memory store (would use database in production)
+// In-memory store with S3 + localStorage persistence
 const opportunities: Map<string, Opportunity> = new Map();
+const STORAGE_KEY = 'college_essay_opportunities';
+let isInitialized = false;
+
+// Import S3 storage helpers
+import { saveDiscoveredOpportunities, getDiscoveredOpportunities, DiscoveredOpportunity } from '../s3-storage';
+
+// Convert Opportunity to S3 format (serializable)
+function toS3Format(opp: Opportunity): DiscoveredOpportunity {
+    return {
+        ...opp,
+        discoveredAt: opp.discoveredAt.toISOString(),
+        appliedAt: opp.appliedAt?.toISOString(),
+    };
+}
+
+// Convert from S3 format to Opportunity (with Date objects)
+function fromS3Format(opp: DiscoveredOpportunity): Opportunity {
+    return {
+        ...opp,
+        discoveredAt: new Date(opp.discoveredAt),
+        appliedAt: opp.appliedAt ? new Date(opp.appliedAt) : undefined,
+    } as Opportunity;
+}
+
+// Load from S3 (with localStorage fallback)
+async function loadFromS3(): Promise<void> {
+    try {
+        const stored = await getDiscoveredOpportunities();
+        if (stored && stored.length > 0) {
+            stored.forEach(opp => {
+                opportunities.set(opp.id, fromS3Format(opp));
+            });
+            console.log(`[OpportunityStore] Loaded ${stored.length} opportunities from S3`);
+        }
+    } catch (error) {
+        console.error('[OpportunityStore] S3 load failed, trying localStorage:', error);
+        loadFromLocalStorage();
+    }
+}
+
+// Fallback: Load from localStorage
+function loadFromLocalStorage(): void {
+    if (typeof window === 'undefined') return;
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+            const parsed = JSON.parse(stored) as Opportunity[];
+            parsed.forEach(opp => {
+                opp.discoveredAt = new Date(opp.discoveredAt);
+                if (opp.appliedAt) opp.appliedAt = new Date(opp.appliedAt);
+                opportunities.set(opp.id, opp);
+            });
+            console.log(`[OpportunityStore] Loaded ${parsed.length} opportunities from localStorage`);
+        }
+    } catch (error) {
+        console.error('[OpportunityStore] localStorage load failed:', error);
+    }
+}
+
+// Save to S3 (with localStorage backup)
+async function saveToStorage(): Promise<void> {
+    const data = Array.from(opportunities.values()).map(toS3Format);
+
+    // Save to localStorage immediately (sync)
+    if (typeof window !== 'undefined') {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        } catch (e) { /* ignore */ }
+    }
+
+    // Save to S3 (async)
+    try {
+        await saveDiscoveredOpportunities(data);
+        console.log(`[OpportunityStore] Saved ${data.length} opportunities to S3`);
+    } catch (error) {
+        console.error('[OpportunityStore] S3 save failed:', error);
+    }
+}
+
+// Initialize: load from S3 on first import
+export async function initializeOpportunityStore(): Promise<void> {
+    if (isInitialized) return;
+    isInitialized = true;
+    await loadFromS3();
+}
+
+// Initialize on client-side
+if (typeof window !== 'undefined') {
+    initializeOpportunityStore();
+}
 
 // Add opportunity to queue
 export function addOpportunity(opp: Omit<Opportunity, 'id' | 'status' | 'discoveredAt'>): Opportunity {
@@ -45,6 +135,7 @@ export function addOpportunity(opp: Omit<Opportunity, 'id' | 'status' | 'discove
         discoveredAt: new Date(),
     };
     opportunities.set(id, opportunity);
+    saveToStorage();
     return opportunity;
 }
 
@@ -75,6 +166,7 @@ export function updateOpportunity(id: string, updates: Partial<Opportunity>): Op
 
     const updated = { ...opp, ...updates };
     opportunities.set(id, updated);
+    saveToStorage();
     return updated;
 }
 
