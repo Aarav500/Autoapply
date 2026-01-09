@@ -66,13 +66,14 @@ export default function ActivitiesPage() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [isAddingNew, setIsAddingNew] = useState(false);
 
-    // Load from S3
+    // Load from S3 - using SAME keys as dashboard
     const {
         data: activities,
         setData: setActivities,
         save: saveActivitiesData,
         isLoading: activitiesLoading
-    } = useS3Storage<Activity[]>('user-activities', { defaultValue: [] });
+    } = useS3Storage<Activity[]>('activities', { defaultValue: [] });
+
 
     const {
         data: achievements,
