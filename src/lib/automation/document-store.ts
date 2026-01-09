@@ -1,12 +1,15 @@
 // ============================================
 // DOCUMENT STORAGE
 // Stores generated CVs, essays, cover letters per opportunity
+// NOW WITH PERSISTENCE TO LOCALSTORAGE/S3
 // ============================================
 
 import { Opportunity } from './opportunity-store';
 import { generateAllContent, TailoredContent } from './content-tailor';
 import { DEFAULT_PROFILE, UserProfile } from './user-profile';
 import { browserManager } from './browser';
+
+const STORAGE_KEY = 'generated-documents';
 
 export interface StoredDocument {
     id: string;
@@ -15,7 +18,7 @@ export interface StoredDocument {
     organization: string;
     type: 'cv' | 'essay' | 'cover_letter';
     content: string;
-    createdAt: Date;
+    createdAt: string; // Changed to string for JSON serialization
     opportunityType: 'job' | 'scholarship';
     opportunityUrl: string;
     matchScore: number;
@@ -26,11 +29,51 @@ export interface OpportunityDocuments {
     cv: StoredDocument | null;
     essay: StoredDocument | null;
     coverLetter: StoredDocument | null;
-    generatedAt: Date;
+    generatedAt: string; // Changed to string for JSON serialization
 }
 
-// In-memory document storage (persists during session)
-const documentStore: Map<string, OpportunityDocuments> = new Map();
+// In-memory document storage (synced with localStorage)
+let documentStore: Map<string, OpportunityDocuments> = new Map();
+let isInitialized = false;
+
+// ============================================
+// PERSISTENCE HELPERS
+// ============================================
+
+function loadFromStorage(): void {
+    if (typeof window === 'undefined') return;
+
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+            const parsed = JSON.parse(stored) as Record<string, OpportunityDocuments>;
+            documentStore = new Map(Object.entries(parsed));
+            browserManager.log(`📂 Loaded ${documentStore.size} documents from storage`);
+        }
+        isInitialized = true;
+    } catch (error) {
+        console.error('Failed to load documents from storage:', error);
+        isInitialized = true;
+    }
+}
+
+function saveToStorage(): void {
+    if (typeof window === 'undefined') return;
+
+    try {
+        const obj = Object.fromEntries(documentStore.entries());
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+    } catch (error) {
+        console.error('Failed to save documents to storage:', error);
+    }
+}
+
+function ensureInitialized(): void {
+    if (!isInitialized && typeof window !== 'undefined') {
+        loadFromStorage();
+    }
+}
+
 
 /**
  * Generate and store all documents for an opportunity
@@ -39,6 +82,8 @@ export function generateAndStoreDocuments(
     opportunity: Opportunity,
     profile: UserProfile = DEFAULT_PROFILE
 ): OpportunityDocuments {
+    ensureInitialized();
+
     const existing = documentStore.get(opportunity.id);
     if (existing) {
         browserManager.log(`📄 Documents already exist for: ${opportunity.title}`);
@@ -48,7 +93,7 @@ export function generateAndStoreDocuments(
     browserManager.log(`📝 Generating documents for: ${opportunity.title} @ ${opportunity.organization}`);
 
     const tailored = generateAllContent(opportunity, profile);
-    const now = new Date();
+    const now = new Date().toISOString();
 
     const docs: OpportunityDocuments = {
         opportunity,
@@ -92,7 +137,8 @@ export function generateAndStoreDocuments(
     };
 
     documentStore.set(opportunity.id, docs);
-    browserManager.log(`✅ Documents generated for: ${opportunity.title}`);
+    saveToStorage(); // Persist to localStorage
+    browserManager.log(`✅ Documents generated and saved for: ${opportunity.title}`);
 
     return docs;
 }
@@ -101,6 +147,7 @@ export function generateAndStoreDocuments(
  * Get all stored documents
  */
 export function getAllDocuments(): OpportunityDocuments[] {
+    ensureInitialized();
     return Array.from(documentStore.values()).sort(
         (a, b) => b.opportunity.matchScore - a.opportunity.matchScore
     );
@@ -110,6 +157,7 @@ export function getAllDocuments(): OpportunityDocuments[] {
  * Get documents for a specific opportunity
  */
 export function getDocumentsForOpportunity(opportunityId: string): OpportunityDocuments | null {
+    ensureInitialized();
     return documentStore.get(opportunityId) || null;
 }
 
@@ -166,6 +214,7 @@ export function getDocumentStats(): {
  * Get document by ID
  */
 export function getDocumentById(docId: string): StoredDocument | null {
+    ensureInitialized();
     for (const docs of documentStore.values()) {
         if (docs.cv?.id === docId) return docs.cv;
         if (docs.essay?.id === docId) return docs.essay;
@@ -174,11 +223,13 @@ export function getDocumentById(docId: string): StoredDocument | null {
     return null;
 }
 
+
 /**
  * Clear all documents
  */
 export function clearAllDocuments(): void {
     documentStore.clear();
+    saveToStorage(); // Also clear from localStorage
     browserManager.log('🗑️ All documents cleared');
 }
 

@@ -80,7 +80,8 @@ export default function ActivitiesPage() {
         setData: setAchievements,
         save: saveAchievementsData,
         isLoading: achievementsLoading
-    } = useS3Storage<Achievement[]>('user-achievements', { defaultValue: [] });
+    } = useS3Storage<Achievement[]>('achievements', { defaultValue: [] });
+
 
     const isLoading = activitiesLoading || achievementsLoading;
 
