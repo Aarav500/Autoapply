@@ -129,7 +129,7 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex gap-3">
-          <Link href="/documents">
+          <Link href="/activities">
             <Button variant="secondary" icon={<Clock className="w-4 h-4" />}>
               Add Activities
             </Button>

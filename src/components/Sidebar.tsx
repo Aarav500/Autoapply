@@ -49,6 +49,7 @@ const aiToolsItems = [
   { icon: FileCheck, label: 'Documents', href: '/documents', badge: 'NEW' },
   { icon: BarChart3, label: 'Analytics', href: '/analytics', badge: 'NEW' },
   { icon: Clock, label: 'Deadlines', href: '/opportunity-deadlines', badge: 'NEW' },
+  { icon: Award, label: 'Activities', href: '/activities', badge: 'NEW' },
   { icon: Linkedin, label: 'LinkedIn', href: '/linkedin', badge: 'NEW' },
   { icon: BookOpen, label: 'My Grades', href: '/grades' },
   { icon: Calendar, label: 'Calendar', href: '/calendar' },
@@ -56,6 +57,7 @@ const aiToolsItems = [
   { icon: Recycle, label: 'Recycler', href: '/recycler' },
   { icon: Focus, label: 'Focus Mode', href: '/focus' },
 ];
+
 
 
 export default function Sidebar() {
