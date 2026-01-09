@@ -62,6 +62,9 @@ export interface UserProfile {
     skills: string[];
     languages: string[];
 
+    // Skills with proficiency levels
+    skillsTaxonomy?: SkillWithProficiency[];
+
     // Links
     linkedIn: string;
     github?: string;
@@ -73,6 +76,9 @@ export interface UserProfile {
     coverLetterPath?: string;
     transcriptPath?: string;
 
+    // Document vault (user-controlled uploads)
+    documentVault?: DocumentVault;
+
     // Essay answers (pre-written for common prompts)
     essayAnswers: {
         whyThisSchool?: string;
@@ -81,7 +87,107 @@ export interface UserProfile {
         leadershipExperience?: string;
         communityService?: string;
     };
+
+    // Job/Opportunity Preferences
+    preferences?: UserJobPreferences;
+
+    // Constraints (for eligibility matching)
+    constraints?: UserEligibilityConstraints;
+
+    // Availability
+    availability?: UserAvailability;
+
+    // Activities (projects, volunteering, clubs)
+    activities?: Activity[];
+
+    // Achievements (awards, honors, publications)
+    achievements?: Achievement[];
 }
+
+// ============================================
+// NEW TYPES FOR ENHANCED MATCHING
+// ============================================
+
+export interface SkillWithProficiency {
+    skill: string;
+    proficiency: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+    yearsOfExperience?: number;
+}
+
+export interface DocumentVault {
+    transcripts?: { name: string; path: string; uploadedAt: string }[];
+    certificates?: { name: string; path: string; uploadedAt: string }[];
+    recommendationLetters?: { name: string; recommenderName: string; path: string; uploadedAt: string }[];
+    idDocuments?: { name: string; path: string; uploadedAt: string }[];
+    portfolioItems?: { name: string; path: string; type: string; uploadedAt: string }[];
+}
+
+export interface UserJobPreferences {
+    // Job preferences
+    desiredRoles: string[];
+    desiredIndustries: string[];
+    desiredLocations: string[];
+    remotePreference: 'remote' | 'hybrid' | 'onsite' | 'any';
+    salaryExpectations?: {
+        min: number;
+        currency: string;
+        period: 'hourly' | 'monthly' | 'yearly';
+    };
+    employmentTypes: ('internship' | 'full-time' | 'part-time' | 'contract')[];
+
+    // Work authorization
+    workAuthorization: {
+        hasUSWorkAuth: boolean;
+        needsVisaSponsorship: boolean;
+        citizenship: string;
+        visaType?: string;
+    };
+}
+
+export interface UserEligibilityConstraints {
+    citizenship: string;
+    residency?: string;
+    isTransferStudent: boolean;
+    isFirstGen: boolean;
+    isLowIncome: boolean;
+    hasDisability?: boolean;
+    isVeteran?: boolean;
+    age?: number;
+}
+
+export interface UserAvailability {
+    earliestStartDate?: string;
+    hoursPerWeek?: number;
+    availableForFullTime: boolean;
+    availableForPartTime: boolean;
+    summerOnly?: boolean;
+}
+
+export interface Activity {
+    id: string;
+    name: string;
+    type: 'project' | 'volunteering' | 'club' | 'research' | 'work' | 'other';
+    organization?: string;
+    role?: string;
+    startDate: string;
+    endDate?: string;
+    current: boolean;
+    description: string;
+    achievements?: string[];
+    skills?: string[];
+}
+
+export interface Achievement {
+    id: string;
+    title: string;
+    type: 'award' | 'honor' | 'publication' | 'competition' | 'certification' | 'other';
+    issuer?: string;
+    date: string;
+    description?: string;
+    url?: string;
+}
+
+
 
 // Default profile for Aarav Shah
 export const DEFAULT_PROFILE: UserProfile = {

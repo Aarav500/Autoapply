@@ -26,7 +26,8 @@ import {
   ClipboardList,
   Linkedin,
   BookOpen,
-  ScrollText
+  ScrollText,
+  FileCheck
 } from 'lucide-react';
 
 const mainNavItems = [
@@ -42,6 +43,7 @@ const mainNavItems = [
 const aiToolsItems = [
   { icon: Brain, label: 'AI Automate', href: '/automate', badge: 'NEW' },
   { icon: Search, label: 'Job Hub', href: '/job-hub', badge: 'NEW' },
+  { icon: FileCheck, label: 'Documents', href: '/documents', badge: 'NEW' },
   { icon: Linkedin, label: 'LinkedIn', href: '/linkedin', badge: 'NEW' },
   { icon: BookOpen, label: 'My Grades', href: '/grades' },
   { icon: Calendar, label: 'Calendar', href: '/calendar' },

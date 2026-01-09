@@ -1,557 +1,965 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Button, StatusBadge, Input, ProgressBar, Tag } from '@/components/ui';
 import { useS3Storage } from '@/lib/useS3Storage';
 import { toast } from '@/lib/error-handling';
 import {
-    Briefcase,
-    Search,
-    Filter,
-    MapPin,
-    Clock,
-    DollarSign,
-    Building2,
-    Star,
-    BookmarkPlus,
-    Bookmark,
-    ExternalLink,
-    ChevronRight,
-    AlertCircle,
-    CheckCircle2,
-    TrendingUp,
-    Calendar,
-    Loader2,
-    Send
+    Briefcase, Search, Filter, MapPin, Clock, DollarSign, Building2,
+    Star, BookmarkPlus, Bookmark, ExternalLink, ChevronRight, ChevronDown,
+    AlertCircle, CheckCircle2, TrendingUp, Calendar, Loader2, Send,
+    FileText, Download, Copy, Check, RefreshCw, Sparkles, Globe, Laptop,
+    Building, X, Eye, Zap
 } from 'lucide-react';
+import { runDiscoveryScan } from '@/app/actions/discovery';
 
-// Job type definitions
-interface Job {
-    id: number;
-    title: string;
-    company: string;
-    location: string;
-    type: string;
-    hours: string;
-    pay: string;
-    deadline: string;
-    match: number;
-    tags: string[];
-    description: string;
-    status: string;
-}
+// ============================================
+// TYPES
+// ============================================
 
-interface SavedJob {
-    jobId: number;
-    savedAt: string;
-}
+type ApplicationStatus = 'not_started' | 'docs_generated' | 'applied' | 'interview' | 'rejected' | 'offer';
+type LocationType = 'remote' | 'hybrid' | 'onsite';
+type EmploymentType = 'internship' | 'full-time' | 'part-time' | 'contract';
 
-interface JobApplication {
+interface EnhancedJob {
     id: string;
-    jobId: number;
     title: string;
     company: string;
-    status: 'applied' | 'interview' | 'offer' | 'rejected';
-    appliedAt: string;
+    companyLogo?: string;
+    locations: string[];
+    remoteType: LocationType;
+    employmentType: EmploymentType;
+    salary?: { min: number; max: number; currency: string; period: string };
+    postedDate: string;
+    deadline?: string;
+    description: string;
+    requiredSkills: string[];
+    preferredSkills: string[];
+    qualifications: string[];
+    responsibilities: string[];
+    sponsorsVisa: boolean;
+    applyUrl: string;
+    sourceUrl: string;
+    sourceName: string;
+    matchScore: number;
+    matchExplanation: string[];
+    applicationStatus: ApplicationStatus;
+    saved: boolean;
+    hidden: boolean;
+    requiredDocuments: string[];
+    generatedDocuments?: { cv?: string; coverLetter?: string };
 }
 
-// Available jobs (mock data simulating Handshake API)
-const availableOnCampusJobs: Job[] = [
-    {
-        id: 1,
-        title: 'Research Assistant',
-        company: 'UCR Biology Department',
-        location: 'On Campus',
-        type: 'Part-time',
-        hours: '10-15 hrs/week',
-        pay: '$17.50/hr',
-        deadline: '2026-01-15',
-        match: 94,
-        tags: ['Research', 'Biology', 'Data Analysis'],
-        description: 'Assist faculty with ongoing research projects in molecular biology.',
-        status: 'open',
-    },
-    {
-        id: 2,
-        title: 'Library Student Assistant',
-        company: 'UCR Library',
-        location: 'On Campus',
-        type: 'Part-time',
-        hours: '15-20 hrs/week',
-        pay: '$16.50/hr',
-        deadline: '2026-01-20',
-        match: 88,
-        tags: ['Customer Service', 'Organization', 'Library'],
-        description: 'Help library patrons, shelve books, and assist with daily operations.',
-        status: 'open',
-    },
-    {
-        id: 3,
-        title: 'IT Help Desk Technician',
-        company: 'UCR Information Technology',
-        location: 'On Campus',
-        type: 'Part-time',
-        hours: '10-15 hrs/week',
-        pay: '$18.00/hr',
-        deadline: '2026-01-25',
-        match: 82,
-        tags: ['IT Support', 'Technical', 'Customer Service'],
-        description: 'Provide technical support to students and staff for various IT issues.',
-        status: 'open',
-    },
-    {
-        id: 4,
-        title: 'Student Ambassador',
-        company: 'UCR Admissions',
-        location: 'On Campus',
-        type: 'Part-time',
-        hours: '8-12 hrs/week',
-        pay: '$17.00/hr',
-        deadline: '2026-01-30',
-        match: 76,
-        tags: ['Public Speaking', 'Campus Tours', 'Leadership'],
-        description: 'Lead campus tours and represent UCR to prospective students.',
-        status: 'open',
-    },
-    {
-        id: 5,
-        title: 'Tutoring Center Tutor',
-        company: 'UCR Academic Resource Center',
-        location: 'On Campus',
-        type: 'Part-time',
-        hours: '5-10 hrs/week',
-        pay: '$18.50/hr',
-        deadline: '2026-02-01',
-        match: 91,
-        tags: ['Teaching', 'Mathematics', 'Physics'],
-        description: 'Tutor students in STEM subjects at the drop-in tutoring center.',
-        status: 'open',
-    },
-];
+interface JobFilters {
+    query: string;
+    remoteTypes: LocationType[];
+    employmentTypes: EmploymentType[];
+    minSalary?: number;
+    sponsorsVisa?: boolean;
+    postedWithin?: number;
+    minMatchScore?: number;
+}
 
-const availableInternships: Job[] = [
+type SortOption = 'match' | 'newest' | 'salary' | 'deadline';
+type TabType = 'discover' | 'saved' | 'applied';
+
+// ============================================
+// SAMPLE DATA (will be replaced by scrapers)
+// ============================================
+
+const sampleJobs: EnhancedJob[] = [
     {
-        id: 101,
+        id: 'job-google-swe-intern',
         title: 'Software Engineering Intern',
         company: 'Google',
-        location: 'Mountain View, CA',
-        type: 'Summer 2026',
-        hours: 'Full-time',
-        pay: '$8,500/month',
-        deadline: '2026-02-15',
-        match: 87,
-        tags: ['Software Development', 'Python', 'Machine Learning'],
-        description: 'Work on core Google products with a team of engineers.',
-        status: 'open',
+        companyLogo: 'https://logo.clearbit.com/google.com',
+        locations: ['Mountain View, CA', 'New York, NY'],
+        remoteType: 'hybrid',
+        employmentType: 'internship',
+        salary: { min: 8000, max: 10000, currency: 'USD', period: 'monthly' },
+        postedDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+        deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        description: 'Build next-generation technologies that impact billions of users. Join our team to work on cutting-edge projects.',
+        requiredSkills: ['Python', 'JavaScript', 'Data Structures', 'Algorithms'],
+        preferredSkills: ['React', 'TypeScript', 'Machine Learning'],
+        qualifications: ['Pursuing BS/MS in Computer Science', 'Strong problem-solving skills'],
+        responsibilities: ['Design and implement software features', 'Collaborate with cross-functional teams', 'Write clean, maintainable code'],
+        sponsorsVisa: true,
+        applyUrl: 'https://careers.google.com/jobs/results/',
+        sourceUrl: 'https://careers.google.com',
+        sourceName: 'Google Careers',
+        matchScore: 92,
+        matchExplanation: ['✓ Skills match: Python, JavaScript, React', '✓ Strong GPA: 3.9', '✓ Sponsors work visas', '✓ Posted recently (5 days ago)'],
+        applicationStatus: 'not_started',
+        saved: false,
+        hidden: false,
+        requiredDocuments: ['resume', 'cover_letter'],
     },
     {
-        id: 102,
-        title: 'Data Science Intern',
-        company: 'Microsoft',
-        location: 'Redmond, WA',
-        type: 'Summer 2026',
-        hours: 'Full-time',
-        pay: '$8,000/month',
-        deadline: '2026-02-20',
-        match: 84,
-        tags: ['Data Science', 'SQL', 'Python'],
-        description: 'Analyze large datasets to drive product decisions.',
-        status: 'open',
+        id: 'job-meta-swe-intern',
+        title: 'Software Engineer Intern',
+        company: 'Meta',
+        companyLogo: 'https://logo.clearbit.com/meta.com',
+        locations: ['Menlo Park, CA'],
+        remoteType: 'hybrid',
+        employmentType: 'internship',
+        salary: { min: 8500, max: 9500, currency: 'USD', period: 'monthly' },
+        postedDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+        deadline: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
+        description: 'Join Meta to build products that bring the world closer together. Work on the metaverse and social platforms.',
+        requiredSkills: ['Python', 'C++', 'Data Structures'],
+        preferredSkills: ['React', 'GraphQL', 'Mobile Development'],
+        qualifications: ['Currently enrolled in BS/MS/PhD in CS or related field'],
+        responsibilities: ['Build new features for Meta products', 'Optimize existing systems', 'Participate in code reviews'],
+        sponsorsVisa: true,
+        applyUrl: 'https://www.metacareers.com/jobs/',
+        sourceUrl: 'https://www.metacareers.com',
+        sourceName: 'Meta Careers',
+        matchScore: 88,
+        matchExplanation: ['✓ Skills match: Python, React', '✓ Entry-level position', '✓ Sponsors work visas'],
+        applicationStatus: 'not_started',
+        saved: false,
+        hidden: false,
+        requiredDocuments: ['resume'],
     },
     {
-        id: 103,
-        title: 'Product Management Intern',
+        id: 'job-amazon-sde-intern',
+        title: 'SDE Intern',
         company: 'Amazon',
-        location: 'Seattle, WA',
-        type: 'Summer 2026',
-        hours: 'Full-time',
-        pay: '$7,500/month',
-        deadline: '2026-02-28',
-        match: 79,
-        tags: ['Product', 'Strategy', 'Analytics'],
-        description: 'Lead product features from conception to launch.',
-        status: 'open',
+        companyLogo: 'https://logo.clearbit.com/amazon.com',
+        locations: ['Seattle, WA', 'Austin, TX'],
+        remoteType: 'onsite',
+        employmentType: 'internship',
+        salary: { min: 7500, max: 8500, currency: 'USD', period: 'monthly' },
+        postedDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+        description: 'Build and innovate at Amazon. Work on products used by millions worldwide.',
+        requiredSkills: ['Java', 'Python', 'AWS', 'Distributed Systems'],
+        preferredSkills: ['Docker', 'Kubernetes'],
+        qualifications: ['Enrolled in CS or related degree program'],
+        responsibilities: ['Design scalable solutions', 'Work with AWS services', 'Ship features to production'],
+        sponsorsVisa: true,
+        applyUrl: 'https://www.amazon.jobs/',
+        sourceUrl: 'https://www.amazon.jobs',
+        sourceName: 'Amazon Jobs',
+        matchScore: 85,
+        matchExplanation: ['✓ Skills match: Python, AWS', '✓ Strong GPA', '✓ Remote available'],
+        applicationStatus: 'not_started',
+        saved: false,
+        hidden: false,
+        requiredDocuments: ['resume', 'cover_letter'],
+    },
+    {
+        id: 'job-microsoft-swe-intern',
+        title: 'Software Engineering Intern',
+        company: 'Microsoft',
+        companyLogo: 'https://logo.clearbit.com/microsoft.com',
+        locations: ['Redmond, WA'],
+        remoteType: 'hybrid',
+        employmentType: 'internship',
+        salary: { min: 8000, max: 9000, currency: 'USD', period: 'monthly' },
+        postedDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+        description: 'Empower every person and organization on the planet to achieve more.',
+        requiredSkills: ['C#', 'TypeScript', 'Azure'],
+        preferredSkills: ['React', '.NET', 'Cloud Computing'],
+        qualifications: ['Pursuing degree in CS, CE, or related field'],
+        responsibilities: ['Develop features for Microsoft products', 'Collaborate with PMs and designers'],
+        sponsorsVisa: true,
+        applyUrl: 'https://careers.microsoft.com/',
+        sourceUrl: 'https://careers.microsoft.com',
+        sourceName: 'Microsoft Careers',
+        matchScore: 82,
+        matchExplanation: ['✓ Skills match: TypeScript, React', '✓ Entry-level position', '✓ Sponsors visas'],
+        applicationStatus: 'not_started',
+        saved: false,
+        hidden: false,
+        requiredDocuments: ['resume'],
+    },
+    {
+        id: 'job-netflix-swe-intern',
+        title: 'Software Engineer Intern',
+        company: 'Netflix',
+        companyLogo: 'https://logo.clearbit.com/netflix.com',
+        locations: ['Los Gatos, CA'],
+        remoteType: 'remote',
+        employmentType: 'internship',
+        salary: { min: 9000, max: 11000, currency: 'USD', period: 'monthly' },
+        postedDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        description: 'Join Netflix to build the future of entertainment. Work on streaming technology.',
+        requiredSkills: ['Java', 'Python', 'Microservices'],
+        preferredSkills: ['Machine Learning', 'Data Engineering'],
+        qualifications: ['Currently pursuing CS degree'],
+        responsibilities: ['Build scalable streaming systems', 'Optimize content delivery'],
+        sponsorsVisa: false,
+        applyUrl: 'https://jobs.netflix.com/',
+        sourceUrl: 'https://jobs.netflix.com',
+        sourceName: 'Netflix Jobs',
+        matchScore: 78,
+        matchExplanation: ['✓ Skills match: Python', '✓ Remote work available', '⚠ Does not sponsor visas'],
+        applicationStatus: 'not_started',
+        saved: false,
+        hidden: false,
+        requiredDocuments: ['resume', 'cover_letter'],
     },
 ];
 
-type TabType = 'on-campus' | 'internships' | 'applied';
+// ============================================
+// MAIN COMPONENT
+// ============================================
 
-export default function JobsPage() {
-    const [activeTab, setActiveTab] = useState<TabType>('on-campus');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+export default function EnhancedJobsPage() {
+    const [activeTab, setActiveTab] = useState<TabType>('discover');
+    const [selectedJob, setSelectedJob] = useState<EnhancedJob | null>(null);
+    const [showFilters, setShowFilters] = useState(false);
+    const [isScanning, setIsScanning] = useState(false);
+    const [isGeneratingDocs, setIsGeneratingDocs] = useState(false);
+    const [copied, setCopied] = useState<string | null>(null);
 
-    // S3 Storage for saved jobs and applications
-    const {
-        data: savedJobs,
-        setData: setSavedJobs,
-        isLoading: savedJobsLoading
-    } = useS3Storage<SavedJob[]>('savedJobs', { defaultValue: [] });
+    // Filters
+    const [filters, setFilters] = useState<JobFilters>({
+        query: '',
+        remoteTypes: [],
+        employmentTypes: [],
+    });
+    const [sortBy, setSortBy] = useState<SortOption>('match');
 
-    const {
-        data: applications,
-        setData: setApplications,
-        isLoading: applicationsLoading
-    } = useS3Storage<JobApplication[]>('jobApplications', { defaultValue: [] });
+    // S3 Storage for persistence
+    const { data: jobs, setData: setJobs, isLoading: jobsLoading } =
+        useS3Storage<EnhancedJob[]>('enhanced-jobs', { defaultValue: sampleJobs });
 
-    const isLoading = savedJobsLoading || applicationsLoading;
+    const { data: savedJobIds, setData: setSavedJobIds } =
+        useS3Storage<string[]>('saved-job-ids', { defaultValue: [] });
 
-    // Check if a job is saved
-    const isJobSaved = (jobId: number) => savedJobs.some(s => s.jobId === jobId);
+    const { data: appliedJobIds, setData: setAppliedJobIds } =
+        useS3Storage<string[]>('applied-job-ids', { defaultValue: [] });
 
-    // Check if user applied to a job
-    const getApplicationStatus = (jobId: number) => applications.find(a => a.jobId === jobId);
+    // Scan for new jobs
+    const handleScan = async () => {
+        setIsScanning(true);
+        toast.info('🔍 Scanning job platforms...');
+        try {
+            const result = await runDiscoveryScan('jobs');
+            if (result.success) {
+                toast.success('✅ Scan complete! Found new opportunities.');
+                // In production, this would fetch from the opportunity store
+            }
+        } catch (error) {
+            toast.error('Scan failed');
+        } finally {
+            setIsScanning(false);
+        }
+    };
 
-    // Save/unsave a job
-    const toggleSaveJob = (job: Job) => {
-        if (isJobSaved(job.id)) {
-            setSavedJobs(prev => prev.filter(s => s.jobId !== job.id));
-            toast.info('Job removed from saved');
+    // Generate documents for a job
+    const handleGenerateDocuments = async (job: EnhancedJob) => {
+        setIsGeneratingDocs(true);
+        toast.info(`📝 Generating documents for ${job.title}...`);
+
+        try {
+            // Simulate document generation (would call real API)
+            await new Promise(r => setTimeout(r, 2000));
+
+            // Update job with generated documents
+            setJobs(prev => prev.map(j =>
+                j.id === job.id
+                    ? {
+                        ...j,
+                        applicationStatus: 'docs_generated',
+                        generatedDocuments: {
+                            cv: `Generated CV for ${job.title}`,
+                            coverLetter: `Generated cover letter for ${job.company}`,
+                        }
+                    }
+                    : j
+            ));
+
+            toast.success('✅ Documents generated! Ready to apply.');
+        } catch (error) {
+            toast.error('Document generation failed');
+        } finally {
+            setIsGeneratingDocs(false);
+        }
+    };
+
+    // Save/unsave job
+    const toggleSaveJob = (job: EnhancedJob) => {
+        if (savedJobIds.includes(job.id)) {
+            setSavedJobIds(prev => prev.filter(id => id !== job.id));
+            toast.info('Removed from saved');
         } else {
-            setSavedJobs(prev => [...prev, { jobId: job.id, savedAt: new Date().toISOString() }]);
-            toast.success('Job saved!');
+            setSavedJobIds(prev => [...prev, job.id]);
+            toast.success('💾 Saved!');
         }
     };
 
-    // Apply to a job
-    const applyToJob = (job: Job) => {
-        if (getApplicationStatus(job.id)) {
-            toast.warning('You already applied to this job');
-            return;
+    // Mark as applied
+    const markAsApplied = (job: EnhancedJob) => {
+        setJobs(prev => prev.map(j =>
+            j.id === job.id ? { ...j, applicationStatus: 'applied' } : j
+        ));
+        if (!appliedJobIds.includes(job.id)) {
+            setAppliedJobIds(prev => [...prev, job.id]);
+        }
+        toast.success('🎉 Marked as applied!');
+    };
+
+    // Copy document to clipboard
+    const copyDocument = async (content: string, type: string) => {
+        await navigator.clipboard.writeText(content);
+        setCopied(type);
+        toast.success('Copied to clipboard!');
+        setTimeout(() => setCopied(null), 2000);
+    };
+
+    // Apply filters and sort
+    const filteredJobs = useMemo(() => {
+        let result = [...jobs];
+
+        // Filter by tab
+        if (activeTab === 'saved') {
+            result = result.filter(j => savedJobIds.includes(j.id));
+        } else if (activeTab === 'applied') {
+            result = result.filter(j => appliedJobIds.includes(j.id));
+        } else {
+            result = result.filter(j => !j.hidden);
         }
 
-        const application: JobApplication = {
-            id: Date.now().toString(),
-            jobId: job.id,
-            title: job.title,
-            company: job.company,
-            status: 'applied',
-            appliedAt: new Date().toISOString(),
-        };
+        // Search query
+        if (filters.query) {
+            const q = filters.query.toLowerCase();
+            result = result.filter(j =>
+                j.title.toLowerCase().includes(q) ||
+                j.company.toLowerCase().includes(q) ||
+                j.requiredSkills.some(s => s.toLowerCase().includes(q))
+            );
+        }
 
-        setApplications(prev => [...prev, application]);
-        toast.success(`Applied to ${job.title}!`);
-    };
+        // Remote type filter
+        if (filters.remoteTypes.length > 0) {
+            result = result.filter(j => filters.remoteTypes.includes(j.remoteType));
+        }
 
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: { staggerChildren: 0.05 },
-        },
-    };
+        // Employment type filter
+        if (filters.employmentTypes.length > 0) {
+            result = result.filter(j => filters.employmentTypes.includes(j.employmentType));
+        }
 
-    const itemVariants = {
-        hidden: { opacity: 0, y: 20 },
-        visible: { opacity: 1, y: 0 },
-    };
+        // Visa sponsorship
+        if (filters.sponsorsVisa) {
+            result = result.filter(j => j.sponsorsVisa);
+        }
 
-    const availableJobs = activeTab === 'on-campus' ? availableOnCampusJobs : activeTab === 'internships' ? availableInternships : [];
-    const filteredJobs = availableJobs.filter(job =>
-        job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        job.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+        // Minimum match score
+        if (filters.minMatchScore) {
+            result = result.filter(j => j.matchScore >= filters.minMatchScore!);
+        }
+
+        // Sort
+        switch (sortBy) {
+            case 'match':
+                result.sort((a, b) => b.matchScore - a.matchScore);
+                break;
+            case 'newest':
+                result.sort((a, b) => new Date(b.postedDate).getTime() - new Date(a.postedDate).getTime());
+                break;
+            case 'salary':
+                result.sort((a, b) => (b.salary?.max || 0) - (a.salary?.max || 0));
+                break;
+            case 'deadline':
+                result.sort((a, b) => {
+                    if (!a.deadline) return 1;
+                    if (!b.deadline) return -1;
+                    return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+                });
+                break;
+        }
+
+        return result;
+    }, [jobs, filters, sortBy, activeTab, savedJobIds, appliedJobIds]);
 
     // Stats
     const stats = useMemo(() => ({
-        onCampus: availableOnCampusJobs.length,
-        internships: availableInternships.length,
-        applied: applications.length,
-        interviews: applications.filter(a => a.status === 'interview').length,
-        saved: savedJobs.length,
-    }), [applications, savedJobs]);
+        total: jobs.filter(j => !j.hidden).length,
+        highMatch: jobs.filter(j => j.matchScore >= 80).length,
+        saved: savedJobIds.length,
+        applied: appliedJobIds.length,
+        docsGenerated: jobs.filter(j => j.applicationStatus === 'docs_generated').length,
+    }), [jobs, savedJobIds, appliedJobIds]);
+
+    // Format helpers
+    const formatSalary = (salary?: EnhancedJob['salary']) => {
+        if (!salary) return null;
+        return `$${salary.min.toLocaleString()}-$${salary.max.toLocaleString()}/${salary.period.replace('ly', '')}`;
+    };
+
+    const formatDate = (date: string) => {
+        const d = new Date(date);
+        const now = new Date();
+        const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays === 0) return 'Today';
+        if (diffDays === 1) return 'Yesterday';
+        if (diffDays < 7) return `${diffDays} days ago`;
+        return d.toLocaleDateString();
+    };
+
+    const getLocationIcon = (type: LocationType) => {
+        switch (type) {
+            case 'remote': return <Globe className="w-4 h-4" />;
+            case 'hybrid': return <Laptop className="w-4 h-4" />;
+            case 'onsite': return <Building className="w-4 h-4" />;
+        }
+    };
+
+    const getStatusColor = (status: ApplicationStatus) => {
+        switch (status) {
+            case 'not_started': return 'var(--text-muted)';
+            case 'docs_generated': return 'var(--warning)';
+            case 'applied': return 'var(--primary-400)';
+            case 'interview': return 'var(--success)';
+            case 'offer': return 'var(--success)';
+            case 'rejected': return 'var(--error)';
+        }
+    };
+
+    if (jobsLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--primary-400)' }} />
+            </div>
+        );
+    }
 
     return (
         <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             className="space-y-6"
         >
             {/* Header */}
-            <motion.div variants={itemVariants} className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
+                    <h1 className="text-3xl font-bold flex items-center gap-3" style={{ fontFamily: 'var(--font-display)' }}>
+                        <Briefcase className="w-8 h-8" style={{ color: 'var(--primary-400)' }} />
                         Job Opportunities
                     </h1>
                     <p style={{ color: 'var(--text-secondary)' }}>
-                        Find and apply to jobs matched to your skills
+                        {stats.total} jobs · {stats.highMatch} high matches · Real-time scraping from 10+ sources
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="px-4 py-2 rounded-lg flex items-center gap-2" style={{ background: 'var(--bg-tertiary)' }}>
-                        <AlertCircle className="w-4 h-4" style={{ color: 'var(--warning)' }} />
-                        <span className="text-sm">On-campus only until Summer 2026</span>
-                    </div>
+                    <Button
+                        variant="secondary"
+                        onClick={handleScan}
+                        disabled={isScanning}
+                        icon={isScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    >
+                        {isScanning ? 'Scanning...' : 'Scan New Jobs'}
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        onClick={() => setShowFilters(!showFilters)}
+                        icon={<Filter className="w-4 h-4" />}
+                    >
+                        Filters
+                    </Button>
                 </div>
-            </motion.div>
+            </div>
 
-            {/* Stats */}
-            <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(20, 184, 166, 0.15)' }}>
-                        <Briefcase className="w-6 h-6" style={{ color: 'var(--accent-teal)' }} />
-                    </div>
-                    <div>
-                        <p className="text-2xl font-bold">{stats.onCampus}</p>
-                        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>On-Campus Jobs</p>
-                    </div>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-5 gap-4">
+                <Card className="text-center" style={{ background: 'rgba(91, 111, 242, 0.1)' }}>
+                    <Briefcase className="w-6 h-6 mx-auto mb-2" style={{ color: 'var(--primary-400)' }} />
+                    <p className="text-2xl font-bold">{stats.total}</p>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Available</p>
                 </Card>
-                <Card className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(168, 85, 247, 0.15)' }}>
-                        <TrendingUp className="w-6 h-6" style={{ color: 'var(--accent-purple)' }} />
-                    </div>
-                    <div>
-                        <p className="text-2xl font-bold">{stats.internships}</p>
-                        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Summer Internships</p>
-                    </div>
+                <Card className="text-center" style={{ background: 'rgba(34, 197, 94, 0.1)' }}>
+                    <TrendingUp className="w-6 h-6 mx-auto mb-2" style={{ color: 'var(--success)' }} />
+                    <p className="text-2xl font-bold">{stats.highMatch}</p>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>High Match (80%+)</p>
                 </Card>
-                <Card className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(34, 197, 94, 0.15)' }}>
-                        <CheckCircle2 className="w-6 h-6" style={{ color: 'var(--success)' }} />
-                    </div>
-                    <div>
-                        <p className="text-2xl font-bold">{stats.applied}</p>
-                        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Applications Sent</p>
-                    </div>
+                <Card className="text-center">
+                    <Bookmark className="w-6 h-6 mx-auto mb-2" style={{ color: 'var(--warning)' }} />
+                    <p className="text-2xl font-bold">{stats.saved}</p>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Saved</p>
                 </Card>
-                <Card className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(245, 158, 11, 0.15)' }}>
-                        <Calendar className="w-6 h-6" style={{ color: 'var(--accent-gold)' }} />
-                    </div>
-                    <div>
-                        <p className="text-2xl font-bold">{stats.interviews}</p>
-                        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Interviews</p>
-                    </div>
+                <Card className="text-center" style={{ background: 'rgba(168, 85, 247, 0.1)' }}>
+                    <FileText className="w-6 h-6 mx-auto mb-2" style={{ color: 'var(--accent-purple)' }} />
+                    <p className="text-2xl font-bold">{stats.docsGenerated}</p>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Docs Ready</p>
                 </Card>
-            </motion.div>
+                <Card className="text-center" style={{ background: 'rgba(20, 184, 166, 0.1)' }}>
+                    <Send className="w-6 h-6 mx-auto mb-2" style={{ color: 'var(--accent-teal)' }} />
+                    <p className="text-2xl font-bold">{stats.applied}</p>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Applied</p>
+                </Card>
+            </div>
 
-            {/* Tabs and Search */}
-            <motion.div variants={itemVariants} className="flex flex-wrap gap-4 items-center">
+            {/* Tabs & Search */}
+            <div className="flex flex-wrap gap-4 items-center">
                 <div className="flex gap-2">
-                    {(['on-campus', 'internships', 'applied'] as TabType[]).map((tab) => (
+                    {(['discover', 'saved', 'applied'] as TabType[]).map((tab) => (
                         <Button
                             key={tab}
                             variant={activeTab === tab ? 'primary' : 'secondary'}
                             onClick={() => setActiveTab(tab)}
                         >
-                            {tab === 'on-campus' ? 'On-Campus Jobs' : tab === 'internships' ? 'Summer Internships' : 'My Applications'}
+                            {tab === 'discover' ? '🔍 Discover' : tab === 'saved' ? '💾 Saved' : '📤 Applied'}
                         </Button>
                     ))}
                 </div>
                 <div className="flex-1" />
-                {activeTab !== 'applied' && (
-                    <Input
-                        placeholder="Search jobs..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        icon={<Search className="w-4 h-4" />}
-                        className="max-w-md"
-                    />
-                )}
-            </motion.div>
+                <Input
+                    placeholder="Search jobs, companies, skills..."
+                    value={filters.query}
+                    onChange={(e) => setFilters(prev => ({ ...prev, query: e.target.value }))}
+                    icon={<Search className="w-4 h-4" />}
+                    className="max-w-md"
+                />
+                <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as SortOption)}
+                    className="px-4 py-2 rounded-lg"
+                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}
+                >
+                    <option value="match">Sort: Match Score</option>
+                    <option value="newest">Sort: Newest</option>
+                    <option value="salary">Sort: Salary</option>
+                    <option value="deadline">Sort: Deadline</option>
+                </select>
+            </div>
 
-            {/* Content */}
-            {activeTab === 'applied' ? (
-                <motion.div variants={itemVariants}>
-                    <Card>
-                        <h3 className="font-semibold mb-4">Application Tracker</h3>
-                        {applications.length === 0 ? (
-                            <div className="text-center py-12">
-                                <Send className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
-                                <p className="mb-2" style={{ color: 'var(--text-muted)' }}>No applications yet</p>
-                                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Apply to jobs to track them here</p>
-                            </div>
-                        ) : (
-                            <div className="table-container">
-                                <table className="table">
-                                    <thead>
-                                        <tr>
-                                            <th>Position</th>
-                                            <th>Company</th>
-                                            <th>Applied Date</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {applications.map((app) => (
-                                            <tr key={app.id}>
-                                                <td className="font-medium">{app.title}</td>
-                                                <td style={{ color: 'var(--text-secondary)' }}>{app.company}</td>
-                                                <td style={{ color: 'var(--text-muted)' }}>
-                                                    {new Date(app.appliedAt).toLocaleDateString()}
-                                                </td>
-                                                <td>
-                                                    <StatusBadge
-                                                        status={app.status === 'interview' ? 'success' : app.status === 'applied' ? 'info' : app.status === 'offer' ? 'success' : 'error'}
-                                                    >
-                                                        {app.status}
-                                                    </StatusBadge>
-                                                </td>
-                                            </tr>
+            {/* Filters Panel */}
+            <AnimatePresence>
+                {showFilters && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                    >
+                        <Card>
+                            <div className="flex flex-wrap gap-6">
+                                <div>
+                                    <p className="text-sm font-medium mb-2">Location Type</p>
+                                    <div className="flex gap-2">
+                                        {(['remote', 'hybrid', 'onsite'] as LocationType[]).map(type => (
+                                            <button
+                                                key={type}
+                                                onClick={() => setFilters(prev => ({
+                                                    ...prev,
+                                                    remoteTypes: prev.remoteTypes.includes(type)
+                                                        ? prev.remoteTypes.filter(t => t !== type)
+                                                        : [...prev.remoteTypes, type]
+                                                }))}
+                                                className={`px-3 py-1 rounded-lg text-sm capitalize ${filters.remoteTypes.includes(type) ? 'ring-2' : ''
+                                                    }`}
+                                                style={{ background: 'var(--bg-secondary)' }}
+                                            >
+                                                {type}
+                                            </button>
                                         ))}
-                                    </tbody>
-                                </table>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium mb-2">Job Type</p>
+                                    <div className="flex gap-2">
+                                        {(['internship', 'full-time', 'part-time'] as EmploymentType[]).map(type => (
+                                            <button
+                                                key={type}
+                                                onClick={() => setFilters(prev => ({
+                                                    ...prev,
+                                                    employmentTypes: prev.employmentTypes.includes(type)
+                                                        ? prev.employmentTypes.filter(t => t !== type)
+                                                        : [...prev.employmentTypes, type]
+                                                }))}
+                                                className={`px-3 py-1 rounded-lg text-sm capitalize ${filters.employmentTypes.includes(type) ? 'ring-2' : ''
+                                                    }`}
+                                                style={{ background: 'var(--bg-secondary)' }}
+                                            >
+                                                {type}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium mb-2">Visa Sponsorship</p>
+                                    <button
+                                        onClick={() => setFilters(prev => ({
+                                            ...prev,
+                                            sponsorsVisa: !prev.sponsorsVisa
+                                        }))}
+                                        className={`px-3 py-1 rounded-lg text-sm ${filters.sponsorsVisa ? 'ring-2' : ''
+                                            }`}
+                                        style={{ background: 'var(--bg-secondary)' }}
+                                    >
+                                        🛂 Sponsors Visa
+                                    </button>
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium mb-2">Min Match Score</p>
+                                    <select
+                                        value={filters.minMatchScore || ''}
+                                        onChange={(e) => setFilters(prev => ({
+                                            ...prev,
+                                            minMatchScore: e.target.value ? parseInt(e.target.value) : undefined
+                                        }))}
+                                        className="px-3 py-1 rounded-lg text-sm"
+                                        style={{ background: 'var(--bg-secondary)' }}
+                                    >
+                                        <option value="">Any</option>
+                                        <option value="70">70%+</option>
+                                        <option value="80">80%+</option>
+                                        <option value="90">90%+</option>
+                                    </select>
+                                </div>
                             </div>
-                        )}
-                    </Card>
-                </motion.div>
-            ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Job List */}
-                    <motion.div variants={containerVariants} className="lg:col-span-2 space-y-4">
-                        {filteredJobs.map((job) => (
-                            <motion.div key={job.id} variants={itemVariants}>
+                        </Card>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Main Content */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Job List */}
+                <div className="lg:col-span-2 space-y-4">
+                    <AnimatePresence>
+                        {filteredJobs.map((job, index) => (
+                            <motion.div
+                                key={job.id}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                transition={{ delay: index * 0.03 }}
+                            >
                                 <Card
-                                    className={`cursor-pointer ${selectedJob?.id === job.id ? 'ring-2' : ''}`}
+                                    className={`cursor-pointer transition-all hover:shadow-lg ${selectedJob?.id === job.id ? 'ring-2' : ''
+                                        }`}
+                                    style={{
+                                        borderLeft: `4px solid ${job.matchScore >= 80 ? 'var(--success)' : 'var(--primary-400)'}`
+                                    }}
                                     onClick={() => setSelectedJob(job)}
                                 >
                                     <div className="flex items-start gap-4">
-                                        <div className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--gradient-accent)' }}>
-                                            <Building2 className="w-7 h-7 text-white" />
+                                        {/* Company Logo */}
+                                        <div
+                                            className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
+                                            style={{ background: 'var(--bg-secondary)' }}
+                                        >
+                                            {job.companyLogo ? (
+                                                <img
+                                                    src={job.companyLogo}
+                                                    alt={job.company}
+                                                    className="w-10 h-10 object-contain"
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).style.display = 'none';
+                                                    }}
+                                                />
+                                            ) : (
+                                                <Building2 className="w-7 h-7" style={{ color: 'var(--text-muted)' }} />
+                                            )}
                                         </div>
+
+                                        {/* Job Info */}
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-start justify-between mb-2">
                                                 <div>
                                                     <h3 className="font-semibold text-lg">{job.title}</h3>
-                                                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{job.company}</p>
+                                                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                                        {job.company}
+                                                    </p>
                                                 </div>
-                                                <StatusBadge status="success">{job.match}% Match</StatusBadge>
+                                                <div className="flex items-center gap-2">
+                                                    <StatusBadge
+                                                        status={job.matchScore >= 80 ? 'success' : 'info'}
+                                                    >
+                                                        {job.matchScore}% Match
+                                                    </StatusBadge>
+                                                </div>
                                             </div>
+
+                                            {/* Meta Info */}
                                             <div className="flex flex-wrap gap-3 text-sm mb-3" style={{ color: 'var(--text-muted)' }}>
                                                 <span className="flex items-center gap-1">
-                                                    <MapPin className="w-4 h-4" /> {job.location}
+                                                    {getLocationIcon(job.remoteType)}
+                                                    {job.locations[0]}
+                                                    {job.locations.length > 1 && ` +${job.locations.length - 1}`}
                                                 </span>
+                                                {job.salary && (
+                                                    <span className="flex items-center gap-1">
+                                                        <DollarSign className="w-4 h-4" />
+                                                        {formatSalary(job.salary)}
+                                                    </span>
+                                                )}
                                                 <span className="flex items-center gap-1">
-                                                    <Clock className="w-4 h-4" /> {job.hours}
+                                                    <Clock className="w-4 h-4" />
+                                                    {formatDate(job.postedDate)}
                                                 </span>
-                                                <span className="flex items-center gap-1">
-                                                    <DollarSign className="w-4 h-4" /> {job.pay}
-                                                </span>
+                                                {job.sponsorsVisa && (
+                                                    <span className="flex items-center gap-1 text-green-500">
+                                                        ✓ Visa Sponsor
+                                                    </span>
+                                                )}
                                             </div>
+
+                                            {/* Skills */}
                                             <div className="flex flex-wrap gap-2">
-                                                {job.tags.map((tag) => (
-                                                    <Tag key={tag}>{tag}</Tag>
+                                                {job.requiredSkills.slice(0, 4).map(skill => (
+                                                    <Tag key={skill}>{skill}</Tag>
                                                 ))}
+                                                {job.requiredSkills.length > 4 && (
+                                                    <Tag>+{job.requiredSkills.length - 4}</Tag>
+                                                )}
                                             </div>
+
+                                            {/* Status indicator */}
+                                            {job.applicationStatus !== 'not_started' && (
+                                                <div
+                                                    className="mt-2 text-xs font-medium"
+                                                    style={{ color: getStatusColor(job.applicationStatus) }}
+                                                >
+                                                    {job.applicationStatus === 'docs_generated' && '📄 Documents ready'}
+                                                    {job.applicationStatus === 'applied' && '✅ Applied'}
+                                                    {job.applicationStatus === 'interview' && '🎯 Interview scheduled'}
+                                                </div>
+                                            )}
                                         </div>
+
                                         <ChevronRight className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
                                     </div>
                                 </Card>
                             </motion.div>
                         ))}
+                    </AnimatePresence>
 
-                        {filteredJobs.length === 0 && (
-                            <Card className="text-center py-12">
-                                <Briefcase className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
-                                <h3 className="text-xl font-semibold mb-2">No jobs found</h3>
-                                <p style={{ color: 'var(--text-muted)' }}>Try adjusting your search terms</p>
-                            </Card>
-                        )}
-                    </motion.div>
+                    {filteredJobs.length === 0 && (
+                        <Card className="text-center py-12">
+                            <Briefcase className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
+                            <h3 className="text-xl font-semibold mb-2">No jobs found</h3>
+                            <p style={{ color: 'var(--text-muted)' }}>
+                                Try adjusting your filters or scan for new opportunities
+                            </p>
+                        </Card>
+                    )}
+                </div>
 
-                    {/* Job Details Panel */}
-                    <motion.div variants={itemVariants} className="space-y-4">
-                        {selectedJob ? (
-                            <>
-                                <Card>
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div className="w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: 'var(--gradient-accent)' }}>
-                                            <Building2 className="w-7 h-7 text-white" />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-semibold text-lg">{selectedJob.title}</h3>
-                                            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{selectedJob.company}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-4 mb-6">
-                                        <div>
-                                            <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Match Score</p>
-                                            <div className="flex items-center gap-3">
-                                                <ProgressBar value={selectedJob.match} className="flex-1" />
-                                                <span className="font-bold" style={{ color: 'var(--success)' }}>{selectedJob.match}%</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Location</p>
-                                                <p className="text-sm font-medium">{selectedJob.location}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Hours</p>
-                                                <p className="text-sm font-medium">{selectedJob.hours}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Pay Rate</p>
-                                                <p className="text-sm font-medium">{selectedJob.pay}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Deadline</p>
-                                                <p className="text-sm font-medium">{selectedJob.deadline}</p>
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <p className="text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Description</p>
-                                            <p className="text-sm">{selectedJob.description}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-3">
-                                        {getApplicationStatus(selectedJob.id) ? (
-                                            <Button className="flex-1" variant="secondary" disabled icon={<CheckCircle2 className="w-4 h-4" />}>
-                                                Applied ✓
-                                            </Button>
+                {/* Job Details Panel */}
+                <div className="space-y-4">
+                    {selectedJob ? (
+                        <>
+                            <Card>
+                                <div className="flex items-start gap-3 mb-4">
+                                    <div
+                                        className="w-14 h-14 rounded-xl flex items-center justify-center overflow-hidden"
+                                        style={{ background: 'var(--bg-secondary)' }}
+                                    >
+                                        {selectedJob.companyLogo ? (
+                                            <img
+                                                src={selectedJob.companyLogo}
+                                                alt={selectedJob.company}
+                                                className="w-10 h-10 object-contain"
+                                            />
                                         ) : (
-                                            <Button
-                                                className="flex-1"
-                                                icon={<Send className="w-4 h-4" />}
-                                                onClick={() => applyToJob(selectedJob)}
-                                            >
-                                                Apply Now
-                                            </Button>
+                                            <Building2 className="w-7 h-7" style={{ color: 'var(--text-muted)' }} />
                                         )}
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-lg">{selectedJob.title}</h3>
+                                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                            {selectedJob.company}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Match Score */}
+                                <div className="mb-4">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="text-sm font-medium">Match Score</span>
+                                        <span className="font-bold" style={{
+                                            color: selectedJob.matchScore >= 80 ? 'var(--success)' : 'var(--primary-400)'
+                                        }}>
+                                            {selectedJob.matchScore}%
+                                        </span>
+                                    </div>
+                                    <ProgressBar value={selectedJob.matchScore} />
+                                </div>
+
+                                {/* Quick Info */}
+                                <div className="grid grid-cols-2 gap-3 mb-4">
+                                    <div className="p-2 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
+                                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Location</p>
+                                        <p className="text-sm font-medium">{selectedJob.locations[0]}</p>
+                                    </div>
+                                    <div className="p-2 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
+                                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Type</p>
+                                        <p className="text-sm font-medium capitalize">{selectedJob.employmentType}</p>
+                                    </div>
+                                    {selectedJob.salary && (
+                                        <div className="p-2 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
+                                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Salary</p>
+                                            <p className="text-sm font-medium">{formatSalary(selectedJob.salary)}</p>
+                                        </div>
+                                    )}
+                                    {selectedJob.deadline && (
+                                        <div className="p-2 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
+                                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Deadline</p>
+                                            <p className="text-sm font-medium">
+                                                {new Date(selectedJob.deadline).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Description */}
+                                <div className="mb-4">
+                                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                        {selectedJob.description}
+                                    </p>
+                                </div>
+
+                                {/* Required Documents */}
+                                <div className="mb-4">
+                                    <p className="text-sm font-medium mb-2">Required Documents</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {selectedJob.requiredDocuments.map(doc => (
+                                            <span
+                                                key={doc}
+                                                className="px-2 py-1 rounded-lg text-xs capitalize"
+                                                style={{ background: 'var(--bg-secondary)' }}
+                                            >
+                                                {doc.replace('_', ' ')}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex flex-col gap-2">
+                                    {selectedJob.applicationStatus === 'not_started' && (
+                                        <Button
+                                            onClick={() => handleGenerateDocuments(selectedJob)}
+                                            disabled={isGeneratingDocs}
+                                            icon={isGeneratingDocs
+                                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                                : <Zap className="w-4 h-4" />
+                                            }
+                                        >
+                                            {isGeneratingDocs ? 'Generating...' : 'Generate Documents'}
+                                        </Button>
+                                    )}
+
+                                    {selectedJob.applicationStatus === 'docs_generated' && (
+                                        <>
+                                            <Button
+                                                onClick={() => window.open(selectedJob.applyUrl, '_blank')}
+                                                icon={<ExternalLink className="w-4 h-4" />}
+                                            >
+                                                Open Apply Link
+                                            </Button>
+                                            <Button
+                                                variant="secondary"
+                                                onClick={() => markAsApplied(selectedJob)}
+                                                icon={<Check className="w-4 h-4" />}
+                                            >
+                                                Mark as Applied
+                                            </Button>
+                                        </>
+                                    )}
+
+                                    {selectedJob.applicationStatus === 'applied' && (
+                                        <Button variant="secondary" disabled icon={<CheckCircle2 className="w-4 h-4" />}>
+                                            Applied ✓
+                                        </Button>
+                                    )}
+
+                                    <div className="flex gap-2">
                                         <Button
                                             variant="secondary"
-                                            icon={isJobSaved(selectedJob.id) ? <Bookmark className="w-4 h-4" /> : <BookmarkPlus className="w-4 h-4" />}
+                                            className="flex-1"
                                             onClick={() => toggleSaveJob(selectedJob)}
+                                            icon={savedJobIds.includes(selectedJob.id)
+                                                ? <Bookmark className="w-4 h-4 fill-current" />
+                                                : <BookmarkPlus className="w-4 h-4" />
+                                            }
                                         >
-                                            {isJobSaved(selectedJob.id) ? 'Saved' : 'Save'}
+                                            {savedJobIds.includes(selectedJob.id) ? 'Saved' : 'Save'}
+                                        </Button>
+                                        <Button
+                                            variant="secondary"
+                                            onClick={() => window.open(selectedJob.applyUrl, '_blank')}
+                                            icon={<ExternalLink className="w-4 h-4" />}
+                                        >
+                                            View
                                         </Button>
                                     </div>
-                                </Card>
+                                </div>
+                            </Card>
 
+                            {/* Why You Match */}
+                            <Card>
+                                <h4 className="font-semibold mb-3">Why You Match</h4>
+                                <div className="space-y-2">
+                                    {selectedJob.matchExplanation.map((reason, i) => (
+                                        <div key={i} className="flex items-start gap-2 text-sm">
+                                            <span>{reason}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </Card>
+
+                            {/* Generated Documents */}
+                            {selectedJob.generatedDocuments && (
                                 <Card>
-                                    <h4 className="font-semibold mb-3">Why You Match</h4>
+                                    <h4 className="font-semibold mb-3">Generated Documents</h4>
                                     <div className="space-y-2">
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--success)' }} />
-                                            <span>Your resume highlights relevant skills</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--success)' }} />
-                                            <span>Previous research experience</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--success)' }} />
-                                            <span>Strong academic background in STEM</span>
-                                        </div>
+                                        {selectedJob.generatedDocuments.cv && (
+                                            <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
+                                                <span className="text-sm flex items-center gap-2">
+                                                    <FileText className="w-4 h-4" />
+                                                    Tailored CV
+                                                </span>
+                                                <div className="flex gap-1">
+                                                    <button
+                                                        onClick={() => copyDocument(selectedJob.generatedDocuments!.cv!, 'cv')}
+                                                        className="p-1 hover:bg-white/10 rounded"
+                                                    >
+                                                        {copied === 'cv' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                                                    </button>
+                                                    <button className="p-1 hover:bg-white/10 rounded">
+                                                        <Download className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {selectedJob.generatedDocuments.coverLetter && (
+                                            <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
+                                                <span className="text-sm flex items-center gap-2">
+                                                    <FileText className="w-4 h-4" />
+                                                    Cover Letter
+                                                </span>
+                                                <div className="flex gap-1">
+                                                    <button
+                                                        onClick={() => copyDocument(selectedJob.generatedDocuments!.coverLetter!, 'cover')}
+                                                        className="p-1 hover:bg-white/10 rounded"
+                                                    >
+                                                        {copied === 'cover' ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                                                    </button>
+                                                    <button className="p-1 hover:bg-white/10 rounded">
+                                                        <Download className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </Card>
-                            </>
-                        ) : (
-                            <Card className="text-center py-12">
-                                <Briefcase className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
-                                <p style={{ color: 'var(--text-muted)' }}>Select a job to view details</p>
-                            </Card>
-                        )}
-                    </motion.div>
+                            )}
+                        </>
+                    ) : (
+                        <Card className="text-center py-12">
+                            <Eye className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
+                            <p style={{ color: 'var(--text-muted)' }}>Select a job to view details</p>
+                        </Card>
+                    )}
                 </div>
-            )}
+            </div>
         </motion.div>
     );
 }
