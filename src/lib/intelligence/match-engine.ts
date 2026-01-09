@@ -52,12 +52,19 @@ export class MatchEngine {
             }
         }
 
-        // LOCATION/STATE CHECK
+        // LOCATION/STATE CHECK - Comprehensive list
         const statePatterns = [
-            { state: 'Florida', patterns: ['florida resident', 'florida students', 'florida scholarship'] },
-            { state: 'Texas', patterns: ['texas resident', 'texas students'] },
-            { state: 'California', patterns: ['california resident', 'california students'] },
-            { state: 'New York', patterns: ['new york resident', 'new york students'] },
+            { state: 'Florida', patterns: ['florida resident', 'florida students', 'florida scholarship', 'for florida'] },
+            { state: 'Texas', patterns: ['texas resident', 'texas students', 'for texas'] },
+            { state: 'California', patterns: ['california resident', 'california students', 'for california'] },
+            { state: 'New York', patterns: ['new york resident', 'new york students', 'for new york'] },
+            { state: 'Georgia', patterns: ['georgia resident', 'georgia students', 'for georgia'] },
+            { state: 'Ohio', patterns: ['ohio resident', 'ohio students', 'for ohio'] },
+            { state: 'Pennsylvania', patterns: ['pennsylvania resident', 'pennsylvania students', 'for pennsylvania'] },
+            { state: 'Michigan', patterns: ['michigan resident', 'michigan students', 'for michigan'] },
+            { state: 'Illinois', patterns: ['illinois resident', 'illinois students', 'for illinois'] },
+            { state: 'North Carolina', patterns: ['north carolina resident', 'north carolina students'] },
+            { state: 'Virginia', patterns: ['virginia resident', 'virginia students', 'for virginia'] },
         ];
         for (const { state, patterns } of statePatterns) {
             if (profile.state !== state && patterns.some(p => oppText.includes(p))) {
@@ -66,6 +73,40 @@ export class MatchEngine {
                 analysis.missingRequirements.push(`${state} residency required`);
                 return analysis;
             }
+        }
+
+        // ETHNICITY/RACE REQUIREMENT CHECK
+        const userEthnicity = (profile.ethnicity || '').toLowerCase();
+        const ethnicityRestrictions = [
+            { ethnicity: 'black', patterns: ['black student', 'african american', 'for black', 'black scholars'] },
+            { ethnicity: 'hispanic', patterns: ['hispanic student', 'latino student', 'for hispanic', 'latinx'] },
+            { ethnicity: 'native american', patterns: ['native american', 'indigenous student', 'tribal', 'american indian'] },
+            { ethnicity: 'asian', patterns: ['asian student', 'for asian', 'asian american'] },
+            { ethnicity: 'pacific islander', patterns: ['pacific islander', 'native hawaiian'] },
+        ];
+        for (const { ethnicity, patterns } of ethnicityRestrictions) {
+            // If scholarship is for a specific ethnicity and user is NOT that ethnicity
+            if (!userEthnicity.includes(ethnicity) && patterns.some(p => oppText.includes(p))) {
+                // Check if it's specifically FOR that group (in title or explicit)
+                const isRestricted = patterns.some(p => opportunity.title.toLowerCase().includes(p)) ||
+                    oppText.includes(`for ${ethnicity}`) ||
+                    oppText.includes(`${ethnicity} only`);
+                if (isRestricted) {
+                    analysis.score = 0;
+                    analysis.category = 'Not Eligible';
+                    analysis.missingRequirements.push(`${ethnicity.charAt(0).toUpperCase() + ethnicity.slice(1)} ethnicity required`);
+                    return analysis;
+                }
+            }
+        }
+
+        // FILTER OUT CATEGORY/LIST PAGES (not actual scholarships)
+        const categoryPatterns = ['top scholarships for', 'best scholarships for', 'upcoming deadlines', 'list of scholarships'];
+        if (categoryPatterns.some(p => opportunity.title.toLowerCase().includes(p))) {
+            analysis.score = 0;
+            analysis.category = 'Not Eligible';
+            analysis.missingRequirements.push('Category page, not an actual scholarship');
+            return analysis;
         }
 
         // DEGREE LEVEL CHECK (Undergrad vs Graduate/Law/Medical)
