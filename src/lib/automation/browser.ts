@@ -36,23 +36,47 @@ class BrowserManager {
         const isProduction = process.env.NODE_ENV === 'production';
         const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
 
-        this.browser = await puppeteer.launch({
-            headless: false, // Force visible browser for manual login/debugging
-            executablePath: executablePath || undefined, // Use system Chromium if set
-            defaultViewport: { width: 1280, height: 800 },
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-blink-features=AutomationControlled',
-                '--disable-dev-shm-usage', // Overcome limited resource problems in containers
-                '--disable-gpu', // GPU not needed for headless
-                '--single-process', // Reduce memory usage
-                '--disable-crash-reporter', // Disable crash reporting
-                '--disable-breakpad', // Disable breakpad crash handler
-                '--no-zygote', // Disable zygote process
-            ],
-            userDataDir: './chrome-data', // Persist session (login, cookies)
-        });
+        try {
+            this.log('🚀 Attempting to launch visible browser...');
+            this.browser = await puppeteer.launch({
+                headless: false,
+                executablePath: executablePath || undefined,
+                defaultViewport: { width: 1280, height: 800 },
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--single-process',
+                    '--disable-crash-reporter',
+                    '--disable-breakpad',
+                    '--no-zygote',
+                ],
+                userDataDir: './chrome-data',
+            });
+        } catch (error) {
+            this.log('⚠️ Failed to launch visible browser (likely missing X server). Falling back to headless mode.');
+            console.error('Headful launch failed:', error);
+
+            this.browser = await puppeteer.launch({
+                headless: true, // Fallback to headless
+                executablePath: executablePath || undefined,
+                defaultViewport: { width: 1280, height: 800 },
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--single-process',
+                    '--disable-crash-reporter',
+                    '--disable-breakpad',
+                    '--no-zygote',
+                ],
+                userDataDir: './chrome-data',
+            });
+        }
 
         this.page = await this.browser.newPage();
 
@@ -61,7 +85,7 @@ class BrowserManager {
             Object.defineProperty(navigator, 'webdriver', { get: () => false });
         });
 
-        this.log('Browser initialized');
+        this.log('✅ Browser initialized');
     }
 
     async close(): Promise<void> {
