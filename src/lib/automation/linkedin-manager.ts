@@ -11,6 +11,14 @@ export interface Experience {
 
 export const linkedInManager = {
     /**
+     * Set session cookie manually
+     */
+    async setCookie(value: string) {
+        if (!value) throw new Error('Cookie value is required');
+        await browserManager.setCookie('li_at', value);
+    },
+
+    /**
      * Updates the user's headline
      */
     async updateHeadline(headline: string) {

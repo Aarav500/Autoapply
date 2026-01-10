@@ -8,7 +8,7 @@ import {
     MessageSquare, Heart, Share2, Users, Eye, TrendingUp, Sparkles,
     CheckCircle2, Circle, Edit3, PlusCircle, Send, RefreshCw, Zap,
     Calendar, Target, Globe, Rocket, Lightbulb, Play, Pause,
-    Settings, Terminal
+    Settings, Terminal, Lock
 } from 'lucide-react';
 import { toast } from '@/lib/error-handling';
 
@@ -466,7 +466,46 @@ export default function LinkedInPage() {
                         {isAutonomous ? 'Stop Auto-Pilot' : 'Activate Auto-Pilot'}
                     </Button>
                 </Card>
+
             </div>
+
+            {/* Manual Cookie Auth (For Headless Environments) */}
+            <Card className="bg-blue-500/10 border-blue-500/20">
+                <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                        <h3 className="font-medium flex items-center gap-2">
+                            <Lock className="w-4 h-4 text-blue-400" />
+                            Manual Login (Headless Mode)
+                        </h3>
+                        <p className="text-xs text-gray-400 mt-1">
+                            If the browser window doesn't appear, paste your <code>li_at</code> cookie here to log in.
+                        </p>
+                    </div>
+                    <div className="flex gap-2">
+                        <input
+                            type="password"
+                            placeholder="Paste li_at cookie..."
+                            className="bg-black/50 border border-white/10 rounded px-3 py-1.5 text-sm w-48 focus:outline-none focus:border-blue-500"
+                            id="cookie-input"
+                        />
+                        <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={() => {
+                                const input = document.getElementById('cookie-input') as HTMLInputElement;
+                                if (input.value) {
+                                    runControlAction('setCookie', { cookie: input.value });
+                                    input.value = '';
+                                } else {
+                                    toast.error('Please paste a cookie first');
+                                }
+                            }}
+                        >
+                            Set Cookie
+                        </Button>
+                    </div>
+                </div>
+            </Card>
 
             {/* Tabs */}
             <div className="flex gap-2 p-1 rounded-xl" style={{ background: 'var(--bg-secondary)' }}>
@@ -842,6 +881,6 @@ export default function LinkedInPage() {
                 )}
 
             </AnimatePresence>
-        </motion.div>
+        </motion.div >
     );
 }

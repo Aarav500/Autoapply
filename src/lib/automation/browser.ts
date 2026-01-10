@@ -123,6 +123,27 @@ class BrowserManager {
     }
 
     // Pause for OTP - returns a Promise that resolves when OTP is provided
+    async setCookie(name: string, value: string, domain: string = '.linkedin.com'): Promise<void> {
+        await this.initialize();
+        if (!this.page) throw new Error('Page not initialized');
+
+        this.log(`🍪 Setting cookie: ${name}...`);
+        await this.page.setCookie({
+            name,
+            value,
+            domain,
+            path: '/',
+            httpOnly: true,
+            secure: true,
+            sameSite: 'None',
+        });
+        this.log('✅ Cookie set successfully');
+
+        // Refresh to apply
+        await this.page.goto('https://www.linkedin.com/feed/', { waitUntil: 'domcontentloaded' });
+    }
+
+    // Pause for OTP - returns a Promise that resolves when OTP is provided
     async pauseForOTP(platform: string): Promise<string> {
         this.state.status = 'paused_for_otp';
         this.state.otpRequired = true;

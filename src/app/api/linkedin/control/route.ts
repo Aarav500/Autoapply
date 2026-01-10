@@ -6,6 +6,11 @@ export async function POST(req: Request) {
     try {
         const { action, payload } = await req.json();
 
+        if (action === 'setCookie') {
+            await linkedInManager.setCookie(payload.cookie);
+            return NextResponse.json({ success: true, message: 'Session cookie set successfully' });
+        }
+
         if (action === 'updateHeadline') {
             await linkedInManager.updateHeadline(payload.text);
             return NextResponse.json({ success: true, message: 'Headline updated' });
