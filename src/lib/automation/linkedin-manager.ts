@@ -110,15 +110,7 @@ export const linkedInManager = {
         await page.click('button[data-view-name="profile-form-save"]');
         await page.waitForSelector('textarea[name="message"]', { hidden: true });
         bm.log('✅ About section updated!');
-        bm.log('✅ About section updated!');
     },
-    // ... (previous code)
-    // [Existing updateAbout implementation - reformatted for space if needed, 
-    // but since I am using multi_replace, I can just append the new methods after this block]
-    // Actually, to be safe and clean, I will just append the new methods to the object.
-    // But multi_replace requires replacing a specific block. 
-    // I will target the closing brace of the object.
-},
 
     /**
      * AUTO-PILOT: Likes posts in the feed
@@ -162,199 +154,199 @@ export const linkedInManager = {
         bm.log(`✅ Engagement complete. Liked ${liked} posts.`);
     },
 
-        /**
-         * AUTO-PILOT: Connects with people based on search
-         */
-        async connectWithNewPeople(keywords: string, limit: number = 2) {
-    const bm = browserManager;
-    await bm.initialize();
-    const page = bm.getPage();
+    /**
+     * AUTO-PILOT: Connects with people based on search
+     */
+    async connectWithNewPeople(keywords: string, limit: number = 2) {
+        const bm = browserManager;
+        await bm.initialize();
+        const page = bm.getPage();
 
-    bm.log(`🤝 Searching for people: "${keywords}"...`);
-    const searchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(keywords)}`;
-    await page.goto(searchUrl, { waitUntil: 'domcontentloaded' });
+        bm.log(`🤝 Searching for people: "${keywords}"...`);
+        const searchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(keywords)}`;
+        await page.goto(searchUrl, { waitUntil: 'domcontentloaded' });
 
-    await page.waitForSelector('.reusable-search__result-container', { timeout: 10000 }).catch(() => null);
+        await page.waitForSelector('.reusable-search__result-container', { timeout: 10000 }).catch(() => null);
 
-    let sent = 0;
-    const connectButtons = await page.$$('button'); // Get all buttons to filter text
+        let sent = 0;
+        const connectButtons = await page.$$('button'); // Get all buttons to filter text
 
-    for (const btn of connectButtons) {
-        if (sent >= limit) break;
+        for (const btn of connectButtons) {
+            if (sent >= limit) break;
 
-        const text = await page.evaluate(el => el.textContent?.trim(), btn);
-        if (text === 'Connect') {
-            bm.log('👋 Clicking Connect...');
-            await btn.click();
-            await new Promise(r => setTimeout(r, 1000));
+            const text = await page.evaluate(el => el.textContent?.trim(), btn);
+            if (text === 'Connect') {
+                bm.log('👋 Clicking Connect...');
+                await btn.click();
+                await new Promise(r => setTimeout(r, 1000));
 
-            // Handle "Add a note" modal -> Click "Send without a note" for speed/automation
-            const sendNowBtn = await page.$('button[aria-label="Send now"], button[aria-label="Send without a note"]');
-            if (sendNowBtn) {
-                await sendNowBtn.click();
-                bm.log('📨 Connection request sent!');
-                sent++;
-            } else {
-                // Sometimes it asks for email, if so, we cancel
-                const closeBtn = await page.$('button[aria-label="Dismiss"]');
-                if (closeBtn) await closeBtn.click();
+                // Handle "Add a note" modal -> Click "Send without a note" for speed/automation
+                const sendNowBtn = await page.$('button[aria-label="Send now"], button[aria-label="Send without a note"]');
+                if (sendNowBtn) {
+                    await sendNowBtn.click();
+                    bm.log('📨 Connection request sent!');
+                    sent++;
+                } else {
+                    // Sometimes it asks for email, if so, we cancel
+                    const closeBtn = await page.$('button[aria-label="Dismiss"]');
+                    if (closeBtn) await closeBtn.click();
+                }
+                await new Promise(r => setTimeout(r, 2000));
             }
-            await new Promise(r => setTimeout(r, 2000));
         }
-    }
-    bm.log(`✅ Networking complete. Sent ${sent} requests.`);
-},
+        bm.log(`✅ Networking complete. Sent ${sent} requests.`);
+    },
 
     /**
      * AUTO-PILOT: Creates a new post
      */
     async createPost(content: string) {
-    if (!content) return;
-    const bm = browserManager;
-    await bm.initialize();
-    const page = bm.getPage();
+        if (!content) return;
+        const bm = browserManager;
+        await bm.initialize();
+        const page = bm.getPage();
 
-    bm.log('✍️ Navigating to start a post...');
-    await page.goto('https://www.linkedin.com/feed/', { waitUntil: 'domcontentloaded' });
+        bm.log('✍️ Navigating to start a post...');
+        await page.goto('https://www.linkedin.com/feed/', { waitUntil: 'domcontentloaded' });
 
-    // Click "Start a post"
-    await page.waitForSelector('button.share-box-feed-entry__trigger', { timeout: 10000 });
-    await page.click('button.share-box-feed-entry__trigger');
+        // Click "Start a post"
+        await page.waitForSelector('button.share-box-feed-entry__trigger', { timeout: 10000 });
+        await page.click('button.share-box-feed-entry__trigger');
 
-    // Wait for modal editor
-    await page.waitForSelector('.ql-editor', { timeout: 5000 });
+        // Wait for modal editor
+        await page.waitForSelector('.ql-editor', { timeout: 5000 });
 
-    bm.log('📝 Typing content...');
-    await page.type('.ql-editor', content, { delay: 30 });
-    await new Promise(r => setTimeout(r, 1000));
+        bm.log('📝 Typing content...');
+        await page.type('.ql-editor', content, { delay: 30 });
+        await new Promise(r => setTimeout(r, 1000));
 
-    bm.log('🚀 Clicking Post...');
-    // Find the Post button (usually disabled until text is there)
-    const postBtn = await page.$('button.share-actions__primary-action');
-    if (postBtn) {
-        await postBtn.click();
-        bm.log('✅ Post published!');
-        // Wait for modal close
-        await new Promise(r => setTimeout(r, 3000));
-    } else {
-        throw new Error('Could not find Post button');
-    }
-},
+        bm.log('🚀 Clicking Post...');
+        // Find the Post button (usually disabled until text is there)
+        const postBtn = await page.$('button.share-actions__primary-action');
+        if (postBtn) {
+            await postBtn.click();
+            bm.log('✅ Post published!');
+            // Wait for modal close
+            await new Promise(r => setTimeout(r, 3000));
+        } else {
+            throw new Error('Could not find Post button');
+        }
+    },
 
     /**
      * Adds an Experience entry
      */
     async addExperience(exp: Experience) {
-    const bm = browserManager;
-    await bm.initialize();
-    const page = bm.getPage();
+        const bm = browserManager;
+        await bm.initialize();
+        const page = bm.getPage();
 
-    bm.log(`💼 Adding Experience: ${exp.title} at ${exp.company}...`);
+        bm.log(`💼 Adding Experience: ${exp.title} at ${exp.company}...`);
 
-    // Go to Experience edit form directly (usually this URL works for adding new)
-    // Or navigate: Profile -> Add Section -> Core -> Add position
-    await page.goto('https://www.linkedin.com/in/', { waitUntil: 'domcontentloaded' });
+        // Go to Experience edit form directly (usually this URL works for adding new)
+        // Or navigate: Profile -> Add Section -> Core -> Add position
+        await page.goto('https://www.linkedin.com/in/', { waitUntil: 'domcontentloaded' });
 
-    // Wait for dynamic load
-    await new Promise(r => setTimeout(r, 2000));
+        // Wait for dynamic load
+        await new Promise(r => setTimeout(r, 2000));
 
-    // Click "Add profile section" if available (top of profile)
-    try {
-        // We'll try a direct URL approach for "Add Position" which is more robust than selecting through menus
-        await page.goto('https://www.linkedin.com/profile/add?startTask=POSITION_NEW', { waitUntil: 'domcontentloaded' });
+        // Click "Add profile section" if available (top of profile)
+        try {
+            // We'll try a direct URL approach for "Add Position" which is more robust than selecting through menus
+            await page.goto('https://www.linkedin.com/profile/add?startTask=POSITION_NEW', { waitUntil: 'domcontentloaded' });
 
-        // Wait for form
-        await page.waitForSelector('input[id*="title"]', { timeout: 10000 });
-    } catch (e) {
-        bm.log('⚠️ Could not open Add Position form directly. Trying manual navigation...');
-        // Fallback navigation would go here
-        throw e;
-    }
+            // Wait for form
+            await page.waitForSelector('input[id*="title"]', { timeout: 10000 });
+        } catch (e) {
+            bm.log('⚠️ Could not open Add Position form directly. Trying manual navigation...');
+            // Fallback navigation would go here
+            throw e;
+        }
 
-    // Fill Title
-    bm.log('📝 Filling Title...');
-    await page.type('input[id*="title"]', exp.title, { delay: 50 });
-    await new Promise(r => setTimeout(r, 1000));
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Enter');
+        // Fill Title
+        bm.log('📝 Filling Title...');
+        await page.type('input[id*="title"]', exp.title, { delay: 50 });
+        await new Promise(r => setTimeout(r, 1000));
+        await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('Enter');
 
-    // Fill Company
-    bm.log('📝 Filling Company...');
-    await page.type('input[id*="company"]', exp.company, { delay: 50 });
-    await new Promise(r => setTimeout(r, 1000));
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Enter');
+        // Fill Company
+        bm.log('📝 Filling Company...');
+        await page.type('input[id*="company"]', exp.company, { delay: 50 });
+        await new Promise(r => setTimeout(r, 1000));
+        await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('Enter');
 
-    // Start Date (Simple approach: Assume current or recent)
-    // Note: Date selectors are complex on LinkedIn (Month/Year dropdowns)
-    // We will try to just set "I am currently working here" if implied, or skip complex date for MVP
-    // For MVP: We just focus on Title/Company/Description which are text fields.
+        // Start Date (Simple approach: Assume current or recent)
+        // Note: Date selectors are complex on LinkedIn (Month/Year dropdowns)
+        // We will try to just set "I am currently working here" if implied, or skip complex date for MVP
+        // For MVP: We just focus on Title/Company/Description which are text fields.
 
-    // Fill Description
-    if (exp.description) {
-        bm.log('📝 Filling Description...');
-        await page.type('textarea[id*="description"]', exp.description, { delay: 30 });
-    }
+        // Fill Description
+        if (exp.description) {
+            bm.log('📝 Filling Description...');
+            await page.type('textarea[id*="description"]', exp.description, { delay: 30 });
+        }
 
-    // Save
-    bm.log('💾 Saving Position...');
-    const saveBtn = await page.$('button[data-view-name="profile-form-save"]');
-    if (saveBtn) await saveBtn.click();
+        // Save
+        bm.log('💾 Saving Position...');
+        const saveBtn = await page.$('button[data-view-name="profile-form-save"]');
+        if (saveBtn) await saveBtn.click();
 
-    await new Promise(r => setTimeout(r, 3000));
-    bm.log('✅ Experience Added!');
-},
+        await new Promise(r => setTimeout(r, 3000));
+        bm.log('✅ Experience Added!');
+    },
 
     /**
      * Adds an Education entry
      */
     async addEducation(edu: { school: string; degree: string; field: string }) {
-    const bm = browserManager;
-    await bm.initialize();
-    const page = bm.getPage();
+        const bm = browserManager;
+        await bm.initialize();
+        const page = bm.getPage();
 
-    bm.log(`🎓 Adding Education: ${edu.school}...`);
+        bm.log(`🎓 Adding Education: ${edu.school}...`);
 
-    // Direct URL for Add Education
-    await page.goto('https://www.linkedin.com/profile/add?startTask=EDUCATION_NEW', { waitUntil: 'domcontentloaded' });
+        // Direct URL for Add Education
+        await page.goto('https://www.linkedin.com/profile/add?startTask=EDUCATION_NEW', { waitUntil: 'domcontentloaded' });
 
-    try {
-        await page.waitForSelector('input[id*="school"]', { timeout: 10000 });
-    } catch (e) {
-        throw new Error('Could not open Add Education form');
-    }
+        try {
+            await page.waitForSelector('input[id*="school"]', { timeout: 10000 });
+        } catch (e) {
+            throw new Error('Could not open Add Education form');
+        }
 
-    // School
-    bm.log('📝 Filling School...');
-    await page.type('input[id*="school"]', edu.school, { delay: 50 });
-    await new Promise(r => setTimeout(r, 1000));
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Enter');
-
-    // Degree
-    if (edu.degree) {
-        bm.log('📝 Filling Degree...');
-        await page.type('input[id*="degree"]', edu.degree, { delay: 50 });
+        // School
+        bm.log('📝 Filling School...');
+        await page.type('input[id*="school"]', edu.school, { delay: 50 });
         await new Promise(r => setTimeout(r, 1000));
         await page.keyboard.press('ArrowDown');
         await page.keyboard.press('Enter');
+
+        // Degree
+        if (edu.degree) {
+            bm.log('📝 Filling Degree...');
+            await page.type('input[id*="degree"]', edu.degree, { delay: 50 });
+            await new Promise(r => setTimeout(r, 1000));
+            await page.keyboard.press('ArrowDown');
+            await page.keyboard.press('Enter');
+        }
+
+        // Field
+        if (edu.field) {
+            bm.log('📝 Filling Field of Study...');
+            await page.type('input[id*="field"]', edu.field, { delay: 50 });
+            await new Promise(r => setTimeout(r, 1000));
+            await page.keyboard.press('ArrowDown');
+            await page.keyboard.press('Enter');
+        }
+
+        // Save
+        bm.log('💾 Saving Education...');
+        const saveBtn = await page.$('button[data-view-name="profile-form-save"]');
+        if (saveBtn) await saveBtn.click();
+
+        await new Promise(r => setTimeout(r, 3000));
+        bm.log('✅ Education Added!');
     }
-
-    // Field
-    if (edu.field) {
-        bm.log('📝 Filling Field of Study...');
-        await page.type('input[id*="field"]', edu.field, { delay: 50 });
-        await new Promise(r => setTimeout(r, 1000));
-        await page.keyboard.press('ArrowDown');
-        await page.keyboard.press('Enter');
-    }
-
-    // Save
-    bm.log('💾 Saving Education...');
-    const saveBtn = await page.$('button[data-view-name="profile-form-save"]');
-    if (saveBtn) await saveBtn.click();
-
-    await new Promise(r => setTimeout(r, 3000));
-    bm.log('✅ Education Added!');
-}
-    };
+};

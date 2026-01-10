@@ -842,7 +842,6 @@ export default function LinkedInPage() {
                 )}
 
             </AnimatePresence>
-        </AnimatePresence>
-        </motion.div >
+        </motion.div>
     );
 }

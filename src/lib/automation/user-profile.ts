@@ -305,8 +305,8 @@ export function buildFullProfile(): UserProfile {
                 fullProfile.lastName = storedProfile.name ? storedProfile.name.split(' ').slice(1).join(' ') : fullProfile.lastName;
                 fullProfile.major = storedProfile.major || fullProfile.major;
                 fullProfile.school = storedProfile.currentSchool || fullProfile.school;
-                fullProfile.gpa = storedProfile.gpa || fullProfile.gpa;
-                fullProfile.graduationYear = storedProfile.graduationYear || fullProfile.graduationYear;
+                fullProfile.gpa = storedProfile.gpa ? Number(storedProfile.gpa) : fullProfile.gpa;
+                fullProfile.graduationYear = storedProfile.graduationYear ? Number(storedProfile.graduationYear) : fullProfile.graduationYear;
 
                 if (storedProfile.interests && storedProfile.interests.length > 0) {
                     // Add interests to skills if not present
@@ -319,14 +319,15 @@ export function buildFullProfile(): UserProfile {
             const storedActivities = activityStorage.loadActivities();
             if (storedActivities && storedActivities.length > 0) {
                 fullProfile.activities = storedActivities.map(a => ({
-                    id: a.id,
-                    name: a.name,
-                    description: a.description,
-                    type: 'other', // Default fallback
-                    startDate: '2023-01-01', // Placeholder as storage.ts doesn't have dates yet
-                    current: true,
-                    role: 'Member',
-                    skills: a.skills
+                    id: a.id || `auto-${Math.random()}`,
+                    name: a.name || '',
+                    description: a.description || '',
+                    type: (a.type as any) || 'other',
+                    startDate: a.startDate || '2023-01-01',
+                    current: a.isOngoing || false,
+                    role: a.role || 'Member',
+                    organization: a.organization || 'Organization',
+                    skills: a.skills || []
                 }));
 
                 // Heuristic: If activity name contains "Club", "Society", mark as club
@@ -343,11 +344,11 @@ export function buildFullProfile(): UserProfile {
             const storedAchievements = achievementStorage.loadAchievements();
             if (storedAchievements && storedAchievements.length > 0) {
                 fullProfile.achievements = storedAchievements.map(a => ({
-                    id: a.id,
-                    title: a.title,
-                    type: a.type,
-                    date: a.date,
-                    description: a.description,
+                    id: a.id || `auto-ach-${Math.random()}`,
+                    title: a.title || '',
+                    type: (a.type as any) || 'other',
+                    date: a.date || '2023',
+                    description: a.description || '',
                     issuer: a.issuer,
                     url: a.url
                 }));

@@ -39,7 +39,7 @@ export function extractFromDocument(text: string): ExtractedData {
             // defaults
             if (!currentItem.id) currentItem.id = `doc-${Date.now()}-${Math.random()}`;
             if (!currentItem.startDate) currentItem.startDate = '2023';
-            if (!currentItem.current) currentItem.current = false;
+            if (!currentItem.isOngoing) currentItem.isOngoing = false;
 
             data.activities.push(currentItem as Activity);
             currentItem = null;

@@ -6,7 +6,8 @@ import { Card, Button } from '@/components/ui';
 import { useS3Storage } from '@/lib/useS3Storage';
 import {
     GraduationCap, Heart, Code, Music, Trophy, Star, Loader2,
-    FileText, CheckCircle, Upload, File
+    FileText, CheckCircle, Upload, File, Users, Briefcase, Award, Plus, X, Save,
+    Trash2
 } from 'lucide-react';
 import { extractFromDocument } from '@/lib/automation/document-extractor';
 import { toast } from '@/lib/error-handling';
@@ -249,16 +250,17 @@ export default function ActivitiesPage() {
                         color: activeTab === 'achievements' ? 'white' : 'var(--text-secondary)',
                     }}
                 >
-                    <button
-                        onClick={() => setActiveTab('documents')}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors`}
-                        style={{
-                            background: activeTab === 'documents' ? 'var(--gradient-primary)' : 'var(--bg-secondary)',
-                            color: activeTab === 'documents' ? 'white' : 'var(--text-secondary)',
-                        }}
-                    >
-                        Documents
-                    </button>
+                    Achievements ({achievements.length})
+                </button>
+                <button
+                    onClick={() => setActiveTab('documents')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors`}
+                    style={{
+                        background: activeTab === 'documents' ? 'var(--gradient-primary)' : 'var(--bg-secondary)',
+                        color: activeTab === 'documents' ? 'white' : 'var(--text-secondary)',
+                    }}
+                >
+                    Documents
                 </button>
             </div>
 
@@ -403,27 +405,100 @@ export default function ActivitiesPage() {
             </AnimatePresence>
 
             {/* Activities List */}
-            {activeTab === 'activities' && (
-                <div className="space-y-3">
-                    {activities.length === 0 ? (
-                        <Card className="text-center py-12">
-                            <Award className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
-                            <p className="text-lg font-medium mb-2">No activities yet</p>
-                            <p style={{ color: 'var(--text-muted)' }} className="mb-4">
-                                Add your extracurricular activities, work experience, and projects
-                            </p>
-                            <Button onClick={() => setIsAddingNew(true)} icon={<Plus className="w-4 h-4" />}>
-                                Add Your First Activity
-                            </Button>
-                        </Card>
-                    ) : (
-                        activities.map((activity, index) => {
-                            const cat = ACTIVITY_CATEGORIES.find(c => c.value === activity.category);
-                            const Icon = cat?.icon || Star;
+            {
+                activeTab === 'activities' && (
+                    <div className="space-y-3">
+                        {activities.length === 0 ? (
+                            <Card className="text-center py-12">
+                                <Award className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
+                                <p className="text-lg font-medium mb-2">No activities yet</p>
+                                <p style={{ color: 'var(--text-muted)' }} className="mb-4">
+                                    Add your extracurricular activities, work experience, and projects
+                                </p>
+                                <Button onClick={() => setIsAddingNew(true)} icon={<Plus className="w-4 h-4" />}>
+                                    Add Your First Activity
+                                </Button>
+                            </Card>
+                        ) : (
+                            activities.map((activity, index) => {
+                                const cat = ACTIVITY_CATEGORIES.find(c => c.value === activity.category);
+                                const Icon = cat?.icon || Star;
 
-                            return (
+                                return (
+                                    <motion.div
+                                        key={activity.id}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: index * 0.05 }}
+                                    >
+                                        <Card>
+                                            <div className="flex items-start gap-4">
+                                                <div
+                                                    className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                                                    style={{ background: `${cat?.color}20` }}
+                                                >
+                                                    <Icon className="w-6 h-6" style={{ color: cat?.color }} />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-start justify-between">
+                                                        <div>
+                                                            <h3 className="font-semibold">{activity.name}</h3>
+                                                            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                                                {activity.role} at {activity.organization}
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            {activity.isOngoing && (
+                                                                <span
+                                                                    className="px-2 py-0.5 rounded-full text-xs font-medium"
+                                                                    style={{ background: 'rgba(34, 197, 94, 0.1)', color: 'var(--success)' }}
+                                                                >
+                                                                    Ongoing
+                                                                </span>
+                                                            )}
+                                                            <button
+                                                                onClick={() => handleDeleteActivity(activity.id)}
+                                                                className="p-2 hover:bg-white/10 rounded-lg text-red-400"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    {activity.description && (
+                                                        <p className="text-sm mt-2" style={{ color: 'var(--text-muted)' }}>
+                                                            {activity.description}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </Card>
+                                    </motion.div>
+                                );
+                            })
+                        )}
+                    </div>
+                )
+            }
+
+            {/* Achievements List */}
+            {
+                activeTab === 'achievements' && (
+                    <div className="space-y-3">
+                        {achievements.length === 0 ? (
+                            <Card className="text-center py-12">
+                                <Trophy className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
+                                <p className="text-lg font-medium mb-2">No achievements yet</p>
+                                <p style={{ color: 'var(--text-muted)' }} className="mb-4">
+                                    Add your awards, honors, and recognitions
+                                </p>
+                                <Button onClick={() => setIsAddingNew(true)} icon={<Plus className="w-4 h-4" />}>
+                                    Add Your First Achievement
+                                </Button>
+                            </Card>
+                        ) : (
+                            achievements.map((achievement, index) => (
                                 <motion.div
-                                    key={activity.id}
+                                    key={achievement.id}
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: index * 0.05 }}
@@ -432,115 +507,46 @@ export default function ActivitiesPage() {
                                         <div className="flex items-start gap-4">
                                             <div
                                                 className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                                                style={{ background: `${cat?.color}20` }}
+                                                style={{ background: 'rgba(251, 191, 36, 0.15)' }}
                                             >
-                                                <Icon className="w-6 h-6" style={{ color: cat?.color }} />
+                                                <Trophy className="w-6 h-6" style={{ color: 'var(--accent-gold)' }} />
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-start justify-between">
                                                     <div>
-                                                        <h3 className="font-semibold">{activity.name}</h3>
-                                                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                                                            {activity.role} at {activity.organization}
-                                                        </p>
+                                                        <h3 className="font-semibold">{achievement.title}</h3>
+                                                        {achievement.issuer && (
+                                                            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                                                {achievement.issuer}
+                                                            </p>
+                                                        )}
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        {activity.isOngoing && (
-                                                            <span
-                                                                className="px-2 py-0.5 rounded-full text-xs font-medium"
-                                                                style={{ background: 'rgba(34, 197, 94, 0.1)', color: 'var(--success)' }}
-                                                            >
-                                                                Ongoing
-                                                            </span>
-                                                        )}
+                                                        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                                                            {new Date(achievement.date).toLocaleDateString()}
+                                                        </span>
                                                         <button
-                                                            onClick={() => handleDeleteActivity(activity.id)}
+                                                            onClick={() => handleDeleteAchievement(achievement.id)}
                                                             className="p-2 hover:bg-white/10 rounded-lg text-red-400"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
                                                         </button>
                                                     </div>
                                                 </div>
-                                                {activity.description && (
+                                                {achievement.description && (
                                                     <p className="text-sm mt-2" style={{ color: 'var(--text-muted)' }}>
-                                                        {activity.description}
+                                                        {achievement.description}
                                                     </p>
                                                 )}
                                             </div>
                                         </div>
                                     </Card>
                                 </motion.div>
-                            );
-                        })
-                    )}
-                </div>
-            )}
-
-            {/* Achievements List */}
-            {activeTab === 'achievements' && (
-                <div className="space-y-3">
-                    {achievements.length === 0 ? (
-                        <Card className="text-center py-12">
-                            <Trophy className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
-                            <p className="text-lg font-medium mb-2">No achievements yet</p>
-                            <p style={{ color: 'var(--text-muted)' }} className="mb-4">
-                                Add your awards, honors, and recognitions
-                            </p>
-                            <Button onClick={() => setIsAddingNew(true)} icon={<Plus className="w-4 h-4" />}>
-                                Add Your First Achievement
-                            </Button>
-                        </Card>
-                    ) : (
-                        achievements.map((achievement, index) => (
-                            <motion.div
-                                key={achievement.id}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.05 }}
-                            >
-                                <Card>
-                                    <div className="flex items-start gap-4">
-                                        <div
-                                            className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                                            style={{ background: 'rgba(251, 191, 36, 0.15)' }}
-                                        >
-                                            <Trophy className="w-6 h-6" style={{ color: 'var(--accent-gold)' }} />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-start justify-between">
-                                                <div>
-                                                    <h3 className="font-semibold">{achievement.title}</h3>
-                                                    {achievement.issuer && (
-                                                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                                                            {achievement.issuer}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                                                        {new Date(achievement.date).toLocaleDateString()}
-                                                    </span>
-                                                    <button
-                                                        onClick={() => handleDeleteAchievement(achievement.id)}
-                                                        className="p-2 hover:bg-white/10 rounded-lg text-red-400"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            {achievement.description && (
-                                                <p className="text-sm mt-2" style={{ color: 'var(--text-muted)' }}>
-                                                    {achievement.description}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </Card>
-                            </motion.div>
-                        ))
-                    )}
-                </div>
-            )}
+                            ))
+                        )}
+                    </div>
+                )
+            }
 
             {/* Tips */}
             <Card style={{ background: 'rgba(91, 111, 242, 0.05)', borderLeft: '4px solid var(--primary-400)' }}>
@@ -557,100 +563,102 @@ export default function ActivitiesPage() {
             </Card>
 
             {/* Documents Tab */}
-            {activeTab === 'documents' && (
-                <div className="space-y-6">
-                    <Card>
-                        <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                            <Upload className="w-5 h-5" />
-                            Upload CV or Paper
-                        </h3>
-                        <p className="mb-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                            Paste the text from your CV, Resume, or Research Paper here.
-                            AI will automatically extract your activities and achievements.
-                        </p>
+            {
+                activeTab === 'documents' && (
+                    <div className="space-y-6">
+                        <Card>
+                            <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                                <Upload className="w-5 h-5" />
+                                Upload CV or Paper
+                            </h3>
+                            <p className="mb-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                Paste the text from your CV, Resume, or Research Paper here.
+                                AI will automatically extract your activities and achievements.
+                            </p>
 
-                        <textarea
-                            value={uploadContent}
-                            onChange={(e) => setUploadContent(e.target.value)}
-                            className="w-full p-4 rounded-lg min-h-[200px] mb-4 font-mono text-sm"
-                            placeholder="Paste your CV text here..."
-                            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}
-                        />
+                            <textarea
+                                value={uploadContent}
+                                onChange={(e) => setUploadContent(e.target.value)}
+                                className="w-full p-4 rounded-lg min-h-[200px] mb-4 font-mono text-sm"
+                                placeholder="Paste your CV text here..."
+                                style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}
+                            />
 
-                        <div className="flex justify-end">
-                            <Button
-                                onClick={() => {
-                                    const result = extractFromDocument(uploadContent);
-                                    setExtractionResult(result as any);
-                                    toast.success(`Found ${result.activities.length} activities & ${result.achievements.length} achievements!`);
-                                }}
-                                disabled={!uploadContent}
+                            <div className="flex justify-end">
+                                <Button
+                                    onClick={() => {
+                                        const result = extractFromDocument(uploadContent);
+                                        setExtractionResult(result as any);
+                                        toast.success(`Found ${result.activities.length} activities & ${result.achievements.length} achievements!`);
+                                    }}
+                                    disabled={!uploadContent}
+                                >
+                                    Analyze & Extract
+                                </Button>
+                            </div>
+                        </Card>
+
+                        {extractionResult && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="space-y-4"
                             >
-                                Analyze & Extract
-                            </Button>
-                        </div>
-                    </Card>
-
-                    {extractionResult && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="space-y-4"
-                        >
-                            <div className="flex items-center justify-between">
-                                <h3 className="font-semibold text-lg">Extraction Results</h3>
-                                <div className="flex gap-2">
-                                    <Button variant="secondary" onClick={() => setExtractionResult(null)}>Discard</Button>
-                                    <Button onClick={() => {
-                                        setActivities([...activities, ...extractionResult.activities]);
-                                        setAchievements([...achievements, ...extractionResult.achievements]);
-                                        setExtractionResult(null);
-                                        setUploadContent('');
-                                        toast.success('Added to profile!');
-                                        setActiveTab('activities');
-                                    }}>
-                                        Save All to Profile
-                                    </Button>
+                                <div className="flex items-center justify-between">
+                                    <h3 className="font-semibold text-lg">Extraction Results</h3>
+                                    <div className="flex gap-2">
+                                        <Button variant="secondary" onClick={() => setExtractionResult(null)}>Discard</Button>
+                                        <Button onClick={() => {
+                                            setActivities([...activities, ...extractionResult.activities]);
+                                            setAchievements([...achievements, ...extractionResult.achievements]);
+                                            setExtractionResult(null);
+                                            setUploadContent('');
+                                            toast.success('Added to profile!');
+                                            setActiveTab('activities');
+                                        }}>
+                                            Save All to Profile
+                                        </Button>
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {extractionResult.activities.length > 0 && (
-                                    <Card>
-                                        <h4 className="font-medium mb-3 flex items-center gap-2">
-                                            <Briefcase className="w-4 h-4" /> New Activities ({extractionResult.activities.length})
-                                        </h4>
-                                        <div className="space-y-2">
-                                            {extractionResult.activities.map((a, i) => (
-                                                <div key={i} className="p-2 rounded bg-white/5 text-sm">
-                                                    <p className="font-semibold">{a.name}</p>
-                                                    <p className="text-xs opacity-70">{a.description?.substring(0, 50)}...</p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </Card>
-                                )}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {extractionResult.activities.length > 0 && (
+                                        <Card>
+                                            <h4 className="font-medium mb-3 flex items-center gap-2">
+                                                <Briefcase className="w-4 h-4" /> New Activities ({extractionResult.activities.length})
+                                            </h4>
+                                            <div className="space-y-2">
+                                                {extractionResult.activities.map((a, i) => (
+                                                    <div key={i} className="p-2 rounded bg-white/5 text-sm">
+                                                        <p className="font-semibold">{a.name}</p>
+                                                        <p className="text-xs opacity-70">{a.description?.substring(0, 50)}...</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </Card>
+                                    )}
 
-                                {extractionResult.achievements.length > 0 && (
-                                    <Card>
-                                        <h4 className="font-medium mb-3 flex items-center gap-2">
-                                            <Trophy className="w-4 h-4" /> New Achievements ({extractionResult.achievements.length})
-                                        </h4>
-                                        <div className="space-y-2">
-                                            {extractionResult.achievements.map((a, i) => (
-                                                <div key={i} className="p-2 rounded bg-white/5 text-sm">
-                                                    <p className="font-semibold">{a.title}</p>
-                                                    <p className="text-xs opacity-70">{a.date}</p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </Card>
-                                )}
-                            </div>
-                        </motion.div>
-                    )}
-                </div>
-            )}
-        </motion.div>
+                                    {extractionResult.achievements.length > 0 && (
+                                        <Card>
+                                            <h4 className="font-medium mb-3 flex items-center gap-2">
+                                                <Trophy className="w-4 h-4" /> New Achievements ({extractionResult.achievements.length})
+                                            </h4>
+                                            <div className="space-y-2">
+                                                {extractionResult.achievements.map((a, i) => (
+                                                    <div key={i} className="p-2 rounded bg-white/5 text-sm">
+                                                        <p className="font-semibold">{a.title}</p>
+                                                        <p className="text-xs opacity-70">{a.date}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </Card>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+                    </div>
+                )
+            }
+        </motion.div >
     );
 }

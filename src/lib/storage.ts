@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
+
+
 // ============================================
 // 1. AUTO-SAVE HOOK
 // ============================================
@@ -281,12 +283,22 @@ export const essayStorage = {
 export interface Activity {
     id: string;
     name: string;
+    role?: string;
+    organization?: string;
+    category?: 'academic' | 'leadership' | 'work' | 'volunteer' | 'creative' | 'athletic' | 'other';
+    type?: string;
     description: string;
-    hours: number;
-    years: string;
-    type: string;
-    skills: string[];
-    impact: string;
+    startDate?: string;
+    endDate?: string;
+    isOngoing?: boolean;
+    hoursPerWeek?: number;
+    weeksPerYear?: number;
+    achievements?: string[];
+    skills?: string[];
+    impact?: string;
+    // Legacy support
+    hours?: number;
+    years?: string;
 }
 
 export const activityStorage = {
@@ -317,11 +329,14 @@ export const activityStorage = {
 export interface Achievement {
     id: string;
     title: string;
-    type: 'award' | 'honor' | 'publication' | 'competition' | 'certification' | 'other';
-    issuer?: string;
+    category?: 'academic' | 'award' | 'publication' | 'certification' | 'other';
+    type?: string;
     date: string;
-    description?: string;
+    description: string;
+    issuer?: string;
     url?: string;
+    // Legacy
+    activities?: string[];
 }
 
 export const achievementStorage = {
@@ -350,13 +365,13 @@ export const achievementStorage = {
 // ============================================
 
 export interface UserProfile {
-    name: string;
-    gpa: number;
-    major: string;
-    currentSchool: string;
-    graduationYear: number;
-    values: string[];
-    interests: string[];
+    name?: string;
+    gpa?: string | number;
+    major?: string;
+    currentSchool?: string;
+    graduationYear?: string | number;
+    values?: string[];
+    interests?: string[];
 }
 
 export const profileStorage = {
