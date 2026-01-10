@@ -37,7 +37,7 @@ class BrowserManager {
         const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
 
         this.browser = await puppeteer.launch({
-            headless: isProduction, // Headless in production, visible locally
+            headless: false, // Force visible browser for manual login/debugging
             executablePath: executablePath || undefined, // Use system Chromium if set
             defaultViewport: { width: 1280, height: 800 },
             args: [
