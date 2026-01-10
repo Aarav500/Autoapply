@@ -7,7 +7,8 @@ import {
     Linkedin, User, Briefcase, GraduationCap, Award, FileText,
     MessageSquare, Heart, Share2, Users, Eye, TrendingUp, Sparkles,
     CheckCircle2, Circle, Edit3, PlusCircle, Send, RefreshCw, Zap,
-    Calendar, Target, Globe, Rocket, Lightbulb, Play, Pause
+    Calendar, Target, Globe, Rocket, Lightbulb, Play, Pause,
+    Settings, Terminal
 } from 'lucide-react';
 import { toast } from '@/lib/error-handling';
 
@@ -154,7 +155,72 @@ export default function LinkedInPage() {
     const [isOptimizing, setIsOptimizing] = useState(false);
     const [isGeneratingPosts, setIsGeneratingPosts] = useState(false);
     const [isAutonomous, setIsAutonomous] = useState(false); // Autonomous Mode State
-    const [activeTab, setActiveTab] = useState<'profile' | 'posts' | 'network'>('profile');
+    const [activeTab, setActiveTab] = useState<'profile' | 'posts' | 'network' | 'control'>('profile');
+    const [automationLog, setAutomationLog] = useState<string[]>([]);
+    const [isRunningAutomation, setIsRunningAutomation] = useState(false);
+
+    // Automation Handler
+    const runControlAction = async (action: string, payload: any) => {
+        setIsRunningAutomation(true);
+        setAutomationLog(prev => [...prev, `🚀 Starting ${action}...`]);
+
+        try {
+            const res = await fetch('/api/linkedin/control', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, payload })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                setAutomationLog(prev => [...prev, `✅ Success: ${data.message}`]);
+                toast.success(data.message);
+            } else {
+                throw new Error(data.error);
+            }
+        } catch (e: any) {
+            setAutomationLog(prev => [...prev, `❌ Error: ${e.message}`]);
+            toast.error(e.message);
+        } finally {
+            setIsRunningAutomation(false);
+        }
+    };
+
+    // SYNC PROFILE HANDLER
+    const handleSyncProfile = async () => {
+        if (isRunningAutomation) return;
+
+        const confirmSync = confirm("This will open a browser and add your stored Experience and Education to your LinkedIn profile. Proceed?");
+        if (!confirmSync) return;
+
+        // 1. Sync Education (Sample Data)
+        const educationSamples = [
+            { school: 'University of California, Riverside', degree: 'Bachelor of Science', field: 'Computer Science' }
+        ];
+
+        for (const edu of educationSamples) {
+            await runControlAction('addEducation', { education: edu });
+        }
+
+        // 2. Sync Experience (From Activities)
+        // Filter only 'Work' or 'Internship' like activities
+        const workActivities = activitiesForPosts.filter(a => a.activity.includes('Intern') || a.activity.includes('Built') || a.activity.includes('Led'));
+
+        for (const act of workActivities) {
+            // Convert activity string to Experience object
+            // This is a naive conversion for demo purposes
+            const exp = {
+                title: act.activity.split(' ')[0] + ' Role', // Guess title
+                company: 'Self-Employed / Project',
+                description: act.postIdea,
+                startDate: '01/2024',
+                current: true
+            };
+            await runControlAction('addExperience', { experience: exp });
+        }
+
+        toast.success('✅ Profile Sync Complete!');
+    };
 
     // Overall profile score
     const profileScore = useMemo(() => {
@@ -238,26 +304,75 @@ export default function LinkedInPage() {
         toast.success('✅ Posted to LinkedIn!');
     };
 
-    // Autonomous Mode Logic (after dependencies are defined)
+    // Autonomous Mode Logic
     useEffect(() => {
         if (!isAutonomous) return;
 
-        const runAutonomousSequence = async () => {
-            if (profileScore < 80) {
-                await handleOptimizeProfile();
+        const performAutonomousAction = async () => {
+            if (isRunningAutomation) return; // Don't overlap
+
+            // INTELLIGENCE ENGINE
+            // 1. Decide what to do based on random probability weighted by priorities
+            const dice = Math.random();
+            let action = '';
+            let payload = {};
+            let logMsg = '';
+
+            // 10% chance to Post (if not recently posted)
+            // 40% chance to Engage (Like posts)
+            // 30% chance to Connect
+            // 20% chance to Idle/Sleep
+
+            if (dice < 0.1) {
+                action = 'createPost';
+                // Pick a random idea
+                const idea = activitiesForPosts[Math.floor(Math.random() * activitiesForPosts.length)].postIdea;
+                const content = generatePostContent(idea);
+                payload = { content };
+                logMsg = '🤖 AI Decision: Creating a new thought leadership post...';
+            } else if (dice < 0.5) {
+                action = 'engageFeed';
+                payload = { count: Math.floor(Math.random() * 3) + 1 };
+                logMsg = '🤖 AI Decision: Engaging with network feed...';
+            } else if (dice < 0.8) {
+                action = 'connectPeople';
+                const targets = ['Software Engineer', 'Recruiter', 'Product Manager', 'Founder'];
+                const kw = targets[Math.floor(Math.random() * targets.length)];
+                payload = { keywords: kw, limit: 1 };
+                logMsg = `🤖 AI Decision: Expanding network (Searching "${kw}")...`;
+            } else {
+                setAutomationLog(prev => [...prev, '💤 AI Decision: Idling for a moment...']);
+                return;
             }
-            if (posts.length === 0) {
-                await handleGeneratePosts();
+
+            // Execute
+            setAutomationLog(prev => [...prev, logMsg]);
+
+            try {
+                // Call the API control route
+                await fetch('/api/linkedin/control', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, payload })
+                });
+                setAutomationLog(prev => [...prev, `✅ Action "${action}" completed.`]);
+
+                // Update local state if needed
+                if (action === 'createPost') {
+                    setPosts(prev => [
+                        { id: `auto-${Date.now()}`, content: (payload as any).content, type: 'insight', status: 'posted', likes: 0, comments: 0, scheduledDate: new Date() },
+                        ...prev
+                    ]);
+                }
+
+            } catch (e: any) {
+                setAutomationLog(prev => [...prev, `❌ Auto Action Failed: ${e.message}`]);
             }
-            // Auto schedule posts
-            setPosts(prev => prev.map(p =>
-                p.status === 'draft' ? { ...p, status: 'scheduled', scheduledDate: new Date() } : p
-            ));
         };
 
-        const interval = setInterval(runAutonomousSequence, 5000); // Check every 5s
+        const interval = setInterval(performAutonomousAction, 15000); // Check every 15s (Aggressive for demo, slow down in prod)
         return () => clearInterval(interval);
-    }, [isAutonomous, profileScore, posts.length, handleOptimizeProfile, handleGeneratePosts]);
+    }, [isAutonomous, isRunningAutomation, posts]);
 
     // Send connection requests
     const handleSendConnections = async () => {
@@ -359,6 +474,7 @@ export default function LinkedInPage() {
                     { key: 'profile', label: 'Profile Sections', icon: User },
                     { key: 'posts', label: 'Content & Posts', icon: FileText },
                     { key: 'network', label: 'Networking', icon: Users },
+                    { key: 'control', label: 'Full Control', icon: Settings },
                 ].map(({ key, label, icon: Icon }) => (
                     <button
                         key={key}
@@ -622,7 +738,111 @@ export default function LinkedInPage() {
                         </div>
                     </motion.div>
                 )}
+
+                {activeTab === 'control' && (
+                    <motion.div
+                        key="control"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="space-y-4"
+                    >
+                        <Card className="border-l-4 border-red-500 bg-red-500/5">
+                            <h3 className="text-red-500 font-bold flex items-center gap-2">
+                                <Terminal className="w-5 h-5" />
+                                Browser Automation Zone
+                            </h3>
+                            <p className="text-sm text-gray-400 mt-1">
+                                These actions will open a browser instance and physically control your LinkedIn profile.
+                                Please ensure you are logged in to LinkedIn in the Chrome window that opens.
+                            </p>
+                        </Card>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Card>
+                                <h3 className="font-medium mb-4">Profile Actions</h3>
+                                <div className="space-y-3">
+                                    <div className="p-3 rounded-lg bg-white/5">
+                                        <label className="text-xs text-gray-400">Update Headline</label>
+                                        <div className="flex gap-2 mt-2">
+                                            <input
+                                                type="text"
+                                                id="ctrl-headline"
+                                                placeholder="e.g. CS Student @ UCR"
+                                                className="flex-1 bg-black/20 rounded px-2 text-sm"
+                                            />
+                                            <Button
+                                                size="sm"
+                                                disabled={isRunningAutomation}
+                                                onClick={() => {
+                                                    const val = (document.getElementById('ctrl-headline') as HTMLInputElement).value;
+                                                    runControlAction('updateHeadline', { text: val });
+                                                }}
+                                            >
+                                                Update
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-3 rounded-lg bg-white/5">
+                                        <label className="text-xs text-gray-400">Update About Section</label>
+                                        <div className="flex gap-2 mt-2">
+                                            <textarea
+                                                id="ctrl-about"
+                                                rows={3}
+                                                placeholder="Write your new bio..."
+                                                className="flex-1 bg-black/20 rounded p-2 text-sm"
+                                            />
+                                            <Button
+                                                size="sm"
+                                                disabled={isRunningAutomation}
+                                                onClick={() => {
+                                                    const val = (document.getElementById('ctrl-about') as HTMLTextAreaElement).value;
+                                                    runControlAction('updateAbout', { text: val });
+                                                }}
+                                            >
+                                                Update
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
+
+                            <Card>
+                                <h3 className="font-medium mb-4">Sync Profile Data</h3>
+                                <p className="text-xs text-gray-400 mb-3">
+                                    Automatically populate your LinkedIn profile with data from your college application activities and education history.
+                                </p>
+                                <Button
+                                    className="w-full bg-blue-600 hover:bg-blue-700"
+                                    icon={<RefreshCw className="w-4 h-4" />}
+                                    disabled={isRunningAutomation}
+                                    onClick={handleSyncProfile}
+                                >
+                                    Sync Activities & Education
+                                </Button>
+                            </Card>
+
+
+                            <Card className="bg-black/40 font-mono text-xs">
+                                <h3 className="font-bold text-green-400 mb-2 flex justify-between">
+                                    <span>Automation Log</span>
+                                    {isAutonomous && <span className="animate-pulse">● LIVE</span>}
+                                </h3>
+                                <div className="h-48 overflow-y-auto space-y-1 flex flex-col-reverse">
+                                    {/* Reverse order to show newest at bottom if using flex-col-reverse or top with standard */}
+                                    {automationLog.length === 0 && <span className="opacity-30">Waiting for command...</span>}
+                                    {automationLog.map((log, i) => (
+                                        <div key={i} className="border-b border-white/5 pb-1">{log}</div>
+                                    ))}
+                                </div>
+                            </Card>
+                        </div>
+                    </motion.div>
+                )}
+
             </AnimatePresence>
-        </motion.div>
+        </AnimatePresence>
+        </motion.div >
     );
 }

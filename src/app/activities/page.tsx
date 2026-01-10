@@ -5,10 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Button } from '@/components/ui';
 import { useS3Storage } from '@/lib/useS3Storage';
 import {
-    Plus, Trash2, Edit, Save, X, Award, Briefcase, Users,
     GraduationCap, Heart, Code, Music, Trophy, Star, Loader2,
-    FileText, CheckCircle
+    FileText, CheckCircle, Upload, File
 } from 'lucide-react';
+import { extractFromDocument } from '@/lib/automation/document-extractor';
 import { toast } from '@/lib/error-handling';
 
 // ============================================
@@ -62,9 +62,11 @@ const ACHIEVEMENT_CATEGORIES = [
 // ============================================
 
 export default function ActivitiesPage() {
-    const [activeTab, setActiveTab] = useState<'activities' | 'achievements'>('activities');
+    const [activeTab, setActiveTab] = useState<'activities' | 'achievements' | 'documents'>('activities');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [isAddingNew, setIsAddingNew] = useState(false);
+    const [uploadContent, setUploadContent] = useState('');
+    const [extractionResult, setExtractionResult] = useState<{ activities: Activity[], achievements: Achievement[] } | null>(null);
 
     // Load from S3 - using SAME keys as dashboard
     const {
@@ -247,8 +249,16 @@ export default function ActivitiesPage() {
                         color: activeTab === 'achievements' ? 'white' : 'var(--text-secondary)',
                     }}
                 >
-                    Achievements ({achievements.length})
-                </button>
+                    <button
+                        onClick={() => setActiveTab('documents')}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors`}
+                        style={{
+                            background: activeTab === 'documents' ? 'var(--gradient-primary)' : 'var(--bg-secondary)',
+                            color: activeTab === 'documents' ? 'white' : 'var(--text-secondary)',
+                        }}
+                    >
+                        Documents
+                    </button>
             </div>
 
             {/* Add New Form */}
@@ -544,6 +554,102 @@ export default function ActivitiesPage() {
                     </div>
                 </div>
             </Card>
+
+            {/* Documents Tab */}
+            {activeTab === 'documents' && (
+                <div className="space-y-6">
+                    <Card>
+                        <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                            <Upload className="w-5 h-5" />
+                            Upload CV or Paper
+                        </h3>
+                        <p className="mb-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                            Paste the text from your CV, Resume, or Research Paper here.
+                            AI will automatically extract your activities and achievements.
+                        </p>
+
+                        <textarea
+                            value={uploadContent}
+                            onChange={(e) => setUploadContent(e.target.value)}
+                            className="w-full p-4 rounded-lg min-h-[200px] mb-4 font-mono text-sm"
+                            placeholder="Paste your CV text here..."
+                            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}
+                        />
+
+                        <div className="flex justify-end">
+                            <Button
+                                onClick={() => {
+                                    const result = extractFromDocument(uploadContent);
+                                    setExtractionResult(result as any);
+                                    toast.success(`Found ${result.activities.length} activities & ${result.achievements.length} achievements!`);
+                                }}
+                                disabled={!uploadContent}
+                            >
+                                Analyze & Extract
+                            </Button>
+                        </div>
+                    </Card>
+
+                    {extractionResult && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="space-y-4"
+                        >
+                            <div className="flex items-center justify-between">
+                                <h3 className="font-semibold text-lg">Extraction Results</h3>
+                                <div className="flex gap-2">
+                                    <Button variant="secondary" onClick={() => setExtractionResult(null)}>Discard</Button>
+                                    <Button onClick={() => {
+                                        setActivities([...activities, ...extractionResult.activities]);
+                                        setAchievements([...achievements, ...extractionResult.achievements]);
+                                        setExtractionResult(null);
+                                        setUploadContent('');
+                                        toast.success('Added to profile!');
+                                        setActiveTab('activities');
+                                    }}>
+                                        Save All to Profile
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {extractionResult.activities.length > 0 && (
+                                    <Card>
+                                        <h4 className="font-medium mb-3 flex items-center gap-2">
+                                            <Briefcase className="w-4 h-4" /> New Activities ({extractionResult.activities.length})
+                                        </h4>
+                                        <div className="space-y-2">
+                                            {extractionResult.activities.map((a, i) => (
+                                                <div key={i} className="p-2 rounded bg-white/5 text-sm">
+                                                    <p className="font-semibold">{a.name}</p>
+                                                    <p className="text-xs opacity-70">{a.description?.substring(0, 50)}...</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </Card>
+                                )}
+
+                                {extractionResult.achievements.length > 0 && (
+                                    <Card>
+                                        <h4 className="font-medium mb-3 flex items-center gap-2">
+                                            <Trophy className="w-4 h-4" /> New Achievements ({extractionResult.achievements.length})
+                                        </h4>
+                                        <div className="space-y-2">
+                                            {extractionResult.achievements.map((a, i) => (
+                                                <div key={i} className="p-2 rounded bg-white/5 text-sm">
+                                                    <p className="font-semibold">{a.title}</p>
+                                                    <p className="text-xs opacity-70">{a.date}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </Card>
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+                </div>
+            )}
         </motion.div>
     );
 }

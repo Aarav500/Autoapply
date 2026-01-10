@@ -311,6 +311,41 @@ export const activityStorage = {
 };
 
 // ============================================
+// 4B. ACHIEVEMENT STORAGE
+// ============================================
+
+export interface Achievement {
+    id: string;
+    title: string;
+    type: 'award' | 'honor' | 'publication' | 'competition' | 'certification' | 'other';
+    issuer?: string;
+    date: string;
+    description?: string;
+    url?: string;
+}
+
+export const achievementStorage = {
+    saveAchievements(achievements: Achievement[]) {
+        storage.save('user_achievements', achievements);
+    },
+
+    loadAchievements(): Achievement[] {
+        return storage.load('user_achievements') || [];
+    },
+
+    addAchievement(achievement: Achievement) {
+        const list = this.loadAchievements();
+        list.push(achievement);
+        this.saveAchievements(list);
+    },
+
+    removeAchievement(id: string) {
+        const list = this.loadAchievements().filter(a => a.id !== id);
+        this.saveAchievements(list);
+    },
+};
+
+// ============================================
 // 5. USER PROFILE STORAGE
 // ============================================
 

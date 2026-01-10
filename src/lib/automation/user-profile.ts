@@ -339,6 +339,21 @@ export function buildFullProfile(): UserProfile {
                 });
             }
 
+            // 3. Load Achievements
+            const { achievementStorage } = await import('../storage');
+            const storedAchievements = achievementStorage.loadAchievements();
+            if (storedAchievements && storedAchievements.length > 0) {
+                fullProfile.achievements = storedAchievements.map(a => ({
+                    id: a.id,
+                    title: a.title,
+                    type: a.type,
+                    date: a.date,
+                    description: a.description,
+                    issuer: a.issuer,
+                    url: a.url
+                }));
+            }
+
         } catch (e) {
             console.warn('Failed to load user profile from storage, using default', e);
         }
