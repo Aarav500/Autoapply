@@ -51,6 +51,7 @@ class BrowserManager {
                 '--disable-breakpad', // Disable breakpad crash handler
                 '--no-zygote', // Disable zygote process
             ],
+            userDataDir: './chrome-data', // Persist session (login, cookies)
         });
 
         this.page = await this.browser.newPage();
