@@ -288,7 +288,7 @@ export const FIELD_PATTERNS: Record<string, string[]> = {
 // Connects to the main storage.ts to get real user data
 // ============================================
 
-import { profileStorage, activityStorage, Activity as StorageActivity, UserProfile as StorageProfile } from '../storage';
+import { profileStorage, activityStorage, achievementStorage, Activity as StorageActivity, UserProfile as StorageProfile } from '../storage';
 
 export function buildFullProfile(): UserProfile {
     // Start with default as base
@@ -340,7 +340,6 @@ export function buildFullProfile(): UserProfile {
             }
 
             // 3. Load Achievements
-            const { achievementStorage } = await import('../storage');
             const storedAchievements = achievementStorage.loadAchievements();
             if (storedAchievements && storedAchievements.length > 0) {
                 fullProfile.achievements = storedAchievements.map(a => ({
