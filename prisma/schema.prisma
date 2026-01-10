@@ -5,8 +5,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 // User Model
@@ -27,6 +27,9 @@ model User {
   activities   Activity[]
   achievements Achievement[]
   emails       EmailDraft[]
+  education    Education[]
+  skills       UserSkill[]
+  leads        Lead[]
 }
 
 // Document Storage
@@ -143,6 +146,8 @@ model Activity {
   updatedAt    DateTime @updatedAt
 
   user         User     @relation(fields: [userId], references: [id])
+  skills       ActivitySkill[]
+  variants     PostVariant[]
 
   @@index([userId])
 }
@@ -207,4 +212,99 @@ model InterviewQuestion {
   difficulty String   // easy, medium, hard
   sampleAnswer String? @db.Text
   createdAt  DateTime @default(now())
+}
+
+// Expanded Education History
+model Education {
+  id           String   @id @default(cuid())
+  userId       String
+  school       String
+  degree       String
+  major        String
+  gpa          Float?
+  startDate    DateTime
+  endDate      DateTime? // null if current
+  description  String?   @db.Text
+
+  user         User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+// Master Skill Taxonomy
+model Skill {
+  id          String    @id @default(cuid())
+  name        String    @unique // Canonical name (e.g., "Python")
+  category    String?   // e.g., "Programming", "Soft Skill"
+
+  // Relations
+  users       UserSkill[]
+  activities  ActivitySkill[]
+}
+
+// User-Skill Proficiency
+model UserSkill {
+  id          String   @id @default(cuid())
+  userId      String
+  skillId     String
+  proficiency String   // beginner, intermediate, advanced, expert
+  verified    Boolean  @default(false)
+
+  user        User     @relation(fields: [userId], references: [id])
+  skill       Skill    @relation(fields: [skillId], references: [id])
+
+  @@unique([userId, skillId])
+  @@index([userId])
+  @@index([skillId])
+}
+
+// Join table for Activity <-> Skills
+model ActivitySkill {
+  activityId String
+  skillId    String
+
+  activity   Activity @relation(fields: [activityId], references: [id])
+  skill      Skill    @relation(fields: [skillId], references: [id])
+
+  @@id([activityId, skillId])
+  @@index([activityId])
+  @@index([skillId])
+}
+
+// Generated Content Variants (for LinkedIn Posts)
+model PostVariant {
+  id          String   @id @default(cuid())
+  activityId  String
+  type        String   // story, technical, lesson, outcome
+  content     String   @db.Text
+  hookScore   Float?
+  readability Float?
+  status      String   @default("draft") // draft, scheduled, published
+  scheduledFor DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  activity    Activity @relation(fields: [activityId], references: [id])
+
+  @@index([activityId])
+}
+
+// Networking / Outreach
+model Lead {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  headline    String?
+  company     String?
+  source      String   // linkedin, alumni_dir, manual
+  profileUrl  String?
+  status      String   // identified, contacted, replied, closed
+  matchScore  Float?   // Correlation to user goals
+  lastContactedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
