@@ -105,15 +105,28 @@ export class DiscoveryService {
         try {
             let count = 0;
 
+            // Load real profile for dynamic queries
+            const { buildFullProfile } = await import('./user-profile');
+            const profile = buildFullProfile();
+
+            // Generate queries based on profile
+            // e.g. "Computer Science intern", "React developer", "Software Engineering"
+            const majorQuery = `${profile.major} intern`;
+            const skillQuery = profile.skills.length > 0 ? `${profile.skills[0]} intern` : 'intern';
+
+            // Prioritize queries
+            const jobQuery = majorQuery;
+
             switch (platform) {
                 case 'linkedin':
-                    count = await discoverJobs('software engineer intern');
+                    // Pass profile to scraper for better matching
+                    count = await discoverJobs(jobQuery, profile);
                     break;
                 case 'bold-org':
                     count = await discoverScholarships();
                     break;
                 case 'indeed':
-                    count = await discoverIndeedJobs('software engineer intern');
+                    count = await discoverIndeedJobs(jobQuery);
                     break;
                 case 'fastweb':
                     count = await discoverFastwebScholarships();
@@ -122,13 +135,13 @@ export class DiscoveryService {
                     count = await discoverCompanyJobs();
                     break;
                 case 'glassdoor':
-                    count = await discoverGlassdoorJobs('software engineer intern');
+                    count = await discoverGlassdoorJobs(jobQuery);
                     break;
                 case 'handshake':
                     count = await discoverHandshakeJobs();
                     break;
                 case 'ziprecruiter':
-                    count = await discoverZipRecruiterJobs('software engineer intern');
+                    count = await discoverZipRecruiterJobs(jobQuery);
                     break;
                 case 'scholarships-com':
                     count = await discoverScholarshipsCom();

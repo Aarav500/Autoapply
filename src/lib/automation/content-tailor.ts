@@ -21,6 +21,9 @@ export function generateTailoredCV(opportunity: Opportunity, profile: UserProfil
         requirements.some(req => req.toLowerCase().includes(skill.toLowerCase()))
     );
 
+    // Get relevant activities
+    const relevantActivities = profile.activities?.slice(0, 3) || [];
+
     const cv = `
 # ${profile.fullName}
 ${profile.email} | ${profile.phone} | ${profile.linkedIn}
@@ -40,9 +43,11 @@ GPA: ${profile.gpa}/4.0
 ${profile.skills.join(' • ')}
 
 ## Relevant Experience
-${profile.workExperience.length > 0
+${(profile.workExperience && profile.workExperience.length > 0)
             ? profile.workExperience.map(w => `**${w.role}** at ${w.company}\n${w.description}`).join('\n\n')
-            : '• Academic projects in ' + relevantSkills.slice(0, 3).join(', ')
+            : (relevantActivities.length > 0)
+                ? relevantActivities.map(a => `**${a.role || 'Member'}** | ${a.name}\n${a.description}`).join('\n\n')
+                : '• Academic projects in ' + relevantSkills.slice(0, 3).join(', ')
         }
 
 ## Languages
@@ -60,13 +65,21 @@ export function generateTailoredEssay(
 ): string {
     const { title, organization, type, description } = opportunity;
 
+    // Find most impactful activity
+    const impactfulActivity = profile.activities && profile.activities.length > 0
+        ? profile.activities[0]
+        : null;
+
     const essay = `
 As a ${profile.major} student at ${profile.school} with a ${profile.gpa} GPA, I am deeply passionate about leveraging technology to solve real-world problems. ${type === 'scholarship'
             ? `The ${title} from ${organization} aligns perfectly with my academic journey and career aspirations.`
             : `The ${title} role at ${organization} represents an exciting opportunity to contribute to ${description.toLowerCase()}.`
         }
 
-My technical foundation in ${profile.skills.slice(0, 3).join(', ')} has prepared me to tackle complex challenges. At ${profile.school}, I've developed both theoretical knowledge and practical skills through rigorous coursework and hands-on projects.
+My technical foundation in ${profile.skills.slice(0, 3).join(', ')} has prepared me to tackle complex challenges. ${impactfulActivity
+            ? `Through my involvement in ${impactfulActivity.name}, I ${impactfulActivity.description.toLowerCase().split('.')[0]}. This experience ran parallel to my coursework at ${profile.school}, where I've developed`
+            : `At ${profile.school}, I've developed`
+        } both theoretical knowledge and practical skills through rigorous coursework and hands-on projects.
 
 ${type === 'scholarship'
             ? `This scholarship would directly support my goal of completing my degree and pursuing innovation in the tech industry. As a ${profile.citizenship} student in the United States, I am committed to making the most of every educational opportunity.`

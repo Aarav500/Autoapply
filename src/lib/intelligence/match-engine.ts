@@ -203,6 +203,37 @@ export class MatchEngine {
             analysis.strengths.push('Demonstrated leadership matches requirements');
         }
 
+        // --- NEW: ACTIVITY & ACHIEVEMENT MATCHING ---
+        if (profile.activities && profile.activities.length > 0) {
+            let activityMatches = 0;
+            for (const act of profile.activities) {
+                // Check if activity name or description keywords appear in opportunity text
+                const keywords = [
+                    ...act.name.toLowerCase().split(' '),
+                    ...(act.description ? act.description.toLowerCase().split(' ') : [])
+                ].filter(w => w.length > 4); // Filter out small words
+
+                const matches = keywords.filter(k => oppText.includes(k));
+                if (matches.length >= 2) { // Threshold for relevance
+                    activityMatches++;
+                    analysis.strengths.push(`Your activity "${act.name}" is relevant`);
+                }
+            }
+            // Bonus for relevant activities
+            if (activityMatches > 0) score += Math.min(15, activityMatches * 5);
+        }
+
+        if (profile.achievements && profile.achievements.length > 0) {
+            // Boost score if user has high-level achievements
+            const hasMajorAward = profile.achievements.some(a =>
+                a.type === 'award' || a.type === 'publication' || a.title.toLowerCase().includes('winner')
+            );
+            if (hasMajorAward) {
+                score += 5;
+                analysis.strengths.push('Strong achievement record');
+            }
+        }
+
         // 3. CATEGORIZATION
         // ----------------------------------------------------
         analysis.score = Math.min(100, score);

@@ -214,11 +214,17 @@ export class AutomationEngine {
         this.log('📄 Generating documents for eligible opportunities...');
 
         const eligible = getEligibleOpportunities(this.config.minMatchScore);
+
+        // Import the builder dynamically or at top-level
+        const { buildFullProfile } = await import('./user-profile');
+        const realProfile = buildFullProfile();
+
         let generated = 0;
 
         for (const opp of eligible) {
             try {
-                generateAndStoreDocuments(opp);
+                // Pass the real profile
+                generateAndStoreDocuments(opp, realProfile);
                 generated++;
                 this.log(`   ✓ ${opp.title} @ ${opp.organization}`);
 

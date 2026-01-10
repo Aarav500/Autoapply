@@ -182,9 +182,9 @@ export function calculateJobMatchScore(job: ScrapedJob, profile: UserProfile = D
 }
 
 // Discover and add jobs to opportunity queue
-export async function discoverJobs(keywords = 'software engineer intern'): Promise<number> {
+export async function discoverJobs(keywords = 'software engineer intern', profile?: UserProfile): Promise<number> {
     const bm = browserManager;
-    bm.log('🔍 Starting job discovery...');
+    bm.log(`🔍 Starting job discovery for query: "${keywords}"`);
 
     const jobs = await scrapeLinkedInJobs(keywords, 20);
     let addedCount = 0;
@@ -202,7 +202,8 @@ export async function discoverJobs(keywords = 'software engineer intern'): Promi
             // ... other fields
         };
 
-        const analysis = MatchEngine.analyze(tempOpp as any);
+        // Pass the profile (if available) to the analyzer
+        const analysis = MatchEngine.analyze(tempOpp as any, profile);
 
         // Only add if it's at least a Reach (not "Not Eligible")
         if (analysis.category !== 'Not Eligible') {
