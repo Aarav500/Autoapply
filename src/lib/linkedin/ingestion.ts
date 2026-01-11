@@ -1,15 +1,11 @@
 import './polyfills';
 import * as cheerio from 'cheerio';
-import { PDFParse } from 'pdf-parse';
 import { LinkedInSnapshot, LinkedInSnapshotSchema } from './profile-graph';
 
 export async function parseLinkedInPDF(buffer: Buffer): Promise<LinkedInSnapshot> {
-    const parser = new PDFParse({ data: buffer });
-    const data = await parser.getText();
+    const pdf = require('pdf-parse');
+    const data = await pdf(buffer);
     const text = data.text;
-
-    // Always call destroy() to free memory as per v2 docs
-    await parser.destroy();
 
     // Extraction logic (Heuristics for LinkedIn Profile PDF)
     const snapshot: Partial<LinkedInSnapshot> = {
