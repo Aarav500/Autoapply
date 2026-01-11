@@ -17,28 +17,50 @@ export async function parseLinkedInPDF(buffer: Buffer): Promise<LinkedInSnapshot
 
     const lines = text.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0);
 
-    // Heuristic 1: First line is usually the Name
-    if (lines.length > 0) {
-        snapshot.fullName = lines[0];
+    // Robust Extraction: Find Name and Headline
+    // Name is usually the first "clean" line that isn't metadata
+    let nameIndex = -1;
+    for (let i = 0; i < Math.min(lines.length, 15); i++) {
+        const line = lines[i];
+        const lower = line.toLowerCase();
+
+        // Skip metadata and noise
+        if (lower === 'contact' ||
+            lower.includes('contact info') ||
+            lower.includes('linkedin profile') ||
+            lower.includes('www.linkedin.com') ||
+            lower.startsWith('page ') ||
+            /^\d+$/.test(line) || // Just numbers
+            lower.includes('top skills') ||
+            lower.includes('languages') ||
+            lower.includes('certifications')) continue;
+
+        snapshot.fullName = line;
+        nameIndex = i;
+        break;
     }
 
-    // Heuristic 2: Headline is often the second line OR between Name and "Contact"
-    // Or it might be the line before "LinkedIn Profile"
-    const contactIndex = lines.findIndex((l: string) => l.toLowerCase().includes('contact'));
-    const profileIndex = lines.findIndex((l: string) => l.toLowerCase().includes('linkedin profile'));
+    // Headline is usually the line immediately following the name
+    // But it could be separated by some noise in بعض formats
+    if (nameIndex !== -1) {
+        for (let j = nameIndex + 1; j < Math.min(lines.length, nameIndex + 4); j++) {
+            const line = lines[j];
+            const lower = line.toLowerCase();
 
-    if (profileIndex > 0) {
-        // In some exports, headline is immediately before "LinkedIn Profile"
-        snapshot.headline = lines[profileIndex - 1];
-    } else if (contactIndex > 1) {
-        // Or it's between name and contact info
-        snapshot.headline = lines[1];
+            if (lower.includes('contact') ||
+                lower.includes('linkedin') ||
+                lower.includes('page ') ||
+                /^\d+$/.test(line)) continue;
+
+            snapshot.headline = line;
+            break;
+        }
     }
 
     // About Section
-    const aboutSplit = text.split(/About\n|Summary\n/i);
+    const aboutSplit = text.split(/About\n|Summary\n|Professional Summary\n|Executive Summary\n/i);
     if (aboutSplit.length > 1) {
-        snapshot.about = aboutSplit[1].split(/Experience\n|Education\n|Projects\n/i)[0].trim();
+        snapshot.about = aboutSplit[1].split(/\nExperience\n|\nEducation\n|\nProjects\n|\nSkills\n/i)[0].trim();
     }
 
     // Experience Section

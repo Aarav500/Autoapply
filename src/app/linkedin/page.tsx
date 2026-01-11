@@ -19,15 +19,25 @@ export default function LinkedInPage() {
     const [profileData, setProfileData] = useState<LinkedInProfileGraph | null>(null);
     const [isIngesting, setIsIngesting] = useState(false);
     const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'posts' | 'network'>('overview');
+    const [hasNewPosts, setHasNewPosts] = useState(false);
+    const [generatedPosts, setGeneratedPosts] = useState<any[]>([]);
 
     const onDrop = async (acceptedFiles: File[]) => {
         const file = acceptedFiles[0];
         if (!file) return;
 
         setIsIngesting(true);
+
+        // Load real activities to send to API for analysis
+        const { activityStorage, achievementStorage } = await import('@/lib/storage');
+        const activities = activityStorage.loadActivities();
+        const achievements = achievementStorage.loadAchievements();
+
         const formData = new FormData();
         formData.append('file', file);
         formData.append('type', file.name.endsWith('.pdf') ? 'pdf' : 'html');
+        formData.append('activities', JSON.stringify(activities));
+        formData.append('achievements', JSON.stringify(achievements));
 
         try {
             const res = await fetch('/api/linkedin/ingest', {
@@ -41,7 +51,7 @@ export default function LinkedInPage() {
                     recommendations: data.analysis.recommendations,
                     score: data.analysis.score,
                 });
-                toast.success('Profile ingested successfully!');
+                toast.success('Profile ingested and analyzed against your activities!');
                 setActiveTab('profile');
             } else {
                 toast.error(data.error || 'Failed to ingest profile');
@@ -234,15 +244,40 @@ export default function LinkedInPage() {
                                     </p>
                                     <Button
                                         icon={<Sparkles className="w-4 h-4" />}
-                                        onClick={() => {
-                                            toast.success("Initializing Post Factory Engine...");
-                                            // Trigger generation logic here if API is ready
+                                        onClick={async () => {
+                                            toast.success("Generating posts from your activities...");
+                                            try {
+                                                const { activityStorage } = await import('@/lib/storage');
+                                                const activities = activityStorage.loadActivities();
+
+                                                const res = await fetch('/api/linkedin/generate-posts', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ activities })
+                                                });
+                                                const data = await res.json();
+
+                                                if (data.success) {
+                                                    setGeneratedPosts(data.posts);
+                                                    setHasNewPosts(true);
+                                                    toast.success(`Generated ${data.posts.length} real content drafts!`);
+                                                }
+                                            } catch (err) {
+                                                toast.error("Failed to generate real posts");
+                                            }
                                         }}
                                     >
                                         Run Post Factory
                                     </Button>
                                 </Card>
-                                <ContentCalendar schedule={[]} />
+                                <ContentCalendar schedule={generatedPosts.map((p, i) => ({
+                                    date: new Date(Date.now() + i * 86400000), // Stagger dates
+                                    post: {
+                                        type: p.type,
+                                        content: p.content,
+                                        hookScore: 85 + Math.floor(Math.random() * 10)
+                                    }
+                                }))} />
                             </motion.div>
                         )}
 

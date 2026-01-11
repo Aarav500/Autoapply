@@ -23,9 +23,12 @@ export async function POST(req: NextRequest) {
             snapshot = await parseLinkedInHTML(html);
         }
 
-        // Load user data for comparison (Mocked for now)
-        const activities: any[] = []; // Would load from storage
-        const achievements: any[] = [];
+        // Load user data for comparison from request if provided
+        const activitiesStr = formData.get('activities') as string;
+        const achievementsStr = formData.get('achievements') as string;
+
+        const activities = activitiesStr ? JSON.parse(activitiesStr) : [];
+        const achievements = achievementsStr ? JSON.parse(achievementsStr) : [];
 
         const analysis = analyzeProfile(snapshot, activities, achievements);
 
