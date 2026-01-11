@@ -1,9 +1,17 @@
-import './polyfills';
 import * as cheerio from 'cheerio';
-import { PDFParse } from 'pdf-parse';
 import { LinkedInSnapshot, LinkedInSnapshotSchema } from './profile-graph';
 
 export async function parseLinkedInPDF(buffer: Buffer): Promise<LinkedInSnapshot> {
+    const { PDFParse } = require('pdf-parse');
+
+    // Explicitly set the worker path to avoid Turbopack resolution issues
+    // Using the legacy worker which is more stable in Node environments
+    try {
+        PDFParse.setWorker(require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs'));
+    } catch (e) {
+        console.warn('Failed to set pdf-parse worker explicitly:', e);
+    }
+
     const parser = new PDFParse({ data: buffer });
     const data = await parser.getText();
     const text = data.text;
