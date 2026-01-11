@@ -1,33 +1,9 @@
+import './polyfills';
 import * as cheerio from 'cheerio';
+import { PDFParse } from 'pdf-parse';
 import { LinkedInSnapshot, LinkedInSnapshotSchema } from './profile-graph';
 
-// COMPREHENSIVE NODE POLYFILLS for PDF.js / pdf-parse
-if (typeof global !== 'undefined') {
-    if (!(global as any).DOMMatrix) {
-        (global as any).DOMMatrix = class DOMMatrix {
-            constructor() { }
-        };
-    }
-    // PDF.js sometimes checks for these in Node
-    if (!(global as any).HTMLCanvasElement) {
-        (global as any).HTMLCanvasElement = class HTMLCanvasElement { };
-    }
-    if (!(global as any).ImageData) {
-        (global as any).ImageData = class ImageData { };
-    }
-}
-
 export async function parseLinkedInPDF(buffer: Buffer): Promise<LinkedInSnapshot> {
-    const { PDFParse } = require('pdf-parse');
-
-    // Explicitly set the worker path to avoid Turbopack resolution issues
-    // Using the legacy worker which is more stable in Node environments
-    try {
-        PDFParse.setWorker(require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs'));
-    } catch (e) {
-        console.warn('Failed to set pdf-parse worker explicitly:', e);
-    }
-
     const parser = new PDFParse({ data: buffer });
     const data = await parser.getText();
     const text = data.text;
