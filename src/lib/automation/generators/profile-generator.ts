@@ -46,7 +46,9 @@ Open to new opportunities in software engineering. Connect with me!
      * Uses strict "Action Verb + Task + Result" formatting if data allows.
      */
     static generateExperienceBlock(activity: Activity): string {
-        const dateRange = `${activity.startDate.split('T')[0]} - ${activity.endDate ? activity.endDate.split('T')[0] : 'Present'}`;
+        const startDate = activity.startDate instanceof Date ? activity.startDate.toISOString() : activity.startDate;
+        const endDate = activity.endDate instanceof Date ? activity.endDate.toISOString() : activity.endDate;
+        const dateRange = `${startDate.split('T')[0]} - ${endDate ? endDate.split('T')[0] : 'Present'}`;
 
         // Simple template for now - can be enhanced with LLM later
         let content = `${activity.role} | ${activity.organization}\n${dateRange}\n\n`;
