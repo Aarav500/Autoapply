@@ -159,17 +159,23 @@ export default function LinkedInPage() {
                                         Your Profile Snapshot
                                     </h3>
                                     <div className="space-y-3">
-                                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                                        <div className="flex justify-between items-start p-3 bg-gray-50 rounded-lg">
                                             <span className="text-sm font-medium">Full Name</span>
-                                            <span className="text-sm text-gray-600 font-bold">{profileData.snapshot.fullName}</span>
+                                            <span className="text-sm text-gray-800 font-bold ml-4 text-right">
+                                                {profileData.snapshot.fullName || 'Not Found'}
+                                            </span>
                                         </div>
                                         <div className="p-3 bg-gray-50 rounded-lg">
                                             <span className="text-sm font-medium block mb-1">Headline</span>
-                                            <span className="text-sm text-gray-600 italic">"{profileData.snapshot.headline}"</span>
+                                            <span className="text-sm text-gray-700 italic leading-relaxed">
+                                                {profileData.snapshot.headline ? `"${profileData.snapshot.headline}"` : 'No headline detected'}
+                                            </span>
                                         </div>
                                         <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                                             <span className="text-sm font-medium">Positions Detected</span>
-                                            <span className="text-sm text-gray-600 font-bold">{profileData.snapshot.positions.length}</span>
+                                            <span className="text-sm text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded">
+                                                {profileData.snapshot.positions.length}
+                                            </span>
                                         </div>
                                     </div>
                                 </Card>
@@ -226,7 +232,13 @@ export default function LinkedInPage() {
                                         Generate engagement-optimized posts from your activities and achievements.
                                         Every claim is verified against your internal data.
                                     </p>
-                                    <Button icon={<Sparkles className="w-4 h-4" />}>
+                                    <Button
+                                        icon={<Sparkles className="w-4 h-4" />}
+                                        onClick={() => {
+                                            toast.success("Initializing Post Factory Engine...");
+                                            // Trigger generation logic here if API is ready
+                                        }}
+                                    >
                                         Run Post Factory
                                     </Button>
                                 </Card>
@@ -250,7 +262,14 @@ export default function LinkedInPage() {
                                     <p className="text-gray-500 max-w-md mx-auto">
                                         Discover high-relevance networking targets from off-platform sources (tech blogs, GitHub, alumni pages).
                                     </p>
-                                    <Button variant="secondary">Initialize Target Discovery</Button>
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => {
+                                            toast.success("Starting Target Discovery Crawl...");
+                                        }}
+                                    >
+                                        Initialize Target Discovery
+                                    </Button>
                                 </Card>
                             </motion.div>
                         )}

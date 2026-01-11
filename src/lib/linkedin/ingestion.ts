@@ -7,7 +7,7 @@ export async function parseLinkedInPDF(buffer: Buffer): Promise<LinkedInSnapshot
     const data = await pdf(buffer);
     const text = data.text;
 
-    // Extraction logic (Heuristics for LinkedIn Profile PDF)
+    // Extraction logic (Robust heuristics for LinkedIn Profile PDF)
     const snapshot: Partial<LinkedInSnapshot> = {
         positions: [],
         education: [],
@@ -15,12 +15,31 @@ export async function parseLinkedInPDF(buffer: Buffer): Promise<LinkedInSnapshot
         projects: [],
     };
 
-    // Basic regex-based extraction (simplified for MVP)
-    const nameMatch = text.match(/^([^\n]+)/);
-    if (nameMatch) snapshot.fullName = nameMatch[1].trim();
+    const lines = text.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0);
 
-    const headlineMatch = text.match(/\n([^\n]+)\n[^\n]*LinkedIn Profile/);
-    if (headlineMatch) snapshot.headline = headlineMatch[1].trim();
+    // Heuristic 1: First line is usually the Name
+    if (lines.length > 0) {
+        snapshot.fullName = lines[0];
+    }
+
+    // Heuristic 2: Headline is often the second line OR between Name and "Contact"
+    // Or it might be the line before "LinkedIn Profile"
+    const contactIndex = lines.findIndex((l: string) => l.toLowerCase().includes('contact'));
+    const profileIndex = lines.findIndex((l: string) => l.toLowerCase().includes('linkedin profile'));
+
+    if (profileIndex > 0) {
+        // In some exports, headline is immediately before "LinkedIn Profile"
+        snapshot.headline = lines[profileIndex - 1];
+    } else if (contactIndex > 1) {
+        // Or it's between name and contact info
+        snapshot.headline = lines[1];
+    }
+
+    // About Section
+    const aboutSplit = text.split(/About\n|Summary\n/i);
+    if (aboutSplit.length > 1) {
+        snapshot.about = aboutSplit[1].split(/Experience\n|Education\n|Projects\n/i)[0].trim();
+    }
 
     // Experience Section
     const experienceSplit = text.split(/Experience\n/i);
