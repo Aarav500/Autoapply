@@ -44,7 +44,7 @@ export class ProfileGraphService {
             fullName: user.name,
             email: user.email,
 
-            education: user.education.map(e => ({
+            education: user.education.map((e: any) => ({
                 ...e,
                 startDate: e.startDate.toISOString(),
                 endDate: e.endDate ? e.endDate.toISOString() : undefined,
@@ -62,7 +62,7 @@ export class ProfileGraphService {
                 .map(this.mapActivityToSchema),
 
             // Direct skills
-            skills: user.skills.map(us => ({
+            skills: user.skills.map((us: any) => ({
                 id: us.id,
                 skillId: us.skillId,
                 skillName: us.skill.name,
@@ -70,7 +70,7 @@ export class ProfileGraphService {
                 verified: us.verified
             })),
 
-            leads: user.leads.map(l => ({
+            leads: user.leads.map((l: any) => ({
                 ...l,
                 profileUrl: l.profileUrl || '',
                 status: l.status as any,
@@ -81,7 +81,7 @@ export class ProfileGraphService {
 
             // Collect all variants
             generatedPosts: user.activities.flatMap(a =>
-                a.variants.map(v => ({
+                a.variants.map((v: any) => ({
                     ...v,
                     type: v.type as any,
                     hookScore: v.hookScore || undefined,
