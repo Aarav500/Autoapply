@@ -1,15 +1,9 @@
+import './polyfills';
 import * as cheerio from 'cheerio';
+import { PDFParse } from 'pdf-parse';
 import { LinkedInSnapshot, LinkedInSnapshotSchema } from './profile-graph';
 
-// Polyfill DOMMatrix for Node environments (required by some pdf-parse dependencies)
-if (typeof global !== 'undefined' && !(global as any).DOMMatrix) {
-    (global as any).DOMMatrix = class DOMMatrix {
-        constructor() { }
-    };
-}
-
 export async function parseLinkedInPDF(buffer: Buffer): Promise<LinkedInSnapshot> {
-    const { PDFParse } = require('pdf-parse');
     const parser = new PDFParse({ data: buffer });
     const data = await parser.getText();
     const text = data.text;
