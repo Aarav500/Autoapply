@@ -1,4 +1,4 @@
-import { Activity, Achievement } from '../storage';
+import { Activity, Achievement } from '@/types/common';
 
 export interface LinkedInPostVariant {
     type: 'story' | 'technical' | 'lessons' | 'results';

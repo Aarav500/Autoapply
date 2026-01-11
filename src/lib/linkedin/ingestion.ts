@@ -58,9 +58,9 @@ export async function parseLinkedInPDF(buffer: Buffer): Promise<LinkedInSnapshot
     }
 
     // About Section
-    const aboutSplit = text.split(/About\n|Summary\n|Professional Summary\n|Executive Summary\n/i);
+    const aboutSplit = text.split(/About\r?\n|Summary\r?\n|Professional Summary\r?\n|Executive Summary\r?\n/i);
     if (aboutSplit.length > 1) {
-        snapshot.about = aboutSplit[1].split(/\nExperience\n|\nEducation\n|\nProjects\n|\nSkills\n/i)[0].trim();
+        snapshot.about = aboutSplit[1].split(/\r?\nExperience\r?\n|\r?\nEducation\r?\n|\r?\nProjects\r?\n|\r?\nSkills\r?\n/i)[0].trim();
     }
 
     // Experience Section

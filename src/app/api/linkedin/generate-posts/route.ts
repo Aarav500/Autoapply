@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generatePostVariants } from '@/lib/linkedin/content-factory';
-import { Activity } from '@/lib/storage';
+import { Activity } from '@/types/common';
 
 export async function POST(req: NextRequest) {
     try {
-        const { activities } = await req.json();
+        const body = await req.json();
+        console.log('LinkedIn Generate Posts Request:', { activityCount: body.activities?.length });
+
+        const { activities } = body;
 
         if (!activities || !Array.isArray(activities) || activities.length === 0) {
             return NextResponse.json({

@@ -280,26 +280,7 @@ export const essayStorage = {
 // 4. ACTIVITY STORAGE
 // ============================================
 
-export interface Activity {
-    id: string;
-    name: string;
-    role?: string;
-    organization?: string;
-    category?: 'academic' | 'leadership' | 'work' | 'volunteer' | 'creative' | 'athletic' | 'other';
-    type?: string;
-    description: string;
-    startDate?: string;
-    endDate?: string;
-    isOngoing?: boolean;
-    hoursPerWeek?: number;
-    weeksPerYear?: number;
-    achievements?: string[];
-    skills?: string[];
-    impact?: string;
-    // Legacy support
-    hours?: number;
-    years?: string;
-}
+import { Activity, Achievement } from '@/types/common';
 
 export const activityStorage = {
     saveActivities(activities: Activity[]) {
@@ -326,18 +307,7 @@ export const activityStorage = {
 // 4B. ACHIEVEMENT STORAGE
 // ============================================
 
-export interface Achievement {
-    id: string;
-    title: string;
-    category?: 'academic' | 'award' | 'publication' | 'certification' | 'other';
-    type?: string;
-    date: string;
-    description: string;
-    issuer?: string;
-    url?: string;
-    // Legacy
-    activities?: string[];
-}
+// Achievement interface moved to types
 
 export const achievementStorage = {
     saveAchievements(achievements: Achievement[]) {

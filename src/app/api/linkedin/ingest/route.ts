@@ -10,6 +10,8 @@ export async function POST(req: NextRequest) {
         const type = formData.get('type') as string; // 'pdf' | 'html'
         const file = formData.get('file');
 
+        console.log('LinkedIn Ingest Request:', { type, fileName: (file as File)?.name });
+
         if (!file) {
             return NextResponse.json({ error: 'No file provided' }, { status: 400 });
         }
