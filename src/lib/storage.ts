@@ -281,6 +281,7 @@ export const essayStorage = {
 // ============================================
 
 import { Activity, Achievement } from '@/types/common';
+export type { Activity, Achievement };
 
 export const activityStorage = {
     saveActivities(activities: Activity[]) {

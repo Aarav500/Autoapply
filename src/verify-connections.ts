@@ -20,7 +20,8 @@ global.window = {} as any;
 // Note: We use relative paths assuming this is in src/
 import { generateTailoredCV, generateTailoredEssay } from './lib/automation/content-tailor';
 import { buildFullProfile } from './lib/automation/user-profile';
-import { activityStorage, Activity } from './lib/storage';
+import { activityStorage } from './lib/storage';
+import type { Activity } from './lib/storage';
 
 async function runTest() {
     console.log('🧪 Starting Verification Tests...');
