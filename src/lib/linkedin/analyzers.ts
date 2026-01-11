@@ -1,5 +1,5 @@
 import { LinkedInSnapshot, ProfileRecommendation } from './profile-graph';
-import { Activity, Achievement } from '../storage';
+import { Activity, Achievement } from '@/types/common';
 
 export function analyzeProfile(snapshot: LinkedInSnapshot, activities: Activity[], achievements: Achievement[]): {
     recommendations: ProfileRecommendation[];

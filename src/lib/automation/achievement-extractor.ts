@@ -1,5 +1,6 @@
 
-import { Activity, Achievement, achievementStorage } from '../storage';
+import { Activity, Achievement } from '@/types/common';
+import { achievementStorage } from '../storage';
 
 // Keywords that suggest an achievement
 const ACHIEVEMENT_KEYWORDS = [

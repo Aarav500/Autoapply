@@ -288,7 +288,8 @@ export const FIELD_PATTERNS: Record<string, string[]> = {
 // Connects to the main storage.ts to get real user data
 // ============================================
 
-import { profileStorage, activityStorage, achievementStorage, Activity as StorageActivity, UserProfile as StorageProfile } from '../storage';
+import { Activity as StorageActivity, Achievement as StorageAchievement, UserProfile as StorageProfile, activityStorage, achievementStorage, profileStorage } from '../storage';
+import { Activity as CommonActivity, Achievement as CommonAchievement } from '@/types/common';
 
 export function buildFullProfile(): UserProfile {
     // Start with default as base
