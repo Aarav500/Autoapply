@@ -9,9 +9,13 @@ if (typeof global !== 'undefined' && !(global as any).DOMMatrix) {
 }
 
 export async function parseLinkedInPDF(buffer: Buffer): Promise<LinkedInSnapshot> {
-    const pdf = require('pdf-parse');
-    const data = await pdf(buffer);
+    const { PDFParse } = require('pdf-parse');
+    const parser = new PDFParse({ data: buffer });
+    const data = await parser.getText();
     const text = data.text;
+
+    // Always call destroy() to free memory as per v2 docs
+    await parser.destroy();
 
     // Extraction logic (Heuristics for LinkedIn Profile PDF)
     const snapshot: Partial<LinkedInSnapshot> = {
