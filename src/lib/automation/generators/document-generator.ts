@@ -73,7 +73,7 @@ ${graph.email}
             experience: topActivities.map(act => ({
                 title: act.role,
                 company: act.organization,
-                date: `${act.startDate.split('T')[0]}`,
+                date: `${(act.startDate instanceof Date ? act.startDate.toISOString() : act.startDate).split('T')[0]}`,
                 bullets: [
                     ProfileGenerator.generateExperienceBlock(act) // Use the "Action-Result" generator
                 ]
