@@ -22,7 +22,7 @@
     "mammoth": "^1.11.0",
     "next": "16.1.1",
     "nodemailer": "^7.0.12",
-    "pdf-parse": "^2.4.5",
+    "pdf-parse": "1.1.1",
     "prisma": "^5.10.0",
     "puppeteer": "^24.34.0",
     "react": "19.2.3",
