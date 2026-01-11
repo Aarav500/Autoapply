@@ -1,6 +1,5 @@
-'use server';
-
 import { NextRequest, NextResponse } from 'next/server';
+import '@/lib/linkedin/polyfills';
 
 // ============================================
 // DOCUMENT PARSING API - PROFESSIONAL GRADE
