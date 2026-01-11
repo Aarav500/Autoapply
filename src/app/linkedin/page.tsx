@@ -11,6 +11,9 @@ import {
     Settings, Terminal, Lock
 } from 'lucide-react';
 import { toast } from '@/lib/error-handling';
+import { ActionCenter } from '@/components/automation/ActionCenter';
+import { ProfileReview } from '@/components/automation/ProfileReview';
+import { ContentCalendar } from '@/components/automation/ContentCalendar';
 
 // LinkedIn Profile Sections
 interface ProfileSection {
@@ -538,65 +541,9 @@ export default function LinkedInPage() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
-                        className="grid grid-cols-1 md:grid-cols-2 gap-4"
                     >
-                        {sections.map((section, index) => (
-                            <motion.div
-                                key={section.id}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.05 }}
-                            >
-                                <Card>
-                                    <div className="flex items-start justify-between mb-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${section.status === 'complete' ? 'bg-green-500/20' :
-                                                section.status === 'needs_improvement' ? 'bg-yellow-500/20' : 'bg-red-500/20'
-                                                }`}>
-                                                <section.icon className={`w-5 h-5 ${section.status === 'complete' ? 'text-green-500' :
-                                                    section.status === 'needs_improvement' ? 'text-yellow-500' : 'text-red-500'
-                                                    }`} />
-                                            </div>
-                                            <div>
-                                                <h4 className="font-medium">{section.name}</h4>
-                                                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                                                    {section.completeness}% complete
-                                                </p>
-                                            </div>
-                                        </div>
-                                        {section.status === 'complete' ? (
-                                            <CheckCircle2 className="w-5 h-5 text-green-500" />
-                                        ) : (
-                                            <Button variant="secondary" size="sm" icon={<Edit3 className="w-3 h-3" />}>
-                                                Improve
-                                            </Button>
-                                        )}
-                                    </div>
-
-                                    <div className="h-1.5 rounded-full overflow-hidden mb-3" style={{ background: 'var(--bg-tertiary)' }}>
-                                        <div
-                                            className="h-full rounded-full transition-all"
-                                            style={{
-                                                width: `${section.completeness}%`,
-                                                background: section.status === 'complete' ? 'var(--success)' :
-                                                    section.status === 'needs_improvement' ? 'var(--warning)' : 'var(--error)'
-                                            }}
-                                        />
-                                    </div>
-
-                                    {section.suggestions.length > 0 && (
-                                        <div className="space-y-1">
-                                            {section.suggestions.map((suggestion, i) => (
-                                                <div key={i} className="flex items-start gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                                                    <Lightbulb className="w-3 h-3 mt-0.5 text-yellow-500" />
-                                                    {suggestion}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </Card>
-                            </motion.div>
-                        ))}
+                        {/* Using the new Profile Review Engine */}
+                        <ProfileReview userId="user_123" />
                     </motion.div>
                 )}
 
@@ -608,94 +555,26 @@ export default function LinkedInPage() {
                         exit={{ opacity: 0, y: -10 }}
                         className="space-y-4"
                     >
-                        {/* Generate Posts Button */}
-                        <Card>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="font-medium">Generate Posts from Activities</h3>
-                                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                                        AI will create engaging posts from your activities and achievements
-                                    </p>
-                                </div>
-                                <Button
-                                    icon={isGeneratingPosts ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                                    onClick={handleGeneratePosts}
-                                    disabled={isGeneratingPosts}
-                                >
-                                    {isGeneratingPosts ? 'Generating...' : 'Generate Posts'}
-                                </Button>
-                            </div>
+                        <Card className="bg-blue-50">
+                            <h3 className="font-bold text-blue-900 mb-2">Automated Content Strategy</h3>
+                            <p className="text-sm text-blue-700 mb-4">
+                                This calendar is populated by the Post Factory based on your activities.
+                                Posts are optimized for "Hook Score" and "Readability".
+                            </p>
+                            <Button
+                                icon={isGeneratingPosts ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                onClick={handleGeneratePosts}
+                                disabled={isGeneratingPosts}
+                            >
+                                {isGeneratingPosts ? 'Generating Variants...' : 'Run Post Factory'}
+                            </Button>
                         </Card>
 
-                        {/* Posts List */}
-                        {posts.length > 0 ? (
-                            <div className="space-y-3">
-                                {posts.map((post, index) => (
-                                    <motion.div
-                                        key={post.id}
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: index * 0.05 }}
-                                    >
-                                        <Card>
-                                            <div className="flex items-start justify-between mb-2">
-                                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${post.type === 'achievement' ? 'bg-green-500/20 text-green-500' :
-                                                    post.type === 'learning' ? 'bg-blue-500/20 text-blue-500' :
-                                                        post.type === 'insight' ? 'bg-purple-500/20 text-purple-500' :
-                                                            'bg-orange-500/20 text-orange-500'
-                                                    }`}>
-                                                    {post.type}
-                                                </span>
-                                                <StatusBadge status={
-                                                    post.status === 'posted' ? 'success' :
-                                                        post.status === 'scheduled' ? 'warning' : 'neutral'
-                                                }>
-                                                    {post.status}
-                                                </StatusBadge>
-                                            </div>
-
-                                            <p className="text-sm mb-3 whitespace-pre-line">{post.content}</p>
-
-                                            {post.source && (
-                                                <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-                                                    📌 From: {post.source}
-                                                </p>
-                                            )}
-
-                                            {post.status === 'posted' && (
-                                                <div className="flex gap-4 text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-                                                    <span className="flex items-center gap-1"><Heart className="w-3 h-3" /> {post.likes} likes</span>
-                                                    <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" /> {post.comments} comments</span>
-                                                </div>
-                                            )}
-
-                                            {post.status === 'draft' && (
-                                                <div className="flex gap-2">
-                                                    <Button variant="secondary" size="sm" icon={<Edit3 className="w-3 h-3" />}>
-                                                        Edit
-                                                    </Button>
-                                                    <Button variant="secondary" size="sm" icon={<Calendar className="w-3 h-3" />}
-                                                        onClick={() => schedulePost(post.id, new Date(Date.now() + 24 * 60 * 60 * 1000))}
-                                                    >
-                                                        Schedule
-                                                    </Button>
-                                                    <Button size="sm" icon={<Send className="w-3 h-3" />} onClick={() => postNow(post.id)}>
-                                                        Post Now
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </Card>
-                                    </motion.div>
-                                ))}
-                            </div>
-                        ) : (
-                            <Card className="text-center py-12">
-                                <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                                <p style={{ color: 'var(--text-muted)' }}>
-                                    Click "Generate Posts" to create content from your activities
-                                </p>
-                            </Card>
-                        )}
+                        <ContentCalendar schedule={[
+                            { date: new Date(), post: { type: 'story', content: 'Launched my new project today!', hookScore: 9.2 } },
+                            { date: new Date(Date.now() + 86400000 * 2), post: { type: 'technical', content: 'Deep dive into Next.js App Router...', hookScore: 8.5 } },
+                            { date: new Date(Date.now() + 86400000 * 5), post: { type: 'lesson', content: '3 things I learned about TypeScript enums.', hookScore: 7.8 } },
+                        ]} />
                     </motion.div>
                 )}
 
@@ -786,101 +665,39 @@ export default function LinkedInPage() {
                         exit={{ opacity: 0, y: -10 }}
                         className="space-y-4"
                     >
-                        <Card className="border-l-4 border-red-500 bg-red-500/5">
-                            <h3 className="text-red-500 font-bold flex items-center gap-2">
-                                <Terminal className="w-5 h-5" />
-                                Browser Automation Zone
-                            </h3>
-                            <p className="text-sm text-gray-400 mt-1">
-                                These actions will open a browser instance and physically control your LinkedIn profile.
-                                Please ensure you are logged in to LinkedIn in the Chrome window that opens.
-                            </p>
-                        </Card>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Card>
-                                <h3 className="font-medium mb-4">Profile Actions</h3>
-                                <div className="space-y-3">
-                                    <div className="p-3 rounded-lg bg-white/5">
-                                        <label className="text-xs text-gray-400">Update Headline</label>
-                                        <div className="flex gap-2 mt-2">
-                                            <input
-                                                type="text"
-                                                id="ctrl-headline"
-                                                placeholder="e.g. CS Student @ UCR"
-                                                className="flex-1 bg-black/20 rounded px-2 text-sm"
-                                            />
-                                            <Button
-                                                size="sm"
-                                                disabled={isRunningAutomation}
-                                                onClick={() => {
-                                                    const val = (document.getElementById('ctrl-headline') as HTMLInputElement).value;
-                                                    runControlAction('updateHeadline', { text: val });
-                                                }}
-                                            >
-                                                Update
-                                            </Button>
-                                        </div>
-                                    </div>
-
-                                    <div className="p-3 rounded-lg bg-white/5">
-                                        <label className="text-xs text-gray-400">Update About Section</label>
-                                        <div className="flex gap-2 mt-2">
-                                            <textarea
-                                                id="ctrl-about"
-                                                rows={3}
-                                                placeholder="Write your new bio..."
-                                                className="flex-1 bg-black/20 rounded p-2 text-sm"
-                                            />
-                                            <Button
-                                                size="sm"
-                                                disabled={isRunningAutomation}
-                                                onClick={() => {
-                                                    const val = (document.getElementById('ctrl-about') as HTMLTextAreaElement).value;
-                                                    runControlAction('updateAbout', { text: val });
-                                                }}
-                                            >
-                                                Update
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </Card>
-
-                            <Card>
-                                <h3 className="font-medium mb-4">Sync Profile Data</h3>
-                                <p className="text-xs text-gray-400 mb-3">
-                                    Automatically populate your LinkedIn profile with data from your college application activities and education history.
-                                </p>
-                                <Button
-                                    className="w-full bg-blue-600 hover:bg-blue-700"
-                                    icon={<RefreshCw className="w-4 h-4" />}
-                                    disabled={isRunningAutomation}
-                                    onClick={handleSyncProfile}
-                                >
-                                    Sync Activities & Education
-                                </Button>
-                            </Card>
-
-
-                            <Card className="bg-black/40 font-mono text-xs">
-                                <h3 className="font-bold text-green-400 mb-2 flex justify-between">
-                                    <span>Automation Log</span>
-                                    {isAutonomous && <span className="animate-pulse">● LIVE</span>}
-                                </h3>
-                                <div className="h-48 overflow-y-auto space-y-1 flex flex-col-reverse">
-                                    {/* Reverse order to show newest at bottom if using flex-col-reverse or top with standard */}
-                                    {automationLog.length === 0 && <span className="opacity-30">Waiting for command...</span>}
-                                    {automationLog.map((log, i) => (
-                                        <div key={i} className="border-b border-white/5 pb-1">{log}</div>
-                                    ))}
-                                </div>
-                            </Card>
-                        </div>
+                        <ActionCenter
+                            items={[
+                                {
+                                    id: '1',
+                                    type: 'message',
+                                    title: 'Reply to Recruiter',
+                                    contentToCopy: "Hi Sarah, thanks for reaching out! I'm definitely interested in learning more about the role.",
+                                    destinationUrl: 'https://linkedin.com/messaging',
+                                    priority: 1
+                                },
+                                {
+                                    id: '2',
+                                    type: 'post',
+                                    title: 'Post about New Feature',
+                                    contentToCopy: "Just shipped the new Automation Engine! 🚀 #Coding #ShipIt",
+                                    destinationUrl: 'https://linkedin.com/feed',
+                                    priority: 2
+                                },
+                                {
+                                    id: '3',
+                                    type: 'profile_update',
+                                    title: 'Update Headline',
+                                    contentToCopy: "CS Student @ UCR | AI & ML Enthusiast | Building F1 Analytics",
+                                    destinationUrl: 'https://linkedin.com/in/me',
+                                    priority: 3
+                                }
+                            ]}
+                            onComplete={(id) => toast.success(`Action ${id} marked complete!`)}
+                        />
                     </motion.div>
                 )}
 
-            </AnimatePresence>
+            </AnimatePresence >
         </motion.div >
     );
 }
