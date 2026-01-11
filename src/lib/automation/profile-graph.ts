@@ -54,11 +54,11 @@ export class ProfileGraphService {
 
             // Map activities to Schema format
             workExperience: user.activities
-                .filter(a => a.organization && !a.name.toLowerCase().includes('project')) // Basic heuristic if no type field yet
+                .filter((a: any) => a.organization && !a.name.toLowerCase().includes('project')) // Basic heuristic if no type field yet
                 .map(this.mapActivityToSchema),
 
             projects: user.activities
-                .filter(a => a.name.toLowerCase().includes('project'))
+                .filter((a: any) => a.name.toLowerCase().includes('project'))
                 .map(this.mapActivityToSchema),
 
             // Direct skills
@@ -80,7 +80,7 @@ export class ProfileGraphService {
             })),
 
             // Collect all variants
-            generatedPosts: user.activities.flatMap(a =>
+            generatedPosts: user.activities.flatMap((a: any) =>
                 a.variants.map((v: any) => ({
                     ...v,
                     type: v.type as any,
