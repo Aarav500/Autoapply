@@ -1,395 +1,66 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Button, StatusBadge, ProgressBar } from '@/components/ui';
 import {
-    Linkedin, User, Briefcase, GraduationCap, Award, FileText,
-    MessageSquare, Heart, Share2, Users, Eye, TrendingUp, Sparkles,
-    CheckCircle2, Circle, Edit3, PlusCircle, Send, RefreshCw, Zap,
-    Calendar, Target, Globe, Rocket, Lightbulb, Play, Pause,
-    Settings, Terminal, Lock
+    Linkedin, User, Briefcase, FileText,
+    Users, Eye, TrendingUp, Sparkles,
+    RefreshCw, Zap, Rocket, Globe,
+    Upload, FileCode, CheckCircle2, ChevronRight
 } from 'lucide-react';
 import { toast } from '@/lib/error-handling';
-import { ActionCenter } from '@/components/automation/ActionCenter';
 import { ProfileReview } from '@/components/automation/ProfileReview';
 import { ContentCalendar } from '@/components/automation/ContentCalendar';
-
-// LinkedIn Profile Sections
-interface ProfileSection {
-    id: string;
-    name: string;
-    icon: any;
-    completeness: number;
-    status: 'complete' | 'incomplete' | 'needs_improvement';
-    suggestions: string[];
-}
-
-interface Post {
-    id: string;
-    content: string;
-    type: 'achievement' | 'learning' | 'insight' | 'project';
-    status: 'draft' | 'scheduled' | 'posted';
-    scheduledDate?: Date;
-    likes?: number;
-    comments?: number;
-    source?: string; // Source activity
-}
-
-interface ConnectionStrategy {
-    target: string;
-    reason: string;
-    messageTemplate: string;
-    status: 'pending' | 'sent' | 'connected';
-}
-
-// Sample profile data
-const profileSections: ProfileSection[] = [
-    {
-        id: 'headline',
-        name: 'Headline',
-        icon: User,
-        completeness: 60,
-        status: 'needs_improvement',
-        suggestions: [
-            'Add keywords: "Software Engineer", "CS Student"',
-            'Mention your target: "Seeking Summer 2026 Internship"',
-            'Include school: "UC Riverside"',
-        ],
-    },
-    {
-        id: 'about',
-        name: 'About Section',
-        icon: FileText,
-        completeness: 40,
-        status: 'incomplete',
-        suggestions: [
-            'Add a compelling story about your journey',
-            'Highlight key skills and achievements',
-            'Include call-to-action for recruiters',
-        ],
-    },
-    {
-        id: 'experience',
-        name: 'Experience',
-        icon: Briefcase,
-        completeness: 80,
-        status: 'needs_improvement',
-        suggestions: [
-            'Add bullet points with quantified achievements',
-            'Include technologies used in each role',
-        ],
-    },
-    {
-        id: 'education',
-        name: 'Education',
-        icon: GraduationCap,
-        completeness: 100,
-        status: 'complete',
-        suggestions: [],
-    },
-    {
-        id: 'skills',
-        name: 'Skills & Endorsements',
-        icon: Award,
-        completeness: 50,
-        status: 'incomplete',
-        suggestions: [
-            'Add: Python, JavaScript, React, Node.js',
-            'Ask connections for endorsements',
-            'Reorder to show top skills first',
-        ],
-    },
-    {
-        id: 'projects',
-        name: 'Projects',
-        icon: Rocket,
-        completeness: 30,
-        status: 'incomplete',
-        suggestions: [
-            'Add your F1 Race Insights project',
-            'Include GitHub links and tech stack',
-            'Add screenshots/demos',
-        ],
-    },
-];
-
-// Sample activities to convert to posts
-const activitiesForPosts = [
-    { id: '1', activity: 'Built F1 Race Insights with ML predictions', postIdea: 'Share the journey of building an ML-powered sports analytics platform' },
-    { id: '2', activity: 'Led study group for 15 students', postIdea: 'Post about leadership lessons from peer tutoring' },
-    { id: '3', activity: 'Published undergraduate research', postIdea: 'Announce your research publication and findings' },
-    { id: '4', activity: 'Completed Machine Learning course with A', postIdea: 'Share key learnings and project outcomes' },
-    { id: '5', activity: 'Volunteer teaching coding to kids', postIdea: 'Post about the impact of tech education' },
-];
-
-// Connection targets for networking
-const connectionTargets: ConnectionStrategy[] = [
-    {
-        target: 'Google Recruiters',
-        reason: 'Target company for internship',
-        messageTemplate: "Hi! I'm a CS student at UC Riverside interested in Google's SWE internship. I'd love to connect and learn about the intern experience.",
-        status: 'pending',
-    },
-    {
-        target: 'Meta University Recruiters',
-        reason: 'Target company for internship',
-        messageTemplate: "Hello! I'm passionate about building products that connect people. Would love to learn about Meta's internship opportunities.",
-        status: 'pending',
-    },
-    {
-        target: 'UCR CS Alumni at FAANG',
-        reason: 'Alumni network at target companies',
-        messageTemplate: "Hi! Fellow UCR CS student here. I'd love to connect and hear about your journey from UCR to [Company].",
-        status: 'pending',
-    },
-    {
-        target: 'ML/AI Engineers',
-        reason: 'Interest area networking',
-        messageTemplate: "Hi! I'm an aspiring ML engineer researching [topic]. Would love to connect with fellow ML enthusiasts!",
-        status: 'pending',
-    },
-];
+import { LinkedInProfileGraph } from '@/lib/linkedin/profile-graph';
+import { useDropzone } from 'react-dropzone';
 
 export default function LinkedInPage() {
-    const [sections, setSections] = useState(profileSections);
-    const [posts, setPosts] = useState<Post[]>([]);
-    const [connections, setConnections] = useState(connectionTargets);
-    const [isOptimizing, setIsOptimizing] = useState(false);
-    const [isGeneratingPosts, setIsGeneratingPosts] = useState(false);
-    const [isAutonomous, setIsAutonomous] = useState(false); // Autonomous Mode State
-    const [activeTab, setActiveTab] = useState<'profile' | 'posts' | 'network' | 'control'>('profile');
-    const [automationLog, setAutomationLog] = useState<string[]>([]);
-    const [isRunningAutomation, setIsRunningAutomation] = useState(false);
+    const [profileData, setProfileData] = useState<LinkedInProfileGraph | null>(null);
+    const [isIngesting, setIsIngesting] = useState(false);
+    const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'posts' | 'network'>('overview');
 
-    // Automation Handler
-    const runControlAction = async (action: string, payload: any) => {
-        setIsRunningAutomation(true);
-        setAutomationLog(prev => [...prev, `🚀 Starting ${action}...`]);
+    const onDrop = async (acceptedFiles: File[]) => {
+        const file = acceptedFiles[0];
+        if (!file) return;
+
+        setIsIngesting(true);
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('type', file.name.endsWith('.pdf') ? 'pdf' : 'html');
 
         try {
-            const res = await fetch('/api/linkedin/control', {
+            const res = await fetch('/api/linkedin/ingest', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action, payload })
+                body: formData,
             });
             const data = await res.json();
-
             if (data.success) {
-                setAutomationLog(prev => [...prev, `✅ Success: ${data.message}`]);
-                toast.success(data.message);
-            } else {
-                throw new Error(data.error);
-            }
-        } catch (e: any) {
-            setAutomationLog(prev => [...prev, `❌ Error: ${e.message}`]);
-            toast.error(e.message);
-        } finally {
-            setIsRunningAutomation(false);
-        }
-    };
-
-    // SYNC PROFILE HANDLER
-    const handleSyncProfile = async () => {
-        if (isRunningAutomation) return;
-
-        const confirmSync = confirm("This will open a browser and add your stored Experience and Education to your LinkedIn profile. Proceed?");
-        if (!confirmSync) return;
-
-        // 1. Sync Education (Sample Data)
-        const educationSamples = [
-            { school: 'University of California, Riverside', degree: 'Bachelor of Science', field: 'Computer Science' }
-        ];
-
-        for (const edu of educationSamples) {
-            await runControlAction('addEducation', { education: edu });
-        }
-
-        // 2. Sync Experience (From Activities)
-        // Filter only 'Work' or 'Internship' like activities
-        const workActivities = activitiesForPosts.filter(a => a.activity.includes('Intern') || a.activity.includes('Built') || a.activity.includes('Led'));
-
-        for (const act of workActivities) {
-            // Convert activity string to Experience object
-            // This is a naive conversion for demo purposes
-            const exp = {
-                title: act.activity.split(' ')[0] + ' Role', // Guess title
-                company: 'Self-Employed / Project',
-                description: act.postIdea,
-                startDate: '01/2024',
-                current: true
-            };
-            await runControlAction('addExperience', { experience: exp });
-        }
-
-        toast.success('✅ Profile Sync Complete!');
-    };
-
-    // Overall profile score
-    const profileScore = useMemo(() => {
-        return Math.round(sections.reduce((sum, s) => sum + s.completeness, 0) / sections.length);
-    }, [sections]);
-
-    // Optimize entire profile with AI
-    const handleOptimizeProfile = async () => {
-        setIsOptimizing(true);
-        toast.info('🧠 AI is optimizing your LinkedIn profile...');
-
-        const steps = [
-            'Analyzing current profile (Gap Analysis)...',
-            'Rewriting Headline: "CS Student @ UCR | AI & ML Enthusiast | Building F1 Analytics"...',
-            'Crafting About Section: "Passionate developer bridging the gap between data and human experience..."',
-            'Injecting SEO Keywords: #React #NextJS #MachineLearning #AWS...',
-            'Identifying Skills: Adding "Prompt Engineering", "Full Stack Development"...',
-        ];
-
-        for (const step of steps) {
-            await new Promise(r => setTimeout(r, 1200));
-            toast.info(`✏️ ${step}`);
-        }
-
-        // Update sections to show improvement
-        setSections(prev => prev.map(s => ({
-            ...s,
-            completeness: Math.min(100, s.completeness + 30),
-            status: s.completeness + 30 >= 80 ? 'complete' : 'needs_improvement',
-        })));
-
-        toast.success('✅ Profile optimized! Review changes in LinkedIn.');
-        setIsOptimizing(false);
-    };
-
-    // Generate posts from activities
-    const handleGeneratePosts = async () => {
-        setIsGeneratingPosts(true);
-        toast.info('📝 AI is generating posts from your activities...');
-
-        await new Promise(r => setTimeout(r, 3000));
-
-        const newPosts: Post[] = activitiesForPosts.map((a, i) => ({
-            id: `post-${i}`,
-            content: generatePostContent(a.postIdea),
-            type: i % 4 === 0 ? 'achievement' : i % 4 === 1 ? 'learning' : i % 4 === 2 ? 'insight' : 'project',
-            status: 'draft',
-            source: a.activity,
-        }));
-
-        setPosts(newPosts);
-        toast.success(`✅ Generated ${newPosts.length} posts! Review and schedule.`);
-        setIsGeneratingPosts(false);
-    };
-
-    // Generate post content (would use Claude in production)
-    const generatePostContent = (idea: string): string => {
-        const templates = [
-            `🚀 Excited to share: ${idea}\n\nKey takeaways:\n• [Point 1]\n• [Point 2]\n• [Point 3]\n\nWhat's your experience with this? 👇\n\n#SoftwareEngineering #Tech #Learning`,
-            `💡 ${idea}\n\nThis taught me:\n1️⃣ [Lesson 1]\n2️⃣ [Lesson 2]\n3️⃣ [Lesson 3]\n\nWould love to hear your thoughts!\n\n#ComputerScience #Growth`,
-            `🎯 Just wrapped up: ${idea}\n\nThe journey was incredible. Here's what I learned...\n\n[Full story]\n\n#Coding #StudentLife #TechCommunity`,
-        ];
-        return templates[Math.floor(Math.random() * templates.length)];
-    };
-
-    // Schedule post
-    const schedulePost = (postId: string, date: Date) => {
-        setPosts(prev => prev.map(p =>
-            p.id === postId ? { ...p, status: 'scheduled', scheduledDate: date } : p
-        ));
-        toast.success('📅 Post scheduled!');
-    };
-
-    // Post now
-    const postNow = async (postId: string) => {
-        toast.info('📤 Publishing to LinkedIn...');
-        await new Promise(r => setTimeout(r, 2000));
-        setPosts(prev => prev.map(p =>
-            p.id === postId ? { ...p, status: 'posted', likes: 0, comments: 0 } : p
-        ));
-        toast.success('✅ Posted to LinkedIn!');
-    };
-
-    // Autonomous Mode Logic
-    useEffect(() => {
-        if (!isAutonomous) return;
-
-        const performAutonomousAction = async () => {
-            if (isRunningAutomation) return; // Don't overlap
-
-            // INTELLIGENCE ENGINE
-            // 1. Decide what to do based on random probability weighted by priorities
-            const dice = Math.random();
-            let action = '';
-            let payload = {};
-            let logMsg = '';
-
-            // 10% chance to Post (if not recently posted)
-            // 40% chance to Engage (Like posts)
-            // 30% chance to Connect
-            // 20% chance to Idle/Sleep
-
-            if (dice < 0.1) {
-                action = 'createPost';
-                // Pick a random idea
-                const idea = activitiesForPosts[Math.floor(Math.random() * activitiesForPosts.length)].postIdea;
-                const content = generatePostContent(idea);
-                payload = { content };
-                logMsg = '🤖 AI Decision: Creating a new thought leadership post...';
-            } else if (dice < 0.5) {
-                action = 'engageFeed';
-                payload = { count: Math.floor(Math.random() * 3) + 1 };
-                logMsg = '🤖 AI Decision: Engaging with network feed...';
-            } else if (dice < 0.8) {
-                action = 'connectPeople';
-                const targets = ['Software Engineer', 'Recruiter', 'Product Manager', 'Founder'];
-                const kw = targets[Math.floor(Math.random() * targets.length)];
-                payload = { keywords: kw, limit: 1 };
-                logMsg = `🤖 AI Decision: Expanding network (Searching "${kw}")...`;
-            } else {
-                setAutomationLog(prev => [...prev, '💤 AI Decision: Idling for a moment...']);
-                return;
-            }
-
-            // Execute
-            setAutomationLog(prev => [...prev, logMsg]);
-
-            try {
-                // Call the API control route
-                await fetch('/api/linkedin/control', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action, payload })
+                setProfileData({
+                    snapshot: data.snapshot,
+                    recommendations: data.analysis.recommendations,
+                    score: data.analysis.score,
                 });
-                setAutomationLog(prev => [...prev, `✅ Action "${action}" completed.`]);
-
-                // Update local state if needed
-                if (action === 'createPost') {
-                    setPosts(prev => [
-                        { id: `auto-${Date.now()}`, content: (payload as any).content, type: 'insight', status: 'posted', likes: 0, comments: 0, scheduledDate: new Date() },
-                        ...prev
-                    ]);
-                }
-
-            } catch (e: any) {
-                setAutomationLog(prev => [...prev, `❌ Auto Action Failed: ${e.message}`]);
+                toast.success('Profile ingested successfully!');
+                setActiveTab('profile');
+            } else {
+                toast.error(data.error || 'Failed to ingest profile');
             }
-        };
-
-        const interval = setInterval(performAutonomousAction, 15000); // Check every 15s (Aggressive for demo, slow down in prod)
-        return () => clearInterval(interval);
-    }, [isAutonomous, isRunningAutomation, posts]);
-
-    // Send connection requests
-    const handleSendConnections = async () => {
-        toast.info('📨 Sending connection requests...');
-
-        for (let i = 0; i < connections.length; i++) {
-            await new Promise(r => setTimeout(r, 1000));
-            setConnections(prev => prev.map((c, idx) =>
-                idx === i ? { ...c, status: 'sent' } : c
-            ));
+        } catch (err) {
+            toast.error('Error uploading profile');
+        } finally {
+            setIsIngesting(false);
         }
-
-        toast.success(`✅ Sent ${connections.length} connection requests!`);
     };
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop,
+        accept: {
+            'application/pdf': ['.pdf'],
+            'text/html': ['.html', '.htm']
+        },
+        multiple: false
+    });
 
     return (
         <motion.div
@@ -402,302 +73,191 @@ export default function LinkedInPage() {
                 <div>
                     <h1 className="text-3xl font-bold flex items-center gap-3" style={{ fontFamily: 'var(--font-display)' }}>
                         <Linkedin className="w-8 h-8" style={{ color: '#0077B5' }} />
-                        LinkedIn Manager
+                        LinkedIn Intelligence
                     </h1>
                     <p style={{ color: 'var(--text-secondary)' }}>
-                        AI-powered profile optimization, post generation, and networking
+                        Ingest your profile data to get AI-powered optimizations and growth strategies.
                     </p>
                 </div>
 
-                <div className="flex gap-3">
-                    <a href="https://www.linkedin.com/in/aarav-shah-9b878329a/" target="_blank" rel="noopener noreferrer">
-                        <Button variant="secondary" icon={<Globe className="w-4 h-4" />}>
-                            View Profile
+                {profileData && (
+                    <div className="flex gap-3">
+                        <Button
+                            variant="secondary"
+                            icon={<RefreshCw className="w-4 h-4" />}
+                            onClick={() => setProfileData(null)}
+                        >
+                            Reset Snapshot
                         </Button>
-                    </a>
-                    <Button
-                        icon={isOptimizing ? <Sparkles className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-                        onClick={handleOptimizeProfile}
-                        disabled={isOptimizing}
-                    >
-                        {isOptimizing ? 'Optimizing...' : 'AI Optimize All'}
-                    </Button>
-                </div>
+                    </div>
+                )}
             </div>
 
-            {/* Profile Score & Connectivity */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card style={{ background: 'linear-gradient(135deg, rgba(0,119,181,0.1) 0%, rgba(91,111,242,0.1) 100%)' }}>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h3 className="font-medium mb-1">Profile Strength</h3>
-                            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                                {profileScore >= 80 ? 'All-Star' : profileScore >= 60 ? 'Intermediate' : 'Beginner'} Profile
-                            </p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-4xl font-bold" style={{ color: '#0077B5' }}>{profileScore}%</p>
-                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                                {100 - profileScore}% to All-Star
-                            </p>
-                        </div>
+            {/* Ingestion Area (If no data) */}
+            {!profileData && (
+                <Card className="p-12 border-2 border-dashed border-gray-200 flex flex-col items-center text-center space-y-4 hover:border-blue-400 transition-colors cursor-pointer" {...getRootProps()}>
+                    <input {...getInputProps()} />
+                    <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 mb-2">
+                        {isIngesting ? <RefreshCw className="w-8 h-8 animate-spin" /> : <Upload className="w-8 h-8" />}
                     </div>
-                    <div className="mt-3">
-                        <ProgressBar value={profileScore} />
-                    </div>
-                </Card>
-
-                <Card className={`${isAutonomous ? 'ring-2 ring-green-500 bg-green-500/10' : ''}`}>
-                    <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-medium flex items-center gap-2">
-                            <Target className="w-5 h-5 text-red-500" />
-                            Autonomous Agent
-                        </h3>
-                        <div className={`px-2 py-0.5 rounded-full text-xs font-bold ${isAutonomous ? 'bg-green-500 text-white' : 'bg-gray-500/20 text-gray-500'}`}>
-                            {isAutonomous ? 'ACTIVE' : 'OFF'}
-                        </div>
-                    </div>
-                    <p className="text-sm text-gray-400 mb-4">
-                        Let the AI manage your profile, connection requests, and posts automatically.
-                    </p>
-                    <Button
-                        size="sm"
-                        className={`w-full ${isAutonomous ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
-                        onClick={() => setIsAutonomous(!isAutonomous)}
-                        icon={isAutonomous ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                    >
-                        {isAutonomous ? 'Stop Auto-Pilot' : 'Activate Auto-Pilot'}
-                    </Button>
-                </Card>
-
-            </div>
-
-            {/* Manual Cookie Auth (For Headless Environments) */}
-            <Card className="bg-blue-500/10 border-blue-500/20">
-                <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                        <h3 className="font-medium flex items-center gap-2">
-                            <Lock className="w-4 h-4 text-blue-400" />
-                            Manual Login (Headless Mode)
-                        </h3>
-                        <p className="text-xs text-gray-400 mt-1">
-                            If the browser window doesn't appear, paste your <code>li_at</code> cookie here to log in.
+                    <div>
+                        <h3 className="text-xl font-bold">Ingest LinkedIn Data</h3>
+                        <p className="text-gray-500 max-w-md mx-auto">
+                            Upload your LinkedIn "Profile PDF" or "Download your data" HTML export to begin the analysis.
                         </p>
                     </div>
-                    <div className="flex gap-2">
-                        <input
-                            type="password"
-                            placeholder="Paste li_at cookie..."
-                            className="bg-black/50 border border-white/10 rounded px-3 py-1.5 text-sm w-48 focus:outline-none focus:border-blue-500"
-                            id="cookie-input"
-                        />
-                        <Button
-                            size="sm"
-                            variant="primary"
-                            onClick={() => {
-                                const input = document.getElementById('cookie-input') as HTMLInputElement;
-                                if (input.value) {
-                                    runControlAction('setCookie', { cookie: input.value });
-                                    input.value = '';
-                                } else {
-                                    toast.error('Please paste a cookie first');
-                                }
-                            }}
-                        >
-                            Set Cookie
-                        </Button>
+                    <div className="flex gap-4 text-xs font-semibold text-gray-400 uppercase tracking-widest mt-4">
+                        <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> No Scraper Required</span>
+                        <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Privacy Focused</span>
                     </div>
-                </div>
-            </Card>
-
-            {/* Tabs */}
-            <div className="flex gap-2 p-1 rounded-xl" style={{ background: 'var(--bg-secondary)' }}>
-                {[
-                    { key: 'profile', label: 'Profile Sections', icon: User },
-                    { key: 'posts', label: 'Content & Posts', icon: FileText },
-                    { key: 'network', label: 'Networking', icon: Users },
-                    { key: 'control', label: 'Full Control', icon: Settings },
-                ].map(({ key, label, icon: Icon }) => (
-                    <button
-                        key={key}
-                        onClick={() => setActiveTab(key as any)}
-                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all`}
-                        style={{
-                            background: activeTab === key ? 'var(--gradient-primary)' : 'transparent',
-                            color: activeTab === key ? 'white' : 'var(--text-secondary)',
-                        }}
-                    >
-                        <Icon className="w-4 h-4" />
-                        {label}
-                    </button>
-                ))}
-            </div>
-
-            {/* Tab Content */}
-            <AnimatePresence mode="wait">
-                {activeTab === 'profile' && (
-                    <motion.div
-                        key="profile"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                    >
-                        {/* Using the new Profile Review Engine */}
-                        <ProfileReview userId="user_123" />
-                    </motion.div>
-                )}
-
-                {activeTab === 'posts' && (
-                    <motion.div
-                        key="posts"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="space-y-4"
-                    >
-                        <Card className="bg-blue-50">
-                            <h3 className="font-bold text-blue-900 mb-2">Automated Content Strategy</h3>
-                            <p className="text-sm text-blue-700 mb-4">
-                                This calendar is populated by the Post Factory based on your activities.
-                                Posts are optimized for "Hook Score" and "Readability".
-                            </p>
-                            <Button
-                                icon={isGeneratingPosts ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                                onClick={handleGeneratePosts}
-                                disabled={isGeneratingPosts}
-                            >
-                                {isGeneratingPosts ? 'Generating Variants...' : 'Run Post Factory'}
-                            </Button>
-                        </Card>
-
-                        <ContentCalendar schedule={[
-                            { date: new Date(), post: { type: 'story', content: 'Launched my new project today!', hookScore: 9.2 } },
-                            { date: new Date(Date.now() + 86400000 * 2), post: { type: 'technical', content: 'Deep dive into Next.js App Router...', hookScore: 8.5 } },
-                            { date: new Date(Date.now() + 86400000 * 5), post: { type: 'lesson', content: '3 things I learned about TypeScript enums.', hookScore: 7.8 } },
-                        ]} />
-                    </motion.div>
-                )}
-
-                {activeTab === 'network' && (
-                    <motion.div
-                        key="network"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="space-y-4"
-                    >
-                        {/* Networking Strategy */}
-                        <Card>
-                            <div className="flex items-center justify-between mb-4">
-                                <div>
-                                    <h3 className="font-medium">Strategic Connections</h3>
-                                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                                        AI-suggested connections to grow your network
-                                    </p>
-                                </div>
-                                <Button
-                                    icon={<Send className="w-4 h-4" />}
-                                    onClick={handleSendConnections}
-                                >
-                                    Send All Requests
-                                </Button>
-                            </div>
-
-                            <div className="space-y-3">
-                                {connections.map((conn, index) => (
-                                    <div key={index} className="p-3 rounded-xl" style={{ background: 'var(--bg-secondary)' }}>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'var(--bg-tertiary)' }}>
-                                                    <Users className="w-4 h-4" />
-                                                </div>
-                                                <div>
-                                                    <p className="font-medium text-sm">{conn.target}</p>
-                                                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{conn.reason}</p>
-                                                </div>
-                                            </div>
-                                            <StatusBadge status={
-                                                conn.status === 'connected' ? 'success' :
-                                                    conn.status === 'sent' ? 'warning' : 'neutral'
-                                            }>
-                                                {conn.status}
-                                            </StatusBadge>
-                                        </div>
-                                        <p className="text-xs p-2 rounded-lg" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}>
-                                            📝 {conn.messageTemplate}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-                        </Card>
-
-                        {/* Stats */}
-                        <div className="grid grid-cols-4 gap-4">
-                            <Card className="text-center">
-                                <Users className="w-6 h-6 mx-auto mb-2" style={{ color: '#0077B5' }} />
-                                <p className="text-2xl font-bold">500+</p>
-                                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Connections</p>
-                            </Card>
-                            <Card className="text-center">
-                                <Eye className="w-6 h-6 mx-auto mb-2" style={{ color: 'var(--success)' }} />
-                                <p className="text-2xl font-bold">1.2K</p>
-                                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Profile Views</p>
-                            </Card>
-                            <Card className="text-center">
-                                <TrendingUp className="w-6 h-6 mx-auto mb-2" style={{ color: 'var(--warning)' }} />
-                                <p className="text-2xl font-bold">45</p>
-                                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Search Appearances</p>
-                            </Card>
-                            <Card className="text-center">
-                                <Heart className="w-6 h-6 mx-auto mb-2" style={{ color: 'var(--error)' }} />
-                                <p className="text-2xl font-bold">89</p>
-                                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Post Impressions</p>
-                            </Card>
+                    {isDragActive && (
+                        <div className="absolute inset-0 bg-blue-500/10 flex items-center justify-center rounded-xl">
+                            <p className="font-bold text-blue-600">Drop your file here</p>
                         </div>
-                    </motion.div>
-                )}
+                    )}
+                </Card>
+            )}
 
-                {activeTab === 'control' && (
-                    <motion.div
-                        key="control"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="space-y-4"
-                    >
-                        <ActionCenter
-                            items={[
-                                {
-                                    id: '1',
-                                    type: 'message',
-                                    title: 'Reply to Recruiter',
-                                    contentToCopy: "Hi Sarah, thanks for reaching out! I'm definitely interested in learning more about the role.",
-                                    destinationUrl: 'https://linkedin.com/messaging',
-                                    priority: 1
-                                },
-                                {
-                                    id: '2',
-                                    type: 'post',
-                                    title: 'Post about New Feature',
-                                    contentToCopy: "Just shipped the new Automation Engine! 🚀 #Coding #ShipIt",
-                                    destinationUrl: 'https://linkedin.com/feed',
-                                    priority: 2
-                                },
-                                {
-                                    id: '3',
-                                    type: 'profile_update',
-                                    title: 'Update Headline',
-                                    contentToCopy: "CS Student @ UCR | AI & ML Enthusiast | Building F1 Analytics",
-                                    destinationUrl: 'https://linkedin.com/in/me',
-                                    priority: 3
-                                }
-                            ]}
-                            onComplete={(id) => toast.success(`Action ${id} marked complete!`)}
-                        />
-                    </motion.div>
-                )}
+            {profileData && (
+                <>
+                    {/* Tabs */}
+                    <div className="flex gap-2 p-1 rounded-xl" style={{ background: 'var(--bg-secondary)' }}>
+                        {[
+                            { key: 'overview', label: 'Overview', icon: TrendingUp },
+                            { key: 'profile', label: 'Profile Optimization', icon: User },
+                            { key: 'posts', label: 'Content Factory', icon: FileCode },
+                            { key: 'network', label: 'Strategic Growth', icon: Users },
+                        ].map(({ key, label, icon: Icon }) => (
+                            <button
+                                key={key}
+                                onClick={() => setActiveTab(key as any)}
+                                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all`}
+                                style={{
+                                    background: activeTab === key ? 'var(--gradient-primary)' : 'transparent',
+                                    color: activeTab === key ? 'white' : 'var(--text-secondary)',
+                                }}
+                            >
+                                <Icon className="w-4 h-4" />
+                                {label}
+                            </button>
+                        ))}
+                    </div>
 
-            </AnimatePresence >
-        </motion.div >
+                    {/* Tab Content */}
+                    <AnimatePresence mode="wait">
+                        {activeTab === 'overview' && (
+                            <motion.div
+                                key="overview"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                className="grid grid-cols-1 md:grid-cols-2 gap-6"
+                            >
+                                <Card className="p-6 space-y-4">
+                                    <h3 className="font-bold text-lg flex items-center gap-2">
+                                        <Rocket className="w-5 h-5 text-blue-500" />
+                                        Your Profile Snapshot
+                                    </h3>
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                                            <span className="text-sm font-medium">Full Name</span>
+                                            <span className="text-sm text-gray-600 font-bold">{profileData.snapshot.fullName}</span>
+                                        </div>
+                                        <div className="p-3 bg-gray-50 rounded-lg">
+                                            <span className="text-sm font-medium block mb-1">Headline</span>
+                                            <span className="text-sm text-gray-600 italic">"{profileData.snapshot.headline}"</span>
+                                        </div>
+                                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                                            <span className="text-sm font-medium">Positions Detected</span>
+                                            <span className="text-sm text-gray-600 font-bold">{profileData.snapshot.positions.length}</span>
+                                        </div>
+                                    </div>
+                                </Card>
+
+                                <Card className="p-6 space-y-4">
+                                    <h3 className="font-bold text-lg flex items-center gap-2">
+                                        <Zap className="w-5 h-5 text-yellow-500" />
+                                        Quick Actions
+                                    </h3>
+                                    <div className="space-y-2">
+                                        <Button
+                                            className="w-full justify-between"
+                                            variant="secondary"
+                                            onClick={() => setActiveTab('profile')}
+                                            icon={<ChevronRight className="w-4 h-4" />}
+                                        >
+                                            Fix {profileData.recommendations.length} profile issues
+                                        </Button>
+                                        <Button
+                                            className="w-full justify-between"
+                                            variant="secondary"
+                                            onClick={() => setActiveTab('posts')}
+                                            icon={<ChevronRight className="w-4 h-4" />}
+                                        >
+                                            Generate post from latest activity
+                                        </Button>
+                                    </div>
+                                </Card>
+                            </motion.div>
+                        )}
+
+                        {activeTab === 'profile' && (
+                            <motion.div
+                                key="profile"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                            >
+                                <ProfileReview data={profileData} onRefresh={() => setProfileData(null)} />
+                            </motion.div>
+                        )}
+
+                        {activeTab === 'posts' && (
+                            <motion.div
+                                key="posts"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                className="space-y-4"
+                            >
+                                <Card className="bg-blue-50 p-6">
+                                    <h3 className="font-bold text-blue-900 mb-2">Automated Content Strategy</h3>
+                                    <p className="text-sm text-blue-700 mb-4">
+                                        Generate engagement-optimized posts from your activities and achievements.
+                                        Every claim is verified against your internal data.
+                                    </p>
+                                    <Button icon={<Sparkles className="w-4 h-4" />}>
+                                        Run Post Factory
+                                    </Button>
+                                </Card>
+                                <ContentCalendar schedule={[]} />
+                            </motion.div>
+                        )}
+
+                        {activeTab === 'network' && (
+                            <motion.div
+                                key="network"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                className="space-y-4"
+                            >
+                                <Card className="p-8 text-center space-y-4">
+                                    <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 mx-auto">
+                                        <Users className="w-8 h-8" />
+                                    </div>
+                                    <h3 className="text-xl font-bold">Strategic Growth Explorer</h3>
+                                    <p className="text-gray-500 max-w-md mx-auto">
+                                        Discover high-relevance networking targets from off-platform sources (tech blogs, GitHub, alumni pages).
+                                    </p>
+                                    <Button variant="secondary">Initialize Target Discovery</Button>
+                                </Card>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </>
+            )}
+        </motion.div>
     );
 }
+
