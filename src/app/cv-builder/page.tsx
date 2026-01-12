@@ -100,6 +100,7 @@ export default function CVBuilderPage() {
 
     // Generation state
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
     const [generatedCV, setGeneratedCV] = useState('');
 
     // AI Config
@@ -312,6 +313,44 @@ ${a.description}
         toast.success('📋 CV copied to clipboard!');
     };
 
+    // Download PDF
+    const handleDownloadPDF = async () => {
+        if (!generatedCV) return;
+
+        setIsDownloading(true);
+        toast.info('📝 Preparing your PDF...');
+
+        try {
+            const response = await fetch('/api/cv/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    markdown: generatedCV,
+                    profile: profile
+                }),
+            });
+
+            if (!response.ok) throw new Error('Failed to generate PDF');
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `CV_${profile?.name?.replace(/\s+/g, '_') || 'Professional'}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            toast.success('✅ PDF downloaded successfully!');
+        } catch (error) {
+            console.error('PDF download error:', error);
+            toast.error('Failed to download PDF. Please try again.');
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
     // Save profile
     const handleSaveProfile = () => {
         setProfile(profileForm);
@@ -479,6 +518,15 @@ ${a.description}
                         </h3>
                         {generatedCV && (
                             <div className="flex gap-2">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleDownloadPDF}
+                                    loading={isDownloading}
+                                    icon={<Download className="w-4 h-4" />}
+                                >
+                                    Download
+                                </Button>
                                 <Button
                                     variant="ghost"
                                     size="sm"
