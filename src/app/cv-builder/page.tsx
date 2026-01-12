@@ -160,22 +160,28 @@ export default function CVBuilderPage() {
 
         try {
             const systemPrompt = mode === 'job'
-                ? `You are an expert resume writer specializing in ATS-optimized resumes. Create a professional CV that:
-- Matches keywords from the job description
-- Quantifies achievements with numbers
-- Uses strong action verbs
-- Is concise and scannable
-- Highlights relevant experience first
+                ? `You are a world-class executive resume writer. Your goal is to create a high-impact, ATS-optimized professional CV tailored to a specific job description.
 
-Format the CV in clean markdown with clear sections.`
-                : `You are an expert at creating CVs for college applications. Create a CV that:
-- Emphasizes leadership and initiative
-- Shows breadth of interests and depth of commitment
-- Highlights academic achievements
-- Connects to ${college.name}'s values: ${college.research.values.join(', ')}
-- What ${college.name} looks for: ${college.research.whatTheyLookFor.join(', ')}
+STRICT GUIDELINES:
+1. TAILORING: Analyze the job description and PRIORITIZE experiences that match required skills. Ignore irrelevant activities.
+2. BULLET POINTS: Use the "Action-Result" (X-Y-Z) formula: Accomplished [X] as measured by [Y], by doing [Z].
+3. QUANTIFY: Use metrics (%, $, numbers) wherever possible to show impact.
+4. TONE: Professional, modern, and high-energy. Use strong action verbs (e.g., spearheaded, engineered, optimized).
+5. STRUCTURE: Professional Summary -> Skills -> Experience -> Education -> Achievements.
+6. CONCISION: Keep bullet points tight and readable. Limit to the top 5-7 most relevant activities/experiences.
 
-Format the CV in clean markdown with clear sections.`;
+Format in clean Markdown using ## for sections and ### for job titles/roles.`
+                : `You are an expert college admissions consultant for elite universities (Ivy League, MIT, Stanford). Your goal is to create a compelling CV that showcases a student's unique "spike" and fit for a specific institution.
+
+STRICT GUIDELINES:
+1. ALIGNMENT: Explicitly map the student's activities to the college's core values: ${college.research.values.join(', ')}.
+2. IMPACT: Focus on leadership, initiative, and community impact. Use the "Context-Action-Result-Learning" framework.
+3. PRIORITIZATION: Select only the most significant activities (Top 6-8) that demonstrate depth of commitment.
+4. PERSONALITY: The professional summary should reflect a clear vision and intellectual vitality.
+5. VALUES: Highlight experiences that directly speak to what ${college.name} looks for: ${college.research.whatTheyLookFor.join(', ')}.
+6. STRUCTURE: About Me -> Academic Achievements -> Significant Activities -> Honors/Awards -> Additional Info.
+
+Format in clean Markdown using ## for sections and ### for activity/achievement titles.`;
 
             const activitiesText = activities.map(a =>
                 `- ${a.name} | ${a.role} at ${a.organization} (${a.startDate} - ${a.endDate}): ${a.description}`
@@ -186,53 +192,35 @@ Format the CV in clean markdown with clear sections.`;
             ).join('\n');
 
             const userMessage = mode === 'job'
-                ? `Create a professional CV for this person targeting this job:
-
-PERSONAL INFO:
-Name: ${profile.name}
-Email: ${profile.email}
-Phone: ${profile.phone || 'Not provided'}
-Location: ${profile.location || 'Not provided'}
-${profile.linkedin ? `LinkedIn: ${profile.linkedin}` : ''}
-${profile.github ? `GitHub: ${profile.github}` : ''}
-
-PROFESSIONAL SUMMARY:
-${profile.summary || 'Create a compelling summary based on my experience'}
-
-MY ACTIVITIES & EXPERIENCE:
-${activitiesText || 'No activities provided'}
-
-MY ACHIEVEMENTS:
-${achievementsText || 'No achievements provided'}
-
-JOB DESCRIPTION TO TARGET:
+                ? `Help me win this job! Generate a tailored CV for:
+                
+JOB DESCRIPTION:
 ${jobDescription || 'General software engineering position'}
 
-Create a tailored, ATS-friendly CV in markdown format.`
-                : `Create a CV for college application to ${college.name}:
+USER DATA:
+- Name: ${profile.name}
+- Current Summary: ${profile.summary || 'Analyze my experience and create a new one'}
+- Experience Items:
+${activitiesText}
+- Honors/Achievements:
+${achievementsText}
 
-PERSONAL INFO:
-Name: ${profile.name}
-Email: ${profile.email}
-Phone: ${profile.phone || 'Not provided'}
-Location: ${profile.location || 'Not provided'}
-${profile.linkedin ? `LinkedIn: ${profile.linkedin}` : ''}
-${profile.github ? `GitHub: ${profile.github}` : ''}
-
-ABOUT ME:
-${profile.summary || 'Create a compelling summary based on my activities'}
-
-MY ACTIVITIES & EXPERIENCE:
-${activitiesText || 'No activities provided'}
-
-MY ACHIEVEMENTS:
-${achievementsText || 'No achievements provided'}
+Focus ONLY on the data that makes me a strong candidate for this specific role. If an activity isn't relevant to the JD, de-emphasize or omit it.`
+                : `Help me get accepted to ${college.name}! Generate a compelling, values-aligned CV.
 
 TARGET COLLEGE: ${college.fullName}
-College Values: ${college.research.values.join(', ')}
-What They Look For: ${college.research.whatTheyLookFor.join(', ')}
+Institutional Values: ${college.research.values.join(', ')}
+Preferences: ${college.research.whatTheyLookFor.join(', ')}
 
-Create a compelling CV that showcases my fit for ${college.name} in markdown format.`;
+STUDENT DATA:
+- Name: ${profile.name}
+- Vision/Summary: ${profile.summary || 'Synthesize a vision from my activities'}
+- Activities:
+${activitiesText}
+- Honors:
+${achievementsText}
+
+Strategically select and frame these items to show how I perfectly embody ${college.name}'s ideal student profile.`;
 
             // Call AI
             const response = await fetch('/api/ai/generate', {

@@ -116,75 +116,96 @@ function convertMarkdownToCVHtml(markdown: string, profile: any): string {
         
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            line-height: 1.4;
-            color: #1a1a1a;
+            line-height: 1.5;
+            color: #111;
             margin: 0;
             padding: 0;
             font-size: 10pt;
+            -webkit-font-smoothing: antialiased;
         }
 
         .header {
             text-align: center;
-            margin-bottom: 10pt;
+            margin-bottom: 8pt;
         }
 
         h1 {
-            font-size: 20pt;
-            margin: 0 0 5pt 0;
+            font-size: 21pt;
+            margin: 0 0 4pt 0;
             color: #000;
             font-weight: 700;
+            letter-spacing: -0.5pt;
         }
 
         h2 {
-            font-size: 13pt;
-            margin-top: 15pt;
-            margin-bottom: 5pt;
-            border-bottom: 1pt solid #333;
-            color: #222;
-            font-weight: 600;
+            font-size: 12pt;
+            margin-top: 14pt;
+            margin-bottom: 6pt;
+            border-bottom: 0.8pt solid #000;
+            color: #000;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.5pt;
+            letter-spacing: 1pt;
             page-break-after: avoid;
         }
 
         h3 {
-            font-size: 11pt;
+            font-size: 10.5pt;
             margin-top: 10pt;
             margin-bottom: 2pt;
             font-weight: 600;
-            color: #333;
+            color: #111;
             page-break-after: avoid;
         }
 
-        p, li {
+        p {
+            margin: 0 0 6pt 0;
+        }
+
+        li {
             margin-bottom: 3pt;
         }
 
         ul {
-            padding-left: 15pt;
+            padding-left: 14pt;
             margin-top: 2pt;
-            margin-bottom: 5pt;
+            margin-bottom: 8pt;
         }
 
         .header-info {
-            margin-bottom: 2pt;
-            color: #444;
+            margin-bottom: 1pt;
+            color: #333;
             font-size: 9pt;
+            font-weight: 450;
         }
 
         .header-info span {
-            margin: 0 2pt;
+            margin: 0 1pt;
         }
 
         .contact-link {
             text-decoration: none;
-            color: #444;
+            color: #333;
+            border-bottom: 0.5pt solid transparent;
+        }
+
+        .contact-link:hover {
+            border-bottom-color: #333;
         }
 
         hr {
-            border: none;
-            border-top: 0.5pt solid #ccc;
-            margin: 8pt 0;
+            display: none; /* We use border-bottom on H2 instead */
+        }
+
+        /* Entry metadata like date/location */
+        em {
+            font-style: italic;
+            color: #444;
+            font-size: 9.5pt;
+        }
+
+        strong {
+            font-weight: 600;
         }
 
         /* Spacing for sections */
@@ -194,7 +215,7 @@ function convertMarkdownToCVHtml(markdown: string, profile: any): string {
 
         @page {
             size: A4;
-            margin: 15mm;
+            margin: 18mm 15mm;
         }
     </style>
 </head>
