@@ -108,7 +108,26 @@ export default function CVBuilderPage() {
     const [apiKeyInput, setApiKeyInput] = useState('');
     const [selectedProvider, setSelectedProvider] = useState<AIProvider>('gemini');
 
+    const [hasServerKey, setHasServerKey] = useState(false);
+
     useEffect(() => {
+        const checkServerKey = async () => {
+            try {
+                const response = await fetch('/api/ai/generate');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.available && data.providers.claude) {
+                        setHasServerKey(true);
+                        setAiConfig({ provider: 'claude', apiKey: 'env' });
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to check server key:', err);
+            }
+        };
+
+        checkServerKey();
+
         const config = getAIConfig();
         if (config) setAiConfig(config);
     }, []);
@@ -123,7 +142,7 @@ export default function CVBuilderPage() {
 
     // Generate CV
     const handleGenerateCV = async () => {
-        if (!aiConfig) {
+        if (!aiConfig && !hasServerKey) {
             setShowAPIKeyModal(true);
             toast.error('Please set up an AI API key first');
             return;
@@ -219,8 +238,8 @@ Create a compelling CV that showcases my fit for ${college.name} in markdown for
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    provider: aiConfig.provider,
-                    apiKey: aiConfig.apiKey,
+                    provider: aiConfig?.provider || 'claude',
+                    apiKey: aiConfig?.apiKey === 'env' ? '' : aiConfig?.apiKey,
                     systemPrompt,
                     userMessage,
                 }),
@@ -325,7 +344,7 @@ ${a.description}
                     >
                         {hasProfile ? 'Edit Profile' : 'Setup Profile'}
                     </Button>
-                    {!aiConfig && (
+                    {!hasServerKey && !aiConfig && (
                         <Button
                             variant="secondary"
                             onClick={() => setShowAPIKeyModal(true)}
