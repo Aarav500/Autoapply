@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
         await browser.close();
 
         // 5. Return PDF as stream
-        return new NextResponse(pdfBuffer, {
+        return new NextResponse(new Blob([pdfBuffer], { type: 'application/pdf' }), {
             headers: {
                 'Content-Type': 'application/pdf',
                 'Content-Disposition': `attachment; filename="CV_${profile?.name?.replace(/\s+/g, '_') || 'Professional'}.pdf"`,
