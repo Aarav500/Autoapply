@@ -44,7 +44,8 @@ export async function POST(request: NextRequest) {
         await browser.close();
 
         // 5. Return PDF as stream
-        return new NextResponse(new Blob([pdfBuffer], { type: 'application/pdf' }), {
+        // We use standard Response and cast to any to bypass the SharedArrayBuffer vs ArrayBuffer type mismatch in this environment
+        return new Response(pdfBuffer as any, {
             headers: {
                 'Content-Type': 'application/pdf',
                 'Content-Disposition': `attachment; filename="CV_${profile?.name?.replace(/\s+/g, '_') || 'Professional'}.pdf"`,
