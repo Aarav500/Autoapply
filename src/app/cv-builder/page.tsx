@@ -523,10 +523,15 @@ When the admissions officer finishes reading, they should think: "This student i
             });
 
             if (!response.ok) {
+                // Log error details
+                const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                console.error('AI API Error:', errorData);
+                toast.error(`AI Generation Failed: ${errorData.message || errorData.error || 'Unknown error'}`);
+
                 // Fallback: Generate locally with template
                 const fallbackCV = generateFallbackCV(profile, activities, achievements, mode, college);
                 setGeneratedCV(fallbackCV);
-                toast.success('✨ CV generated with template!');
+                toast.warning('⚠️ Using fallback template - Configure AI API key in Settings for AI-powered generation');
             } else {
                 const data = await response.json();
                 const generatedText = data.text;
@@ -565,10 +570,12 @@ When the admissions officer finishes reading, they should think: "This student i
             }
         } catch (error) {
             console.error('CV generation error:', error);
+            toast.error(`Generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
             // Use fallback
             const fallbackCV = generateFallbackCV(profile, activities, achievements, mode, college);
             setGeneratedCV(fallbackCV);
-            toast.success('✨ CV generated with template!');
+            toast.warning('⚠️ Using fallback template - Check console for errors');
         } finally {
             setIsGenerating(false);
         }
