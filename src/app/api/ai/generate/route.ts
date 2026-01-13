@@ -24,8 +24,9 @@ async function callClaude(apiKey: string, systemPrompt: string, userMessage: str
             'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-            model: 'claude-3-opus-20240229',
-            max_tokens: 4096,
+            model: 'claude-opus-4-5-20251101',
+            max_tokens: 8192,
+            temperature: 0.3,
             system: systemPrompt,
             messages: [{ role: 'user', content: userMessage }],
         }),
@@ -74,7 +75,8 @@ async function callOpenAI(apiKey: string, systemPrompt: string, userMessage: str
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userMessage },
             ],
-            max_tokens: 4096,
+            max_tokens: 8192,
+            temperature: 0.3,
         }),
     });
 
