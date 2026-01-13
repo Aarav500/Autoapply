@@ -314,16 +314,13 @@ ${qualityChecklist.map(item => item).join('\n')}
 ═══════════════════════════════════════════════════════════════════
 
 REMEMBER: This CV needs to get past ATS (keyword match) AND impress human recruiters (compelling narrative). You're not just listing experiences—you're telling the story of why this candidate is THE perfect hire.`;
-            }
 
-            // Now continue with the userMessage construction for job mode only
-            if (mode === 'job') {
+                // Now construct the userMessage for job mode
                 const achievementsText = achievements.map(a =>
                     `- ${a.title} | ${a.org} (${a.date})`
                 ).join('\n');
 
-                userMessage
-                ? `═══════════════════════════════════════════════════════════════════
+                userMessage = `═══════════════════════════════════════════════════════════════════
 🎯 MISSION: Create ATS-optimized CV for THIS role
 ═══════════════════════════════════════════════════════════════════
 
@@ -371,7 +368,7 @@ ${achievementsText || '[No achievements provided - focus on activities above]'}
 
 This CV must make it CRYSTAL CLEAR why I'm the #1 candidate for this role.`;
             }
-            // For college mode, elite prompt system already set systemPrompt and userMessage above
+            // For college mode, elite prompt system already set systemPrompt and userMessage above (in the if block)
 
             // Call AI
             const response = await fetch('/api/ai/generate', {
