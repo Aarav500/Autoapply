@@ -160,28 +160,133 @@ export default function CVBuilderPage() {
 
         try {
             const systemPrompt = mode === 'job'
-                ? `You are a world-class executive resume writer. Your goal is to create a high-impact, ATS-optimized professional CV tailored to a specific job description.
+                ? `You are a world-class executive resume writer with expertise in ATS optimization and applicant psychology. Create a compelling, tailored professional CV that positions the candidate as the PERFECT fit for the target role.
 
-STRICT GUIDELINES:
-1. TAILORING: Analyze the job description and PRIORITIZE experiences that match required skills. Ignore irrelevant activities.
-2. BULLET POINTS: Use the "Action-Result" (X-Y-Z) formula: Accomplished [X] as measured by [Y], by doing [Z].
-3. QUANTIFY: Use metrics (%, $, numbers) wherever possible to show impact.
-4. TONE: Professional, modern, and high-energy. Use strong action verbs (e.g., spearheaded, engineered, optimized).
-5. STRUCTURE: Professional Summary -> Skills -> Experience -> Education -> Achievements.
-6. CONCISION: Keep bullet points tight and readable. Limit to the top 5-7 most relevant activities/experiences.
+CRITICAL OPTIMIZATION STRATEGIES:
 
-Format in clean Markdown using ## for sections and ### for job titles/roles.`
-                : `You are an expert college admissions consultant for elite universities (Ivy League, MIT, Stanford). Your goal is to create a compelling CV that showcases a student's unique "spike" and fit for a specific institution.
+1. ATS OPTIMIZATION (Critical for passing automated screening):
+   - Extract ALL technical keywords, tools, frameworks, and skills from the job description
+   - Mirror the EXACT terminology used in the JD (e.g., if they say "React.js", use "React.js" not "React")
+   - Include a dedicated "Technical Skills" or "Core Competencies" section with keyword-rich content
+   - Use standard section headers: Professional Summary, Skills, Experience, Education, Achievements
+   - Avoid tables, columns, images, or graphics that ATS cannot parse
+   - Include relevant certifications and acronyms from the JD
 
-STRICT GUIDELINES:
-1. ALIGNMENT: Explicitly map the student's activities to the college's core values: ${college.research.values.join(', ')}.
-2. IMPACT: Focus on leadership, initiative, and community impact. Use the "Context-Action-Result-Learning" framework.
-3. PRIORITIZATION: Select only the most significant activities (Top 6-8) that demonstrate depth of commitment.
-4. PERSONALITY: The professional summary should reflect a clear vision and intellectual vitality.
-5. VALUES: Highlight experiences that directly speak to what ${college.name} looks for: ${college.research.whatTheyLookFor.join(', ')}.
-6. STRUCTURE: About Me -> Academic Achievements -> Significant Activities -> Honors/Awards -> Additional Info.
+2. TAILORED IMPACT STORYTELLING:
+   - For EACH bullet point, use the X-Y-Z formula: "Accomplished [X] as measured by [Y] by doing [Z]"
+   - ONLY include experiences that directly relate to job requirements (ruthlessly cut irrelevant content)
+   - Prioritize experiences that match "required" skills over "nice-to-have" skills
+   - Quantify everything: %, $, time saved, users impacted, performance improvements
+   - Lead with results, not responsibilities (e.g., "Increased conversion by 40%" not "Responsible for conversion optimization")
 
-Format in clean Markdown using ## for sections and ### for activity/achievement titles.`;
+3. STRATEGIC KEYWORD PLACEMENT:
+   - First bullet of each role should contain the most relevant keywords for that position
+   - Professional summary must include top 5-7 keywords from the job posting
+   - Skills section should list technologies in order of relevance to the JD
+   - Use both acronyms AND full forms (e.g., "CI/CD (Continuous Integration/Continuous Deployment)")
+
+4. FORMATTING & READABILITY:
+   - Professional summary: 3-4 sentences highlighting unique value proposition and top achievements
+   - Each role: 3-5 achievement-focused bullets (not duties)
+   - Keep total length to 1-2 pages maximum
+   - Use powerful action verbs: spearheaded, architected, engineered, drove, accelerated, optimized
+   - Ensure parallel structure in all bullet points (all start with past tense verbs)
+
+5. EXPERIENCE PRIORITIZATION:
+   - Rank experiences by relevance to target role, not chronologically
+   - Give more detail (more bullets) to highly relevant roles
+   - Consolidate or minimize less relevant experiences
+   - If switching industries, emphasize transferable skills
+
+STRUCTURE (in this exact order):
+## Professional Summary
+[3-4 sentences with top keywords and value proposition]
+
+## Technical Skills / Core Competencies
+[Keyword-optimized, comma-separated or categorized by type]
+
+## Professional Experience
+[Most relevant experiences first, achievement-focused bullets with metrics]
+
+## Education
+[Degree, institution, relevant coursework if early career]
+
+## Achievements & Recognition
+[Awards, publications, speaking engagements if relevant]
+
+CRITICAL: This CV must pass ATS screening AND impress human recruiters. Every word must earn its place by demonstrating fit for THIS specific role.`
+                : `You are an elite college admissions consultant specializing in Ivy League and top-tier university applications. Create a compelling, authentic CV that positions this student as an EXCEPTIONAL fit for ${college.name} specifically.
+
+CRITICAL STRATEGIES FOR COLLEGE CVs:
+
+1. INSTITUTIONAL ALIGNMENT (Most Important):
+   - Study ${college.name}'s core values: ${college.research.values.join(', ')}
+   - Understand what they seek: ${college.research.whatTheyLookFor.join(', ')}
+   - Map EVERY activity to at least one college value with explicit connections
+   - Use language that mirrors the college's mission statement and culture
+   - Reference specific programs: ${college.research.notablePrograms.slice(0, 3).join(', ')}
+
+2. DEMONSTRATE INTELLECTUAL VITALITY:
+   - Show PASSION and DEPTH over breadth (colleges want "spiky" students, not well-rounded)
+   - Highlight intellectual curiosity, research, independent projects
+   - Connect activities to show a coherent narrative/theme
+   - Emphasize learning, growth, and future aspirations
+   - Include academic achievements that show rigor (AP, IB, advanced coursework)
+
+3. LEADERSHIP & IMPACT STORYTELLING:
+   - Use Context-Action-Result-Learning (CARL) framework for key activities:
+     * Context: What was the challenge/opportunity?
+     * Action: What did YOU specifically do?
+     * Result: What changed/improved? (quantify!)
+     * Learning: How did this shape your vision?
+   - Focus on INITIATIVE and AGENCY (what you STARTED, not just participated in)
+   - Show community impact and service with measurable outcomes
+   - Demonstrate leadership in unconventional ways (not just titles)
+
+4. ACTIVITY SELECTION & PRIORITIZATION:
+   - Select 6-8 MOST SIGNIFICANT activities (quality >>> quantity)
+   - Prioritize by: (1) Alignment with college values, (2) Leadership/impact, (3) Time commitment
+   - Activities should show DEPTH: multi-year commitments with increasing responsibility
+   - Include "spiky" achievements that differentiate from other applicants
+   - Balance: academics, extracurriculars, service, personal pursuits
+
+5. AUTHENTIC VOICE & PERSONALITY:
+   - Personal summary should reveal character, values, and authentic passion
+   - Avoid clichés and generic statements ("hard-working", "passionate about helping others")
+   - Show SPECIFIC interests and WHY they matter to you
+   - Convey intellectual humility and growth mindset
+   - Let your unique perspective and experiences shine through
+
+6. STRATEGIC FRAMING FOR ${college.name}:
+   - Emphasize experiences that align with ${college.name}'s unique culture
+   - If applying to STEM-focused: highlight technical depth and research
+   - If applying to liberal arts: emphasize interdisciplinary thinking and humanities
+   - Show fit with specific programs, research centers, or opportunities at ${college.name}
+   - Demonstrate you've done deep research on the institution
+
+STRUCTURE (in this exact order):
+## Personal Statement / About Me
+[2-3 sentences revealing authentic passion, intellectual vision, and core values]
+
+## Academic Profile
+[School, GPA if strong, key coursework, academic interests, research]
+
+## Leadership & Significant Activities
+[6-8 activities with CARL framework, prioritized by impact and alignment]
+### Activity Name | Role
+*Duration, Hours/week commitment*
+[Context-Action-Result-Learning description with specific outcomes]
+
+## Honors & Recognition
+[Academic awards, competitions, publications - most impressive first]
+
+## Skills & Additional Information
+[Languages, technical skills, relevant interests that show depth]
+
+## Why ${college.name}
+[2-3 sentences on specific fit with programs, values, and opportunities]
+
+CRITICAL: This CV must tell a COHERENT story of who this student is, what they care about, and why they're a perfect match for ${college.name}'s community and values. Admissions officers should finish reading and think "This student belongs here."`;
 
             const activitiesText = activities.map(a =>
                 `- ${a.name} | ${a.role} at ${a.organization} (${a.startDate} - ${a.endDate}): ${a.description}`
@@ -192,35 +297,70 @@ Format in clean Markdown using ## for sections and ### for activity/achievement 
             ).join('\n');
 
             const userMessage = mode === 'job'
-                ? `Help me win this job! Generate a tailored CV for:
-                
-JOB DESCRIPTION:
-${jobDescription || 'General software engineering position'}
+                ? `OBJECTIVE: Create an ATS-optimized, tailored CV that positions me as the IDEAL candidate for this specific role.
 
-USER DATA:
-- Name: ${profile.name}
-- Current Summary: ${profile.summary || 'Analyze my experience and create a new one'}
-- Experience Items:
-${activitiesText}
-- Honors/Achievements:
-${achievementsText}
+=== TARGET JOB DESCRIPTION ===
+${jobDescription || 'General software engineering position requiring strong technical skills, problem-solving ability, and collaboration.'}
 
-Focus ONLY on the data that makes me a strong candidate for this specific role. If an activity isn't relevant to the JD, de-emphasize or omit it.`
-                : `Help me get accepted to ${college.name}! Generate a compelling, values-aligned CV.
+=== CANDIDATE PROFILE ===
+Name: ${profile.name}
+Contact: ${profile.email}${profile.phone ? ' | ' + profile.phone : ''}${profile.location ? ' | ' + profile.location : ''}
+${profile.linkedin ? 'LinkedIn: ' + profile.linkedin : ''}
+${profile.github ? 'GitHub: ' + profile.github : ''}
+${profile.portfolio ? 'Portfolio: ' + profile.portfolio : ''}
 
-TARGET COLLEGE: ${college.fullName}
-Institutional Values: ${college.research.values.join(', ')}
-Preferences: ${college.research.whatTheyLookFor.join(', ')}
+Current Professional Summary: ${profile.summary || '[Create a compelling summary by analyzing my experience and the job requirements]'}
 
-STUDENT DATA:
-- Name: ${profile.name}
-- Vision/Summary: ${profile.summary || 'Synthesize a vision from my activities'}
-- Activities:
-${activitiesText}
-- Honors:
-${achievementsText}
+=== EXPERIENCE & ACTIVITIES ===
+${activitiesText || '[No activities provided - create template sections]'}
 
-Strategically select and frame these items to show how I perfectly embody ${college.name}'s ideal student profile.`;
+=== ACHIEVEMENTS & HONORS ===
+${achievementsText || '[No achievements provided]'}
+
+=== GENERATION INSTRUCTIONS ===
+1. Extract ALL keywords from the job description (technologies, skills, tools, methodologies)
+2. ONLY include experiences that demonstrate relevant skills for this role
+3. Reframe each experience to highlight transferable skills matching the JD
+4. Quantify impact with specific metrics wherever possible
+5. Ensure the CV passes ATS by using exact keyword matches from the JD
+6. Create a professional summary that includes top 5 keywords and unique value proposition
+7. Optimize for both ATS algorithms AND human recruiter review
+
+This CV should make it OBVIOUS why I'm the perfect fit for this role.`
+                : `OBJECTIVE: Create a compelling CV that demonstrates authentic fit and exceptional potential for ${college.name}.
+
+=== TARGET INSTITUTION ===
+College: ${college.fullName}
+Core Values: ${college.research.values.join(', ')}
+What They Look For: ${college.research.whatTheyLookFor.join(', ')}
+Notable Programs: ${college.research.notablePrograms.join(', ')}
+
+=== APPLICANT PROFILE ===
+Name: ${profile.name}
+Contact: ${profile.email}
+${profile.portfolio ? 'Portfolio: ' + profile.portfolio : ''}
+${profile.researchPaper ? 'Research: ' + profile.researchPaper : ''}
+
+Personal Vision/Statement: ${profile.summary || '[Synthesize a vision from my activities that shows intellectual curiosity and values alignment]'}
+
+=== ACTIVITIES & INVOLVEMENTS ===
+${activitiesText || '[No activities provided - request student to add activities]'}
+
+=== HONORS & ACHIEVEMENTS ===
+${achievementsText || '[No achievements provided]'}
+
+=== GENERATION INSTRUCTIONS ===
+1. Select ONLY the 6-8 most impactful activities that align with ${college.name}'s values
+2. For each activity, explicitly connect it to at least one of ${college.name}'s core values
+3. Use the CARL framework (Context-Action-Result-Learning) for significant activities
+4. Demonstrate depth and sustained commitment over breadth
+5. Highlight leadership, initiative, and measurable community impact
+6. Show intellectual vitality and passion for learning
+7. Create a coherent narrative that shows WHO this student is beyond grades
+8. Include a "Why ${college.name}" section that demonstrates genuine fit
+9. Make the student sound authentic, not generic or cliché
+
+The admissions reader should finish this CV thinking: "This student truly embodies our values and would thrive in our community."`;
 
             // Call AI
             const response = await fetch('/api/ai/generate', {
@@ -255,7 +395,7 @@ Strategically select and frame these items to show how I perfectly embody ${coll
         }
     };
 
-    // Fallback CV generator
+    // Fallback CV generator with improved formatting
     const generateFallbackCV = (
         profile: UserProfile,
         activities: ActivityItem[],
@@ -265,34 +405,56 @@ Strategically select and frame these items to show how I perfectly embody ${coll
     ): string => {
         const header = `# ${profile.name || 'Your Name'}
 
-${profile.email || 'email@example.com'} | ${profile.phone || '(xxx) xxx-xxxx'} | ${profile.location || 'City, State'}
-${profile.linkedin ? `[LinkedIn](${profile.linkedin})` : ''} ${profile.github ? `| [GitHub](${profile.github})` : ''}
+${profile.email || 'email@example.com'} | ${profile.phone || '(555) 123-4567'} | ${profile.location || 'City, State'}
+${profile.linkedin ? `[LinkedIn](${profile.linkedin})` : ''} ${profile.github ? `| [GitHub](${profile.github})` : ''} ${profile.portfolio ? `| [Portfolio](${profile.portfolio})` : ''}
 
 ---`;
 
-        const summary = profile.summary
-            ? `## Summary\n\n${profile.summary}\n\n---`
+        const summary = mode === 'job'
+            ? `## Professional Summary\n\n${profile.summary || 'Results-driven professional with proven expertise in driving impact through technical excellence and collaborative problem-solving. Passionate about leveraging cutting-edge technologies to solve complex challenges and deliver measurable business value.'}\n\n---`
+            : `## About Me\n\n${profile.summary || 'Passionate student with a deep commitment to learning, leadership, and community impact. Driven by intellectual curiosity and a desire to make meaningful contributions to society.'}\n\n---`;
+
+        // For job CVs, add a skills section
+        const skillsSection = mode === 'job' && activities.length > 0
+            ? `## Technical Skills & Core Competencies\n\nProgramming Languages • Web Development • Data Analysis • Project Management • Team Leadership • Problem Solving • Communication\n\n---\n\n`
             : '';
 
         const experience = activities.length > 0
-            ? `## Experience & Activities\n\n${activities.map(a => `### ${a.role} | ${a.organization}
-*${a.startDate} - ${a.endDate}*
+            ? `## ${mode === 'job' ? 'Professional Experience' : 'Leadership & Activities'}\n\n${activities.slice(0, mode === 'job' ? 7 : 8).map(a => {
+                const totalHours = a.hoursPerWeek * a.weeksPerYear;
+                return `### ${a.role} | ${a.organization}
+*${a.startDate} - ${a.endDate}* ${totalHours > 0 ? `• ${a.hoursPerWeek} hrs/week` : ''}
 
-${a.description}
+${a.description || 'Contributed to team success through dedicated effort and collaboration.'}
 
-- Contributed ${a.hoursPerWeek * a.weeksPerYear} hours annually
-`).join('\n')}\n---`
-            : '';
+${mode === 'job'
+    ? `- Demonstrated strong problem-solving abilities and technical expertise
+- Collaborated with cross-functional teams to achieve project goals
+- Delivered measurable results and drove continuous improvement`
+    : `- Total commitment: ${totalHours} hours annually
+- Developed leadership and organizational skills
+- Made meaningful impact on community and peers`}
+`;
+            }).join('\n')}\n---`
+            : mode === 'job'
+                ? `## Professional Experience\n\n*Add your work experience, internships, and relevant projects*\n\n---`
+                : `## Leadership & Activities\n\n*Add your extracurricular activities, leadership roles, and community involvement*\n\n---`;
 
         const achievementsSection = achievements.length > 0
-            ? `## Achievements & Honors\n\n${achievements.map(a => `- **${a.title}** - ${a.org} (${a.date})`).join('\n')}\n\n---`
+            ? `## ${mode === 'job' ? 'Achievements & Recognition' : 'Honors & Awards'}\n\n${achievements.map(a => `- **${a.title}** - ${a.org} (${a.date})`).join('\n')}\n\n---`
+            : '';
+
+        const education = mode === 'job'
+            ? `\n## Education\n\n**[Your Degree]** - [University Name]\n*Expected Graduation: [Year]*\n- Relevant Coursework: [List key courses]\n- GPA: [X.XX/4.0]`
             : '';
 
         const footer = mode === 'college'
-            ? `\n## Why ${college.name}\n\nI am excited to apply to ${college.name} because of its commitment to ${college.research.values[0].toLowerCase()} and ${college.research.values[1].toLowerCase()}. The ${college.research.notablePrograms[0]} program particularly aligns with my interests.`
+            ? `\n## Why ${college.name}\n\nI am deeply excited about ${college.name} because of its unwavering commitment to ${college.research.values[0].toLowerCase()} and ${college.research.values[1].toLowerCase()}. The ${college.research.notablePrograms[0]} program particularly resonates with my passion for ${college.research.values[0].toLowerCase()}, and I am eager to contribute to and learn from ${college.name}'s vibrant community of scholars and innovators.`
             : '';
 
-        return `${header}\n\n${summary}\n\n${experience}\n\n${achievementsSection}${footer}`;
+        return mode === 'job'
+            ? `${header}\n\n${summary}\n\n${skillsSection}${experience}\n\n${achievementsSection}${education}`
+            : `${header}\n\n${summary}\n\n${experience}\n\n${achievementsSection}${footer}`;
     };
 
     // Copy to clipboard
