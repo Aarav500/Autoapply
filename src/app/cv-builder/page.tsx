@@ -166,6 +166,19 @@ export default function CVBuilderPage() {
         toast.info(`🚀 Generating ${mode === 'job' ? 'job-targeted' : 'college-targeted'} CV...`);
 
         try {
+            // ===== INTELLIGENCE ENGINE: Process activities FIRST for optimal tailoring =====
+            const enrichedActivities = processActivitiesForCV(activities, {
+                mode,
+                targetContext: mode === 'job'
+                    ? (jobDescription || '')
+                    : college.research.values.join(', '),
+                maxActivities: mode === 'job' ? 10 : 8,
+                enforceQuantification: true
+            });
+
+            const activitiesText = formatActivitiesForPrompt(enrichedActivities);
+            const qualityChecklist = generateQualityChecklist(enrichedActivities, mode);
+
             const systemPrompt = mode === 'job'
                 ? `You are an ELITE executive resume writer who has helped 1000+ candidates land roles at FAANG, Fortune 500, and top startups. Your CVs have a 95% interview callback rate.
 
@@ -392,19 +405,6 @@ ${qualityChecklist.map(item => item).join('\n')}
 TONE: Confident but humble. Passionate but authentic. Intellectual but accessible.
 
 REMEMBER: Admissions officers read 50+ applications per day. This CV must make them STOP and think: "We NEED this student in our community." Tell a story that only THIS student can tell.`;
-
-            // ===== INTELLIGENCE ENGINE: Process activities for optimal tailoring =====
-            const enrichedActivities = processActivitiesForCV(activities, {
-                mode,
-                targetContext: mode === 'job'
-                    ? (jobDescription || '')
-                    : college.research.values.join(', '),
-                maxActivities: mode === 'job' ? 10 : 8,
-                enforceQuantification: true
-            });
-
-            const activitiesText = formatActivitiesForPrompt(enrichedActivities);
-            const qualityChecklist = generateQualityChecklist(enrichedActivities, mode);
 
             const achievementsText = achievements.map(a =>
                 `- ${a.title} | ${a.org} (${a.date})`
