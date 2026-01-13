@@ -8,6 +8,13 @@ import { toast } from '@/lib/error-handling';
 import { getAIConfig, AIConfig, AIProvider, setAPIKey } from '@/lib/ai-providers';
 import { targetColleges } from '@/lib/colleges-data';
 import {
+    processActivitiesForCV,
+    formatActivitiesForPrompt,
+    generateQualityChecklist,
+    validateCVCompleteness,
+    EnrichedActivity
+} from '@/lib/cv-intelligence';
+import {
     FileText,
     Briefcase,
     GraduationCap,
@@ -160,207 +167,348 @@ export default function CVBuilderPage() {
 
         try {
             const systemPrompt = mode === 'job'
-                ? `You are a world-class executive resume writer with expertise in ATS optimization and applicant psychology. Create a compelling, tailored professional CV that positions the candidate as the PERFECT fit for the target role.
+                ? `You are an ELITE executive resume writer who has helped 1000+ candidates land roles at FAANG, Fortune 500, and top startups. Your CVs have a 95% interview callback rate.
 
-CRITICAL OPTIMIZATION STRATEGIES:
+🎯 PRIMARY OBJECTIVE: Create an ATS-optimized, keyword-rich CV that positions this candidate as the #1 choice for THIS specific role.
 
-1. ATS OPTIMIZATION (Critical for passing automated screening):
-   - Extract ALL technical keywords, tools, frameworks, and skills from the job description
-   - Mirror the EXACT terminology used in the JD (e.g., if they say "React.js", use "React.js" not "React")
-   - Include a dedicated "Technical Skills" or "Core Competencies" section with keyword-rich content
-   - Use standard section headers: Professional Summary, Skills, Experience, Education, Achievements
-   - Avoid tables, columns, images, or graphics that ATS cannot parse
-   - Include relevant certifications and acronyms from the JD
+═══════════════════════════════════════════════════════════════════
+⚠️  CRITICAL REQUIREMENT - ACTIVITY INCLUSION ⚠️
+═══════════════════════════════════════════════════════════════════
 
-2. TAILORED IMPACT STORYTELLING:
-   - For EACH bullet point, use the X-Y-Z formula: "Accomplished [X] as measured by [Y] by doing [Z]"
-   - ONLY include experiences that directly relate to job requirements (ruthlessly cut irrelevant content)
-   - Prioritize experiences that match "required" skills over "nice-to-have" skills
-   - Quantify everything: %, $, time saved, users impacted, performance improvements
-   - Lead with results, not responsibilities (e.g., "Increased conversion by 40%" not "Responsible for conversion optimization")
+You will receive ${enrichedActivities.length} pre-scored activities below.
 
-3. STRATEGIC KEYWORD PLACEMENT:
-   - First bullet of each role should contain the most relevant keywords for that position
-   - Professional summary must include top 5-7 keywords from the job posting
-   - Skills section should list technologies in order of relevance to the JD
-   - Use both acronyms AND full forms (e.g., "CI/CD (Continuous Integration/Continuous Deployment)")
+🚨 MANDATORY RULES (VIOLATION = FAILURE):
+1. You MUST include ALL ${enrichedActivities.length} activities in the final CV
+2. Each activity MUST appear with at least 2-3 achievement bullets
+3. High-priority activities get 4-5 bullets with detailed metrics
+4. Medium-priority activities get 2-3 bullets
+5. Low-priority activities get 2 bullets minimum
+6. DO NOT skip, merge, or omit any activity marked as provided
 
-4. FORMATTING & READABILITY:
-   - Professional summary: 3-4 sentences highlighting unique value proposition and top achievements
-   - Each role: 3-5 achievement-focused bullets (not duties)
-   - Keep total length to 1-2 pages maximum
-   - Use powerful action verbs: spearheaded, architected, engineered, drove, accelerated, optimized
-   - Ensure parallel structure in all bullet points (all start with past tense verbs)
+═══════════════════════════════════════════════════════════════════
+📊 ATS OPTIMIZATION FRAMEWORK (Pass Rate: 98%)
+═══════════════════════════════════════════════════════════════════
 
-5. EXPERIENCE PRIORITIZATION:
-   - Rank experiences by relevance to target role, not chronologically
-   - Give more detail (more bullets) to highly relevant roles
-   - Consolidate or minimize less relevant experiences
-   - If switching industries, emphasize transferable skills
+**Keyword Strategy:**
+- Extract EVERY technical term from job description
+- Use EXACT terminology (e.g., "React.js" if JD says "React.js", not "React")
+- Include acronyms AND full forms: "CI/CD (Continuous Integration/Continuous Deployment)"
+- Professional summary MUST contain top 7-10 keywords
+- First bullet of each role MUST include 2-3 JD keywords
 
-STRUCTURE (in this exact order):
+**ATS-Safe Formatting:**
+- Standard headers: Professional Summary, Technical Skills, Professional Experience, Education
+- No tables, columns, text boxes, headers/footers, images
+- Left-aligned text, simple bullets (•)
+- Date format: MM/YYYY - MM/YYYY
+
+═══════════════════════════════════════════════════════════════════
+💎 IMPACT STORYTELLING FRAMEWORK (X-Y-Z Formula)
+═══════════════════════════════════════════════════════════════════
+
+For EVERY bullet point, follow this formula:
+**"Accomplished [X] as measured by [Y] by doing [Z]"**
+
+✅ GOOD: "Increased user engagement by 40% (150K → 210K MAU) by implementing React-based infinite scroll and predictive content loading"
+❌ BAD: "Responsible for improving user engagement through various technical implementations"
+
+**Quantification Requirements:**
+- Use numbers: %, $, time saved, users impacted, performance gains
+- If no metrics exist, estimate reasonably: "~50 users", "5+ projects", "approximately 20% improvement"
+- Include scale: team size, budget, user base, geographic reach
+
+**Action Verb Bank (Power Verbs ONLY):**
+- Impact: Accelerated, Amplified, Boosted, Maximized, Optimized
+- Building: Architected, Built, Deployed, Engineered, Developed
+- Leadership: Directed, Led, Managed, Spearheaded, Pioneered
+- Analysis: Analyzed, Evaluated, Identified, Researched, Investigated
+
+═══════════════════════════════════════════════════════════════════
+🎨 STRUCTURE & FORMATTING
+═══════════════════════════════════════════════════════════════════
+
 ## Professional Summary
-[3-4 sentences with top keywords and value proposition]
+[3-4 powerful sentences. Must include: (1) years of experience/background, (2) top 7 keywords from JD, (3) unique value proposition, (4) career highlight with metric]
 
-## Technical Skills / Core Competencies
-[Keyword-optimized, comma-separated or categorized by type]
+## Technical Skills & Core Competencies
+**Programming & Technologies:** [Most relevant to JD first]
+**Tools & Platforms:** [Match JD terminology]
+**Methodologies:** [Agile, Scrum, etc. if in JD]
+**Soft Skills:** [Only if explicitly mentioned in JD]
 
 ## Professional Experience
-[Most relevant experiences first, achievement-focused bullets with metrics]
+[Order by RELEVANCE to role, not chronology - put most relevant first]
+
+For each activity:
+### [Role Title] | [Organization Name]
+*[Start Date] - [End Date] • [Hours/week commitment if significant]*
+
+- [X-Y-Z bullet with metrics and 2-3 JD keywords]
+- [X-Y-Z bullet emphasizing leadership/initiative]
+- [X-Y-Z bullet showing technical depth]
+- [X-Y-Z bullet with business impact]
+- [Optional 5th bullet for high-priority activities]
 
 ## Education
-[Degree, institution, relevant coursework if early career]
+**[Degree]** in [Major] - [University]
+[Graduation Date] • GPA: [X.XX/4.0] (if strong)
+*Relevant Coursework:* [If early career and relevant to role]
 
 ## Achievements & Recognition
-[Awards, publications, speaking engagements if relevant]
+[Awards, publications, patents - only if impressive and relevant]
 
-CRITICAL: This CV must pass ATS screening AND impress human recruiters. Every word must earn its place by demonstrating fit for THIS specific role.`
-                : `You are an elite college admissions consultant specializing in Ivy League and top-tier university applications. Create a compelling, authentic CV that positions this student as an EXCEPTIONAL fit for ${college.name} specifically.
+═══════════════════════════════════════════════════════════════════
+✅ QUALITY CHECKLIST (Must satisfy ALL before submitting)
+═══════════════════════════════════════════════════════════════════
 
-CRITICAL STRATEGIES FOR COLLEGE CVs:
+${qualityChecklist.map(item => item).join('\n')}
+✓ Every bullet starts with powerful past-tense action verb
+✓ No generic statements like "responsible for" or "worked on"
+✓ Parallel structure throughout (consistent tense and format)
+✓ Total length: 1-2 pages (preferably 1 page if <5 years experience)
+✓ Zero typos, perfect grammar, consistent formatting
 
-1. INSTITUTIONAL ALIGNMENT (Most Important):
-   - Study ${college.name}'s core values: ${college.research.values.join(', ')}
-   - Understand what they seek: ${college.research.whatTheyLookFor.join(', ')}
-   - Map EVERY activity to at least one college value with explicit connections
-   - Use language that mirrors the college's mission statement and culture
-   - Reference specific programs: ${college.research.notablePrograms.slice(0, 3).join(', ')}
+═══════════════════════════════════════════════════════════════════
 
-2. DEMONSTRATE INTELLECTUAL VITALITY:
-   - Show PASSION and DEPTH over breadth (colleges want "spiky" students, not well-rounded)
-   - Highlight intellectual curiosity, research, independent projects
-   - Connect activities to show a coherent narrative/theme
-   - Emphasize learning, growth, and future aspirations
-   - Include academic achievements that show rigor (AP, IB, advanced coursework)
+REMEMBER: This CV needs to get past ATS (keyword match) AND impress human recruiters (compelling narrative). You're not just listing experiences—you're telling the story of why this candidate is THE perfect hire.`
+                : `You are an ELITE college admissions consultant with 20+ years experience at top Ivy League admissions offices. You've helped 500+ students gain admission to Harvard, Stanford, MIT, and top universities with acceptance rates below 5%.
 
-3. LEADERSHIP & IMPACT STORYTELLING:
-   - Use Context-Action-Result-Learning (CARL) framework for key activities:
-     * Context: What was the challenge/opportunity?
-     * Action: What did YOU specifically do?
-     * Result: What changed/improved? (quantify!)
-     * Learning: How did this shape your vision?
-   - Focus on INITIATIVE and AGENCY (what you STARTED, not just participated in)
-   - Show community impact and service with measurable outcomes
-   - Demonstrate leadership in unconventional ways (not just titles)
+🎯 PRIMARY OBJECTIVE: Create a compelling, authentic CV that demonstrates this student is an EXCEPTIONAL fit for ${college.name} and embodies their institutional values.
 
-4. ACTIVITY SELECTION & PRIORITIZATION:
-   - Select 6-8 MOST SIGNIFICANT activities (quality >>> quantity)
-   - Prioritize by: (1) Alignment with college values, (2) Leadership/impact, (3) Time commitment
-   - Activities should show DEPTH: multi-year commitments with increasing responsibility
-   - Include "spiky" achievements that differentiate from other applicants
-   - Balance: academics, extracurriculars, service, personal pursuits
+═══════════════════════════════════════════════════════════════════
+⚠️  CRITICAL REQUIREMENT - ACTIVITY INCLUSION ⚠️
+═══════════════════════════════════════════════════════════════════
 
-5. AUTHENTIC VOICE & PERSONALITY:
-   - Personal summary should reveal character, values, and authentic passion
-   - Avoid clichés and generic statements ("hard-working", "passionate about helping others")
-   - Show SPECIFIC interests and WHY they matter to you
-   - Convey intellectual humility and growth mindset
-   - Let your unique perspective and experiences shine through
+You will receive ${enrichedActivities.length} pre-scored activities below, ranked by alignment with ${college.name}'s values.
 
-6. STRATEGIC FRAMING FOR ${college.name}:
-   - Emphasize experiences that align with ${college.name}'s unique culture
-   - If applying to STEM-focused: highlight technical depth and research
-   - If applying to liberal arts: emphasize interdisciplinary thinking and humanities
-   - Show fit with specific programs, research centers, or opportunities at ${college.name}
-   - Demonstrate you've done deep research on the institution
+🚨 MANDATORY RULES (VIOLATION = REJECTION):
+1. You MUST include ALL ${enrichedActivities.length} activities in the final CV
+2. Each activity MUST use the CARL framework (Context-Action-Result-Learning)
+3. High-priority activities get 150-200 word detailed narratives
+4. Medium-priority activities get 100-150 word narratives
+5. Low-priority activities get 75-100 word descriptions minimum
+6. DO NOT skip, combine, or omit any activity provided
+7. MUST show total hours and duration for EVERY activity
 
-STRUCTURE (in this exact order):
-## Personal Statement / About Me
-[2-3 sentences revealing authentic passion, intellectual vision, and core values]
+═══════════════════════════════════════════════════════════════════
+🎓 ${college.name.toUpperCase()} - INSTITUTIONAL INTELLIGENCE
+═══════════════════════════════════════════════════════════════════
+
+**Core Values:** ${college.research.values.join(', ')}
+**What They Seek:** ${college.research.whatTheyLookFor.join(', ')}
+**Signature Programs:** ${college.research.notablePrograms.slice(0, 3).join(', ')}
+
+**Your Mission:** Map EVERY activity to at least one of these values. Use the college's own language. Show you understand what makes ${college.name} unique.
+
+═══════════════════════════════════════════════════════════════════
+💎 CARL FRAMEWORK - Required for Every Activity
+═══════════════════════════════════════════════════════════════════
+
+**C - CONTEXT:** What was the situation/challenge/opportunity?
+- Set the scene (1-2 sentences)
+- Explain why this mattered
+
+**A - ACTION:** What did YOU specifically do?
+- Focus on YOUR initiative and agency
+- Use first person implicitly: "Founded...", "Led...", "Developed..."
+- Emphasize what you STARTED or CHANGED
+
+**R - RESULT:** What measurable impact did you create?
+- Quantify: # of people affected, hours contributed, money raised, improvement %
+- Show tangible outcomes
+
+**L - LEARNING:** How did this shape your intellectual journey?
+- Connect to academic interests or future goals
+- Show personal growth and reflection
+- Link to ${college.name}'s values
+
+✅ EXAMPLE (Good):
+**Founder & President | Community Coding Initiative**
+*Sept 2021 - Present • 15 hrs/week • 720 total hours*
+
+[C] Recognizing that only 20% of students at local Title I schools had access to computer science education, I founded the Community Coding Initiative to bridge the digital divide. [A] I recruited 12 volunteer college CS students, designed a 12-week Python curriculum, secured \$5,000 in grants for laptops, and personally taught 4 sections. [R] Over 3 years, we've taught 180 underserved students (ages 10-16), with 85% continuing to advanced courses and 12 winning regional coding competitions. [L] This experience revealed how education equity and technical skills intersect—a passion I hope to explore through ${college.name}'s [relevant program], where I can study both CS and social impact.
+
+❌ EXAMPLE (Bad):
+**Member | Coding Club**
+Participated in club activities and helped teach students.
+
+═══════════════════════════════════════════════════════════════════
+🎨 CV STRUCTURE FOR ${college.name}
+═══════════════════════════════════════════════════════════════════
+
+## About Me / Personal Vision
+[2-3 sentences that reveal: (1) Your authentic intellectual passion, (2) Core values that align with ${college.name}, (3) What drives you. Be SPECIFIC, not generic. Avoid clichés like "hard-working" or "passionate about learning."]
 
 ## Academic Profile
-[School, GPA if strong, key coursework, academic interests, research]
+**[High School Name]**
+GPA: [X.XX/4.0] (if strong) • Class Rank: [if impressive]
+**Relevant Coursework:** [AP, IB, or advanced courses that show rigor]
+**Academic Interests:** [Specific fields you want to explore]
+[Include research, independent study, or significant academic projects]
 
 ## Leadership & Significant Activities
-[6-8 activities with CARL framework, prioritized by impact and alignment]
-### Activity Name | Role
-*Duration, Hours/week commitment*
-[Context-Action-Result-Learning description with specific outcomes]
+[Order by alignment with ${college.name}'s values and impact, NOT chronologically]
+
+For EACH activity, use this format:
+
+### [Activity Name] | [Your Role]
+*[Start] - [End] (X.X years) • [Hours/week] hrs/week • [Total hours] total hours*
+**Alignment:** [Which ${college.name} value(s) this demonstrates]
+
+[Full CARL narrative: Context → Action → Result → Learning. 75-200 words depending on priority. Must be compelling storytelling, not bullet points.]
+
+**Key Outcomes:**
+- [Quantified impact metric #1]
+- [Quantified impact metric #2]
+- [Leadership growth or personal achievement]
 
 ## Honors & Recognition
-[Academic awards, competitions, publications - most impressive first]
+[List awards, publications, competitions, scholarships]
+- **[Award Name]** - [Issuing Organization] ([Date])
+  [1 sentence on significance if not obvious]
 
-## Skills & Additional Information
-[Languages, technical skills, relevant interests that show depth]
+## Technical Skills & Languages
+**Programming/Technical:** [If applicable]
+**Languages:** [Fluency levels: Native, Fluent, Conversational, Basic]
+**Additional Skills:** [Music, art, athletics, etc. - only if significant]
 
 ## Why ${college.name}
-[2-3 sentences on specific fit with programs, values, and opportunities]
+[3-4 sentences demonstrating SPECIFIC fit. Mention exact programs, professors, research centers, or unique opportunities. Show you've done deep research. Connect your activities/interests to what ${college.name} offers.]
 
-CRITICAL: This CV must tell a COHERENT story of who this student is, what they care about, and why they're a perfect match for ${college.name}'s community and values. Admissions officers should finish reading and think "This student belongs here."`;
+═══════════════════════════════════════════════════════════════════
+✅ QUALITY CHECKLIST FOR ${college.name}
+═══════════════════════════════════════════════════════════════════
 
-            const activitiesText = activities.map(a =>
-                `- ${a.name} | ${a.role} at ${a.organization} (${a.startDate} - ${a.endDate}): ${a.description}`
-            ).join('\n');
+${qualityChecklist.map(item => item).join('\n')}
+✓ Authentic voice (not generic or cliché)
+✓ Coherent narrative showing intellectual journey
+✓ Evidence of "spike" (depth in 1-2 areas) not just well-roundedness
+✓ Initiative and agency (what student STARTED, not just participated in)
+✓ Personal growth and reflection evident
+✓ Strong fit with ${college.name}'s specific culture and programs
+
+═══════════════════════════════════════════════════════════════════
+
+TONE: Confident but humble. Passionate but authentic. Intellectual but accessible.
+
+REMEMBER: Admissions officers read 50+ applications per day. This CV must make them STOP and think: "We NEED this student in our community." Tell a story that only THIS student can tell.`;
+
+            // ===== INTELLIGENCE ENGINE: Process activities for optimal tailoring =====
+            const enrichedActivities = processActivitiesForCV(activities, {
+                mode,
+                targetContext: mode === 'job'
+                    ? (jobDescription || '')
+                    : college.research.values.join(', '),
+                maxActivities: mode === 'job' ? 10 : 8,
+                enforceQuantification: true
+            });
+
+            const activitiesText = formatActivitiesForPrompt(enrichedActivities);
+            const qualityChecklist = generateQualityChecklist(enrichedActivities, mode);
 
             const achievementsText = achievements.map(a =>
                 `- ${a.title} | ${a.org} (${a.date})`
             ).join('\n');
 
             const userMessage = mode === 'job'
-                ? `OBJECTIVE: Create an ATS-optimized, tailored CV that positions me as the IDEAL candidate for this specific role.
+                ? `═══════════════════════════════════════════════════════════════════
+🎯 MISSION: Create ATS-optimized CV for THIS role
+═══════════════════════════════════════════════════════════════════
 
-=== TARGET JOB DESCRIPTION ===
-${jobDescription || 'General software engineering position requiring strong technical skills, problem-solving ability, and collaboration.'}
+📄 TARGET JOB DESCRIPTION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${jobDescription || 'General software engineering position requiring strong technical skills, problem-solving ability, teamwork, and experience with modern development tools and methodologies.'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-=== CANDIDATE PROFILE ===
-Name: ${profile.name}
-Contact: ${profile.email}${profile.phone ? ' | ' + profile.phone : ''}${profile.location ? ' | ' + profile.location : ''}
-${profile.linkedin ? 'LinkedIn: ' + profile.linkedin : ''}
-${profile.github ? 'GitHub: ' + profile.github : ''}
-${profile.portfolio ? 'Portfolio: ' + profile.portfolio : ''}
+👤 CANDIDATE PROFILE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**Name:** ${profile.name}
+**Contact:** ${profile.email}${profile.phone ? ' | ' + profile.phone : ''}${profile.location ? ' | ' + profile.location : ''}
+${profile.linkedin ? '**LinkedIn:** ' + profile.linkedin : ''}
+${profile.github ? '**GitHub:** ' + profile.github : ''}
+${profile.portfolio ? '**Portfolio:** ' + profile.portfolio : ''}
 
-Current Professional Summary: ${profile.summary || '[Create a compelling summary by analyzing my experience and the job requirements]'}
+**Current Summary/Bio:**
+${profile.summary || '[Analyze my activities below and create a compelling 3-4 sentence professional summary that includes top keywords from the job description and highlights my unique value proposition]'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-=== EXPERIENCE & ACTIVITIES ===
-${activitiesText || '[No activities provided - create template sections]'}
+💼 MY PROFESSIONAL EXPERIENCE & ACTIVITIES (${enrichedActivities.length} TOTAL):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${activitiesText}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-=== ACHIEVEMENTS & HONORS ===
-${achievementsText || '[No achievements provided]'}
+🏆 ACHIEVEMENTS & HONORS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${achievementsText || '[No achievements provided - focus on activities above]'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-=== GENERATION INSTRUCTIONS ===
-1. Extract ALL keywords from the job description (technologies, skills, tools, methodologies)
-2. ONLY include experiences that demonstrate relevant skills for this role
-3. Reframe each experience to highlight transferable skills matching the JD
-4. Quantify impact with specific metrics wherever possible
-5. Ensure the CV passes ATS by using exact keyword matches from the JD
-6. Create a professional summary that includes top 5 keywords and unique value proposition
-7. Optimize for both ATS algorithms AND human recruiter review
+⚠️  CRITICAL EXECUTION REQUIREMENTS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Include ALL ${enrichedActivities.length} activities listed above (no exceptions)
+✅ High-priority activities → 4-5 achievement bullets each
+✅ Medium-priority activities → 2-3 achievement bullets each
+✅ Low-priority activities → 2 achievement bullets minimum
+✅ Use X-Y-Z formula for every single bullet point
+✅ Extract and use EXACT keywords from job description
+✅ Start every bullet with powerful action verb (past tense)
+✅ Include quantifiable metrics in 100% of bullets
+✅ Professional summary must include top 7-10 JD keywords
+✅ Order experiences by relevance to role (high-priority first)
+✅ Total length: 1-2 pages maximum
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-This CV should make it OBVIOUS why I'm the perfect fit for this role.`
-                : `OBJECTIVE: Create a compelling CV that demonstrates authentic fit and exceptional potential for ${college.name}.
+This CV must make it CRYSTAL CLEAR why I'm the #1 candidate for this role.`
+                : `═══════════════════════════════════════════════════════════════════
+🎓 MISSION: Create college CV for ${college.name}
+═══════════════════════════════════════════════════════════════════
 
-=== TARGET INSTITUTION ===
-College: ${college.fullName}
-Core Values: ${college.research.values.join(', ')}
-What They Look For: ${college.research.whatTheyLookFor.join(', ')}
-Notable Programs: ${college.research.notablePrograms.join(', ')}
+🏛️  TARGET INSTITUTION PROFILE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**Institution:** ${college.fullName}
+**Core Values:** ${college.research.values.join(', ')}
+**What They Seek:** ${college.research.whatTheyLookFor.join(', ')}
+**Signature Programs:** ${college.research.notablePrograms.join(', ')}
 
-=== APPLICANT PROFILE ===
-Name: ${profile.name}
-Contact: ${profile.email}
-${profile.portfolio ? 'Portfolio: ' + profile.portfolio : ''}
-${profile.researchPaper ? 'Research: ' + profile.researchPaper : ''}
+${college.name} is looking for students who embody these values and will contribute meaningfully to their intellectual community.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Personal Vision/Statement: ${profile.summary || '[Synthesize a vision from my activities that shows intellectual curiosity and values alignment]'}
+👤 APPLICANT PROFILE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**Name:** ${profile.name}
+**Contact:** ${profile.email}
+${profile.portfolio ? '**Portfolio/Website:** ' + profile.portfolio : ''}
+${profile.researchPaper ? '**Research:** ' + profile.researchPaper : ''}
 
-=== ACTIVITIES & INVOLVEMENTS ===
-${activitiesText || '[No activities provided - request student to add activities]'}
+**Personal Vision/Intellectual Passion:**
+${profile.summary || '[Analyze my activities below and synthesize a 2-3 sentence personal vision that: (1) reveals my authentic intellectual passion, (2) shows alignment with ' + college.name + "'s values, (3) demonstrates what drives me beyond academics. Be specific, not generic.]"}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-=== HONORS & ACHIEVEMENTS ===
-${achievementsText || '[No achievements provided]'}
+🌟 MY LEADERSHIP & ACTIVITIES (${enrichedActivities.length} TOTAL - Pre-ranked by fit with ${college.name}):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${activitiesText}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-=== GENERATION INSTRUCTIONS ===
-1. Select ONLY the 6-8 most impactful activities that align with ${college.name}'s values
-2. For each activity, explicitly connect it to at least one of ${college.name}'s core values
-3. Use the CARL framework (Context-Action-Result-Learning) for significant activities
-4. Demonstrate depth and sustained commitment over breadth
-5. Highlight leadership, initiative, and measurable community impact
-6. Show intellectual vitality and passion for learning
-7. Create a coherent narrative that shows WHO this student is beyond grades
-8. Include a "Why ${college.name}" section that demonstrates genuine fit
-9. Make the student sound authentic, not generic or cliché
+🏆 HONORS & ACHIEVEMENTS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${achievementsText || '[No achievements provided yet]'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-The admissions reader should finish this CV thinking: "This student truly embodies our values and would thrive in our community."`;
+⚠️  CRITICAL EXECUTION REQUIREMENTS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Include ALL ${enrichedActivities.length} activities (MANDATORY - no exceptions)
+✅ High-priority activities → 150-200 word CARL narrative each
+✅ Medium-priority activities → 100-150 word CARL narrative each
+✅ Low-priority activities → 75-100 word CARL narrative minimum
+✅ For EACH activity, explicitly state which ${college.name} value(s) it demonstrates
+✅ Show total hours and years of commitment for every activity
+✅ Use CARL framework (Context-Action-Result-Learning) for all activities
+✅ Emphasize initiative, leadership, and measurable impact
+✅ Create cohesive narrative showing intellectual journey
+✅ Include compelling "Why ${college.name}" section with specific program references
+✅ Authentic voice (no generic clichés like "hard-working" or "passionate")
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When the admissions officer finishes reading, they should think: "This student is a PERFECT fit for ${college.name}. We need them in our community."`;
 
             // Call AI
             const response = await fetch('/api/ai/generate', {
@@ -381,8 +529,40 @@ The admissions reader should finish this CV thinking: "This student truly embodi
                 toast.success('✨ CV generated with template!');
             } else {
                 const data = await response.json();
-                setGeneratedCV(data.text);
-                toast.success('✨ CV generated successfully!');
+                const generatedText = data.text;
+
+                // ===== QUALITY VALIDATION: Check if all activities are included =====
+                const validation = validateCVCompleteness(generatedText, activities);
+
+                if (!validation.isComplete && validation.missingActivities.length > 0) {
+                    toast.warning(
+                        `⚠️ Generated CV is missing ${validation.missingActivities.length} activities. Adding them now...`,
+                        { duration: 4000 }
+                    );
+
+                    // Append missing activities to CV
+                    let enhancedCV = generatedText;
+                    enhancedCV += '\n\n---\n\n## Additional Experience\n\n';
+
+                    validation.missingActivities.forEach((missingName, idx) => {
+                        const missingActivity = activities.find(a =>
+                            missingName.includes(a.organization) || missingName.includes(a.role)
+                        );
+
+                        if (missingActivity) {
+                            const totalHours = missingActivity.hoursPerWeek * missingActivity.weeksPerYear;
+                            enhancedCV += `### ${missingActivity.role} | ${missingActivity.organization}\n`;
+                            enhancedCV += `*${missingActivity.startDate} - ${missingActivity.endDate}* • ${totalHours} total hours\n\n`;
+                            enhancedCV += `${missingActivity.description}\n\n`;
+                        }
+                    });
+
+                    setGeneratedCV(enhancedCV);
+                    toast.info(`✅ All ${activities.length} activities now included in CV!`);
+                } else {
+                    setGeneratedCV(generatedText);
+                    toast.success(`✨ CV generated with all ${activities.length} activities included!`);
+                }
             }
         } catch (error) {
             console.error('CV generation error:', error);
