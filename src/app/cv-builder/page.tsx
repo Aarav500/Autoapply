@@ -536,8 +536,7 @@ When the admissions officer finishes reading, they should think: "This student i
 
                 if (!validation.isComplete && validation.missingActivities.length > 0) {
                     toast.warning(
-                        `⚠️ Generated CV is missing ${validation.missingActivities.length} activities. Adding them now...`,
-                        { duration: 4000 }
+                        `⚠️ Generated CV is missing ${validation.missingActivities.length} activities. Adding them now...`
                     );
 
                     // Append missing activities to CV
