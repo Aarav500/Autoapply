@@ -15,6 +15,12 @@ import {
     EnrichedActivity
 } from '@/lib/cv-intelligence';
 import {
+    deduplicateActivities,
+    validateCVQuality,
+    generateEliteCollegeCVPrompt,
+    postProcessCV
+} from '@/lib/cv-generator-elite';
+import {
     FileText,
     Briefcase,
     GraduationCap,
@@ -166,21 +172,45 @@ export default function CVBuilderPage() {
         toast.info(`🚀 Generating ${mode === 'job' ? 'job-targeted' : 'college-targeted'} CV...`);
 
         try {
-            // ===== INTELLIGENCE ENGINE: Process activities FIRST for optimal tailoring =====
-            const enrichedActivities = processActivitiesForCV(activities, {
-                mode,
-                targetContext: mode === 'job'
-                    ? (jobDescription || '')
-                    : college.research.values.join(', '),
-                maxActivities: mode === 'job' ? 10 : 8,
-                enforceQuantification: true
-            });
+            // ===== STEP 1: DEDUPLICATE ACTIVITIES =====
+            console.log('[CV Builder] Deduplicating activities...');
+            const deduplicated = deduplicateActivities(activities);
+            console.log(`[CV Builder] Deduplicated: ${activities.length} → ${deduplicated.length} unique activities`);
 
-            const activitiesText = formatActivitiesForPrompt(enrichedActivities);
-            const qualityChecklist = generateQualityChecklist(enrichedActivities, mode);
+            if (deduplicated.length === 0) {
+                toast.error('No activities found. Please add activities first.');
+                setIsGenerating(false);
+                return;
+            }
 
-            const systemPrompt = mode === 'job'
-                ? `You are an ELITE executive resume writer who has helped 1000+ candidates land roles at FAANG, Fortune 500, and top startups. Your CVs have a 95% interview callback rate.
+            // ===== STEP 2: USE ELITE PROMPT FOR COLLEGE CVs =====
+            let systemPrompt: string;
+            let userMessage: string;
+
+            if (mode === 'college') {
+                // Use the new elite system for college CVs
+                const elitePrompt = generateEliteCollegeCVPrompt(
+                    profile,
+                    activities,
+                    achievements,
+                    college.name,
+                    college.research.values
+                );
+                systemPrompt = elitePrompt.systemPrompt;
+                userMessage = elitePrompt.userMessage;
+            } else {
+                // For job CVs, use the existing intelligence engine
+                const enrichedActivities = processActivitiesForCV(activities, {
+                    mode,
+                    targetContext: jobDescription || '',
+                    maxActivities: 10,
+                    enforceQuantification: true
+                });
+
+                const activitiesText = formatActivitiesForPrompt(enrichedActivities);
+                const qualityChecklist = generateQualityChecklist(enrichedActivities, mode);
+
+                systemPrompt = `You are an ELITE executive resume writer who has helped 1000+ candidates land roles at FAANG, Fortune 500, and top startups. Your CVs have a 95% interview callback rate.
 
 🎯 PRIMARY OBJECTIVE: Create an ATS-optimized, keyword-rich CV that positions this candidate as the #1 choice for THIS specific role.
 
@@ -283,134 +313,16 @@ ${qualityChecklist.map(item => item).join('\n')}
 
 ═══════════════════════════════════════════════════════════════════
 
-REMEMBER: This CV needs to get past ATS (keyword match) AND impress human recruiters (compelling narrative). You're not just listing experiences—you're telling the story of why this candidate is THE perfect hire.`
-                : `You are an ELITE college admissions consultant with 20+ years experience at top Ivy League admissions offices. You've helped 500+ students gain admission to Harvard, Stanford, MIT, and top universities with acceptance rates below 5%.
+REMEMBER: This CV needs to get past ATS (keyword match) AND impress human recruiters (compelling narrative). You're not just listing experiences—you're telling the story of why this candidate is THE perfect hire.`;
+            }
 
-🎯 PRIMARY OBJECTIVE: Create a compelling, authentic CV that demonstrates this student is an EXCEPTIONAL fit for ${college.name} and embodies their institutional values.
+            // Now continue with the userMessage construction for job mode only
+            if (mode === 'job') {
+                const achievementsText = achievements.map(a =>
+                    `- ${a.title} | ${a.org} (${a.date})`
+                ).join('\n');
 
-═══════════════════════════════════════════════════════════════════
-⚠️  CRITICAL REQUIREMENT - ACTIVITY INCLUSION ⚠️
-═══════════════════════════════════════════════════════════════════
-
-You will receive ${enrichedActivities.length} pre-scored activities below, ranked by alignment with ${college.name}'s values.
-
-🚨 MANDATORY RULES (VIOLATION = REJECTION):
-1. You MUST include ALL ${enrichedActivities.length} activities in the final CV
-2. Each activity MUST use the CARL framework (Context-Action-Result-Learning)
-3. High-priority activities get 150-200 word detailed narratives
-4. Medium-priority activities get 100-150 word narratives
-5. Low-priority activities get 75-100 word descriptions minimum
-6. DO NOT skip, combine, or omit any activity provided
-7. MUST show total hours and duration for EVERY activity
-
-═══════════════════════════════════════════════════════════════════
-🎓 ${college.name.toUpperCase()} - INSTITUTIONAL INTELLIGENCE
-═══════════════════════════════════════════════════════════════════
-
-**Core Values:** ${college.research.values.join(', ')}
-**What They Seek:** ${college.research.whatTheyLookFor.join(', ')}
-**Signature Programs:** ${college.research.notablePrograms.slice(0, 3).join(', ')}
-
-**Your Mission:** Map EVERY activity to at least one of these values. Use the college's own language. Show you understand what makes ${college.name} unique.
-
-═══════════════════════════════════════════════════════════════════
-💎 CARL FRAMEWORK - Required for Every Activity
-═══════════════════════════════════════════════════════════════════
-
-**C - CONTEXT:** What was the situation/challenge/opportunity?
-- Set the scene (1-2 sentences)
-- Explain why this mattered
-
-**A - ACTION:** What did YOU specifically do?
-- Focus on YOUR initiative and agency
-- Use first person implicitly: "Founded...", "Led...", "Developed..."
-- Emphasize what you STARTED or CHANGED
-
-**R - RESULT:** What measurable impact did you create?
-- Quantify: # of people affected, hours contributed, money raised, improvement %
-- Show tangible outcomes
-
-**L - LEARNING:** How did this shape your intellectual journey?
-- Connect to academic interests or future goals
-- Show personal growth and reflection
-- Link to ${college.name}'s values
-
-✅ EXAMPLE (Good):
-**Founder & President | Community Coding Initiative**
-*Sept 2021 - Present • 15 hrs/week • 720 total hours*
-
-[C] Recognizing that only 20% of students at local Title I schools had access to computer science education, I founded the Community Coding Initiative to bridge the digital divide. [A] I recruited 12 volunteer college CS students, designed a 12-week Python curriculum, secured \$5,000 in grants for laptops, and personally taught 4 sections. [R] Over 3 years, we've taught 180 underserved students (ages 10-16), with 85% continuing to advanced courses and 12 winning regional coding competitions. [L] This experience revealed how education equity and technical skills intersect—a passion I hope to explore through ${college.name}'s [relevant program], where I can study both CS and social impact.
-
-❌ EXAMPLE (Bad):
-**Member | Coding Club**
-Participated in club activities and helped teach students.
-
-═══════════════════════════════════════════════════════════════════
-🎨 CV STRUCTURE FOR ${college.name}
-═══════════════════════════════════════════════════════════════════
-
-## About Me / Personal Vision
-[2-3 sentences that reveal: (1) Your authentic intellectual passion, (2) Core values that align with ${college.name}, (3) What drives you. Be SPECIFIC, not generic. Avoid clichés like "hard-working" or "passionate about learning."]
-
-## Academic Profile
-**[High School Name]**
-GPA: [X.XX/4.0] (if strong) • Class Rank: [if impressive]
-**Relevant Coursework:** [AP, IB, or advanced courses that show rigor]
-**Academic Interests:** [Specific fields you want to explore]
-[Include research, independent study, or significant academic projects]
-
-## Leadership & Significant Activities
-[Order by alignment with ${college.name}'s values and impact, NOT chronologically]
-
-For EACH activity, use this format:
-
-### [Activity Name] | [Your Role]
-*[Start] - [End] (X.X years) • [Hours/week] hrs/week • [Total hours] total hours*
-**Alignment:** [Which ${college.name} value(s) this demonstrates]
-
-[Full CARL narrative: Context → Action → Result → Learning. 75-200 words depending on priority. Must be compelling storytelling, not bullet points.]
-
-**Key Outcomes:**
-- [Quantified impact metric #1]
-- [Quantified impact metric #2]
-- [Leadership growth or personal achievement]
-
-## Honors & Recognition
-[List awards, publications, competitions, scholarships]
-- **[Award Name]** - [Issuing Organization] ([Date])
-  [1 sentence on significance if not obvious]
-
-## Technical Skills & Languages
-**Programming/Technical:** [If applicable]
-**Languages:** [Fluency levels: Native, Fluent, Conversational, Basic]
-**Additional Skills:** [Music, art, athletics, etc. - only if significant]
-
-## Why ${college.name}
-[3-4 sentences demonstrating SPECIFIC fit. Mention exact programs, professors, research centers, or unique opportunities. Show you've done deep research. Connect your activities/interests to what ${college.name} offers.]
-
-═══════════════════════════════════════════════════════════════════
-✅ QUALITY CHECKLIST FOR ${college.name}
-═══════════════════════════════════════════════════════════════════
-
-${qualityChecklist.map(item => item).join('\n')}
-✓ Authentic voice (not generic or cliché)
-✓ Coherent narrative showing intellectual journey
-✓ Evidence of "spike" (depth in 1-2 areas) not just well-roundedness
-✓ Initiative and agency (what student STARTED, not just participated in)
-✓ Personal growth and reflection evident
-✓ Strong fit with ${college.name}'s specific culture and programs
-
-═══════════════════════════════════════════════════════════════════
-
-TONE: Confident but humble. Passionate but authentic. Intellectual but accessible.
-
-REMEMBER: Admissions officers read 50+ applications per day. This CV must make them STOP and think: "We NEED this student in our community." Tell a story that only THIS student can tell.`;
-
-            const achievementsText = achievements.map(a =>
-                `- ${a.title} | ${a.org} (${a.date})`
-            ).join('\n');
-
-            const userMessage = mode === 'job'
+                userMessage
                 ? `═══════════════════════════════════════════════════════════════════
 🎯 MISSION: Create ATS-optimized CV for THIS role
 ═══════════════════════════════════════════════════════════════════
@@ -457,58 +369,9 @@ ${achievementsText || '[No achievements provided - focus on activities above]'}
 ✅ Total length: 1-2 pages maximum
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-This CV must make it CRYSTAL CLEAR why I'm the #1 candidate for this role.`
-                : `═══════════════════════════════════════════════════════════════════
-🎓 MISSION: Create college CV for ${college.name}
-═══════════════════════════════════════════════════════════════════
-
-🏛️  TARGET INSTITUTION PROFILE:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-**Institution:** ${college.fullName}
-**Core Values:** ${college.research.values.join(', ')}
-**What They Seek:** ${college.research.whatTheyLookFor.join(', ')}
-**Signature Programs:** ${college.research.notablePrograms.join(', ')}
-
-${college.name} is looking for students who embody these values and will contribute meaningfully to their intellectual community.
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-👤 APPLICANT PROFILE:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-**Name:** ${profile.name}
-**Contact:** ${profile.email}
-${profile.portfolio ? '**Portfolio/Website:** ' + profile.portfolio : ''}
-${profile.researchPaper ? '**Research:** ' + profile.researchPaper : ''}
-
-**Personal Vision/Intellectual Passion:**
-${profile.summary || '[Analyze my activities below and synthesize a 2-3 sentence personal vision that: (1) reveals my authentic intellectual passion, (2) shows alignment with ' + college.name + "'s values, (3) demonstrates what drives me beyond academics. Be specific, not generic.]"}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🌟 MY LEADERSHIP & ACTIVITIES (${enrichedActivities.length} TOTAL - Pre-ranked by fit with ${college.name}):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${activitiesText}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🏆 HONORS & ACHIEVEMENTS:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${achievementsText || '[No achievements provided yet]'}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-⚠️  CRITICAL EXECUTION REQUIREMENTS:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ Include ALL ${enrichedActivities.length} activities (MANDATORY - no exceptions)
-✅ High-priority activities → 150-200 word CARL narrative each
-✅ Medium-priority activities → 100-150 word CARL narrative each
-✅ Low-priority activities → 75-100 word CARL narrative minimum
-✅ For EACH activity, explicitly state which ${college.name} value(s) it demonstrates
-✅ Show total hours and years of commitment for every activity
-✅ Use CARL framework (Context-Action-Result-Learning) for all activities
-✅ Emphasize initiative, leadership, and measurable impact
-✅ Create cohesive narrative showing intellectual journey
-✅ Include compelling "Why ${college.name}" section with specific program references
-✅ Authentic voice (no generic clichés like "hard-working" or "passionate")
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-When the admissions officer finishes reading, they should think: "This student is a PERFECT fit for ${college.name}. We need them in our community."`;
+This CV must make it CRYSTAL CLEAR why I'm the #1 candidate for this role.`;
+            }
+            // For college mode, elite prompt system already set systemPrompt and userMessage above
 
             // Call AI
             const response = await fetch('/api/ai/generate', {
@@ -534,7 +397,21 @@ When the admissions officer finishes reading, they should think: "This student i
                 toast.warning('⚠️ Using fallback template - Configure AI API key in Settings for AI-powered generation');
             } else {
                 const data = await response.json();
-                const generatedText = data.text;
+                let generatedText = data.text;
+
+                // ===== STEP 3: POST-PROCESS & VALIDATE =====
+                console.log('[CV Builder] Post-processing generated CV...');
+
+                // Apply elite post-processing (remove duplicates, generic phrases)
+                generatedText = postProcessCV(generatedText);
+
+                // Run quality validation
+                const qualityCheck = validateCVQuality(generatedText, activities);
+                console.log('[CV Builder] Quality check:', qualityCheck);
+
+                if (!qualityCheck.passed) {
+                    toast.warning(`⚠️ CV quality score: ${qualityCheck.score}/100. Issues: ${qualityCheck.issues.slice(0, 2).join(', ')}`);
+                }
 
                 // ===== QUALITY VALIDATION: Check if all activities are included =====
                 const validation = validateCVCompleteness(generatedText, activities);
