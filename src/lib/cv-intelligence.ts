@@ -28,7 +28,7 @@ export function scoreActivityForJob(
     activity: ActivityItem,
     jobKeywords: string[]
 ): { score: number; matches: string[] } {
-    const text = `${activity.name} ${activity.role} ${activity.organization} ${activity.description}`.toLowerCase();
+    const text = `${activity.name || ''} ${activity.role || ''} ${activity.organization || ''} ${activity.description || ''}`.toLowerCase();
     const matches: string[] = [];
     let score = 0;
 
@@ -60,10 +60,12 @@ export function scoreActivityForJob(
     if (technicalTerms.test(activity.description)) score += 7;
 
     // Recency bonus (recent experience more relevant)
-    const endYear = activity.endDate.includes('Present') ? new Date().getFullYear() : parseInt(activity.endDate.split(/[-/]/)[0]);
-    const yearsSince = new Date().getFullYear() - endYear;
-    if (yearsSince <= 1) score += 5;
-    else if (yearsSince <= 2) score += 3;
+    if (activity.endDate) {
+        const endYear = activity.endDate.includes('Present') ? new Date().getFullYear() : parseInt(activity.endDate.split(/[-/]/)[0]);
+        const yearsSince = new Date().getFullYear() - endYear;
+        if (yearsSince <= 1) score += 5;
+        else if (yearsSince <= 2) score += 3;
+    }
 
     return { score, matches };
 }
@@ -75,7 +77,7 @@ export function scoreActivityForCollege(
     activity: ActivityItem,
     collegeValues: string[]
 ): { score: number; alignedValues: string[] } {
-    const text = `${activity.name} ${activity.role} ${activity.description}`.toLowerCase();
+    const text = `${activity.name || ''} ${activity.role || ''} ${activity.description || ''}`.toLowerCase();
     const alignedValues: string[] = [];
     let score = 0;
 
@@ -129,6 +131,7 @@ export function scoreActivityForCollege(
  * Calculate duration in years between two date strings
  */
 function calculateDurationYears(startDate: string, endDate: string): number {
+    if (!startDate || !endDate) return 0;
     const start = new Date(startDate);
     const end = endDate.includes('Present') ? new Date() : new Date(endDate);
     return (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365);
@@ -143,13 +146,14 @@ export function enrichActivityForJob(
     score: number
 ): EnrichedActivity {
     // Generate quantified impact if missing
-    const hasMetrics = /\d+%|\d+x|\$\d+|\d+ (users|people|customers|clients)/i.test(activity.description);
+    const description = activity.description || '';
+    const hasMetrics = /\d+%|\d+x|\$\d+|\d+ (users|people|customers|clients)/i.test(description);
     const quantifiedImpact = hasMetrics
-        ? activity.description
-        : `${activity.description} [Note: Add quantifiable metrics for stronger impact]`;
+        ? description
+        : `${description} [Note: Add quantifiable metrics for stronger impact]`;
 
     // Create tailored description that emphasizes matched keywords
-    const tailoredDescription = activity.description;
+    const tailoredDescription = description;
 
     const priority: 'high' | 'medium' | 'low' = score > 50 ? 'high' : score > 30 ? 'medium' : 'low';
 
@@ -239,20 +243,20 @@ export function formatActivitiesForPrompt(enrichedActivities: EnrichedActivity[]
     }
 
     return enrichedActivities.map((activity, idx) => {
-        const totalHours = activity.hoursPerWeek * activity.weeksPerYear;
-        const duration = calculateDurationYears(activity.startDate, activity.endDate);
+        const totalHours = (activity.hoursPerWeek || 0) * (activity.weeksPerYear || 0);
+        const duration = calculateDurationYears(activity.startDate || '', activity.endDate || '');
 
         return `
 【ACTIVITY ${idx + 1}】 [Priority: ${activity.priority.toUpperCase()} | Relevance Score: ${activity.relevanceScore}]
-Name: ${activity.name}
-Role: ${activity.role}
-Organization: ${activity.organization}
-Duration: ${activity.startDate} → ${activity.endDate} (${duration.toFixed(1)} years)
-Time Commitment: ${activity.hoursPerWeek} hrs/week × ${activity.weeksPerYear} weeks/year = ${totalHours} total hours
-Matched Keywords/Values: ${activity.matchedKeywords.length > 0 ? activity.matchedKeywords.join(', ') : 'None'}
+Name: ${activity.name || 'Unnamed Activity'}
+Role: ${activity.role || 'Member'}
+Organization: ${activity.organization || 'Organization'}
+Duration: ${activity.startDate || 'Unknown'} → ${activity.endDate || 'Present'} (${duration.toFixed(1)} years)
+Time Commitment: ${activity.hoursPerWeek || 0} hrs/week × ${activity.weeksPerYear || 0} weeks/year = ${totalHours} total hours
+Matched Keywords/Values: ${activity.matchedKeywords && activity.matchedKeywords.length > 0 ? activity.matchedKeywords.join(', ') : 'None'}
 
 Description:
-${activity.description}
+${activity.description || 'No description provided'}
 
 REQUIREMENT: You MUST include this activity in the final CV with proper tailoring.
 `.trim();
@@ -299,12 +303,12 @@ export function validateCVCompleteness(
     activities.forEach(activity => {
         // Check if activity name OR organization appears in CV
         const activityMentioned =
-            generatedCV.includes(activity.name) ||
-            generatedCV.includes(activity.organization) ||
-            generatedCV.includes(activity.role);
+            (activity.name && generatedCV.includes(activity.name)) ||
+            (activity.organization && generatedCV.includes(activity.organization)) ||
+            (activity.role && generatedCV.includes(activity.role));
 
         if (!activityMentioned) {
-            missing.push(`${activity.role} at ${activity.organization}`);
+            missing.push(`${activity.role || 'Unknown role'} at ${activity.organization || 'Unknown org'}`);
         }
     });
 
