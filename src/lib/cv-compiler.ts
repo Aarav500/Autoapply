@@ -4,6 +4,42 @@
 // ============================================
 
 /**
+ * BAN LIST FOR CV CONTENT
+ *
+ * These phrases are FORBIDDEN in all CV renderers.
+ * They belong in personal statements, not CVs.
+ */
+const CV_BAN_LIST = [
+    'I believe',
+    'I realized',
+    'When I discovered',
+    'Mens et Manus',
+    'I was inspired',
+    'I recognized',
+    'Aligns with MIT',
+    'Aligns with Stanford',
+    'Aligns with',
+    'When the Taliban',
+    'I became fascinated',
+    'I saw an opportunity',
+    'my passion',
+    'I am passionate',
+    'I hope to',
+    'I dream of'
+];
+
+/**
+ * MODE-SPECIFIC CATEGORY FILTERS
+ *
+ * Each CV mode only shows certain experience categories.
+ */
+const MODE_CATEGORY_FILTERS: Record<string, string[]> = {
+    'research': ['research', 'industry'], // NO activism, NO volunteer, NO leadership
+    'industry': ['industry', 'research'], // NO activism, NO volunteer
+    'college': ['research', 'industry', 'leadership', 'volunteer', 'entrepreneurship'] // ALL allowed
+};
+
+/**
  * CANONICAL EXPERIENCE GRAPH
  *
  * This is the single source of truth for all experience data.
@@ -348,13 +384,19 @@ export function compileCV(
     profile: any,
     options: CVCompilerOptions
 ): CompiledCV {
-    // Step 1: Filter and rank experiences based on target
-    const ranked = rankExperiencesForTarget(experiences, options);
+    // Step 1: Filter by mode-specific categories
+    const allowedCategories = MODE_CATEGORY_FILTERS[options.target];
+    const filtered = experiences.filter(exp =>
+        allowedCategories.includes(exp.category)
+    );
 
-    // Step 2: Apply page limit compression
+    // Step 2: Rank experiences based on target
+    const ranked = rankExperiencesForTarget(filtered, options);
+
+    // Step 3: Apply page limit compression
     const compressed = compressToPageLimit(ranked, options.pageLimit);
 
-    // Step 3: Render using appropriate template
+    // Step 4: Render using appropriate template
     let content: string;
     switch (options.target) {
         case 'industry':
@@ -368,7 +410,10 @@ export function compileCV(
             break;
     }
 
-    // Step 4: Validate and return
+    // Step 5: Validate content (remove banned phrases if present)
+    content = validateCVContent(content, options.target);
+
+    // Step 6: Generate metadata and return
     const metadata = generateMetadata(content, compressed);
 
     return { content, metadata };
@@ -706,16 +751,53 @@ function scoreExperienceForTarget(exp: ExperienceNode, options: CVCompilerOption
     return score;
 }
 
+/**
+ * COMPRESSION ENGINE
+ * Auto-trims experiences to meet page limits
+ */
 function compressToPageLimit(experiences: ExperienceNode[], limit: PageLimit): ExperienceNode[] {
+    // HARD limits by page count
     const targetCounts: Record<PageLimit, number> = {
-        1: 4,
-        2: 8,
-        3: 12,
-        4: 16
+        1: 4,  // Industry: 1 page max
+        2: 8,  // Research internships: 2 pages max
+        3: 12, // PhD applications: 3 pages max
+        4: 16  // College admissions: 4 pages max (but prefer 2-3)
     };
 
+    // AUTO-OMIT RULES
+    // Drop experiences that are weak signal regardless of ranking
+    const filtered = experiences.filter(exp => {
+        // Drop: <10 hours (unless published or deployed)
+        if (exp.hours < 10 && !exp.isPublished && !exp.isProduction) {
+            return false;
+        }
+
+        // Drop: >4 years old with no publications/deployments
+        const yearsAgo = calculateYearsAgo(exp.dates.end);
+        if (yearsAgo > 4 && !exp.isPublished && !exp.isProduction) {
+            return false;
+        }
+
+        // Drop: Generic volunteer work (no outcomes)
+        if (exp.category === 'volunteer' &&
+            exp.outcomes.metrics.length === 0 &&
+            !exp.outcomes.publications &&
+            exp.hours < 50) {
+            return false;
+        }
+
+        return true;
+    });
+
     const targetCount = targetCounts[limit];
-    return experiences.slice(0, targetCount);
+    return filtered.slice(0, targetCount);
+}
+
+function calculateYearsAgo(endDate: string): number {
+    if (endDate === 'Present') return 0;
+    const end = new Date(endDate);
+    const now = new Date();
+    return (now.getTime() - end.getTime()) / (1000 * 60 * 60 * 24 * 365);
 }
 
 // ============================================
@@ -753,7 +835,37 @@ function generateIndustrySummary(experiences: ExperienceNode[], keywords: string
 
 function generateCollegeSummary(experiences: ExperienceNode[]): string {
     const topDomain = experiences[0]?.domain || 'technology';
-    return `Passionate about ${topDomain.toLowerCase()} with deep commitment to using technical skills for social impact. Driven by intellectual curiosity and desire to solve meaningful problems.`;
+    // REMOVED: "Passionate about" and emotional language
+    // College CVs should show passion through actions, not declarations
+    return `Focused on ${topDomain.toLowerCase()} with commitment to using technical skills for impact. Driven by curiosity and solving meaningful problems through rigorous research and implementation.`;
+}
+
+/**
+ * VALIDATE CV CONTENT
+ * Removes banned phrases and checks format compliance
+ */
+function validateCVContent(content: string, target: CVTarget): string {
+    let validated = content;
+
+    // Remove ALL banned phrases (case-insensitive)
+    CV_BAN_LIST.forEach(phrase => {
+        const regex = new RegExp(phrase, 'gi');
+        validated = validated.replace(regex, '[REMOVED]');
+    });
+
+    // Additional validation for research/industry modes
+    if (target === 'research' || target === 'industry') {
+        // Remove any remaining first-person emotional language
+        const emotionalPatterns = [
+            /\b(fascinated|inspired|passionate|dream|hope)\b/gi,
+            /\b(I felt|I thought|I wanted)\b/gi
+        ];
+        emotionalPatterns.forEach(pattern => {
+            validated = validated.replace(pattern, '[REMOVED]');
+        });
+    }
+
+    return validated;
 }
 
 function generateMetadata(content: string, experiences: ExperienceNode[]): CompiledCV['metadata'] {
@@ -761,6 +873,15 @@ function generateMetadata(content: string, experiences: ExperienceNode[]): Compi
     const publicationCount = experiences.flatMap(e => e.outcomes.publications || []).length;
 
     const warnings: string[] = [];
+
+    // Check for banned phrases
+    const hasBannedPhrases = CV_BAN_LIST.some(phrase =>
+        content.toLowerCase().includes(phrase.toLowerCase())
+    );
+    if (hasBannedPhrases) {
+        warnings.push('⚠️ CV contains banned essay phrases');
+    }
+
     if (wordCount > 2000) warnings.push('CV exceeds recommended word count');
     if (experiences.length < 3) warnings.push('Too few experiences included');
 
