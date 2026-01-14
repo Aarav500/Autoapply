@@ -209,7 +209,15 @@ export function generateEliteCollegeCVPrompt(
    - Each activity: 75-150 words
    - No fluff, no filler, just achievements
 
-6. **${collegeName} ALIGNMENT**: Explicitly connect each activity to ${collegeName}'s values: ${collegeValues.join(', ')}
+6. **${collegeName} ALIGNMENT**: Connect activities to SPECIFIC ${collegeName} programs/professors/labs, not just generic values.
+
+7. **NARRATIVE-DRIVEN**: Start major activities with compelling "origin stories" - WHY you started, personal connection, moment of realization.
+
+8. **PRIORITIZE IMPACT**: Focus on activities with:
+   - Most hours invested (>100 hrs shows commitment)
+   - Unique/unusual (stands out from other applicants)
+   - Measurable outcomes (published, deployed, raised money)
+   - Activities <10 hours should be omitted unless extraordinary
 
 ═══════════════════════════════════════════════════════════════════
 📋 CV STRUCTURE (MUST FOLLOW EXACTLY):
@@ -270,7 +278,12 @@ GPA: [X.XX] • Key Interests: [specific fields]
 ---
 
 ## Why ${collegeName}
-[3-4 sentences with SPECIFIC programs, professors, or research centers. Show deep knowledge of what makes ${collegeName} unique.]
+[3-4 sentences with SPECIFIC programs, professors, or research centers. Examples of specificity:
+- Name actual professors and their research areas
+- Reference specific labs (e.g., "MIT CSAIL", "ORC", "Media Lab")
+- Mention courses by number (e.g., "6.046 Design & Analysis of Algorithms")
+- Connect YOUR work to THEIR research (e.g., "My quantum supply chain work extends Prof. Bertsimas's prescriptive analytics")
+Show you've done deep research - not just "MIT has great research."]
 
 ═══════════════════════════════════════════════════════════════════
 ✅ QUALITY CHECKLIST (ALL MUST BE TRUE):
@@ -343,16 +356,36 @@ ${achievements.length > 0
     : '[No achievements provided]'}
 
 ═══════════════════════════════════════════════════════════════════
-⚠️  EXECUTION REQUIREMENTS:
+${collegeName === 'MIT' ? `🎯 MIT-SPECIFIC GUIDANCE:
+═══════════════════════════════════════════════════════════════════
+
+For "Why MIT" section, reference:
+• **Operations Research Center (ORC)** - Prof. Dimitris Bertsimas (prescriptive analytics, optimization)
+• **CSAIL (Computer Science & AI Lab)** - Distributed Robotics Lab (Prof. Daniela Rus), Accessibility Group
+• **MIT-IBM Watson AI Lab** - Enterprise AI deployment, production ML systems
+• **Sloan School** - Operations management, supply chain intelligence
+• **Course 6-3 (CS)** or **Course 15 (Management Science)** connections
+• "Mens et Manus" philosophy - theory + hands-on building
+
+For activity alignment, be SPECIFIC:
+• Quantum supply chain research → "Extends Prof. Bertsimas's ORC prescriptive analytics into quantum regime"
+• ML/AI projects → "Exemplifies MIT CSAIL's end-to-end systems approach"
+• Accessibility tech → "Aligns with CSAIL Accessibility Group's human-centered computing"
+• Social impact work → "Embodies MIT's 'Mens et Manus' - using technical skills for humanitarian needs"
+
+═══════════════════════════════════════════════════════════════════
+` : ''}⚠️  EXECUTION REQUIREMENTS:
 ═══════════════════════════════════════════════════════════════════
 
 ✅ Include ALL ${deduped.length} activities (each appears EXACTLY ONCE)
-✅ Use CARL framework (75-150 words each)
+✅ Use CARL framework with narrative hooks (75-150 words each)
 ✅ Quantify EVERY activity with numbers
-✅ Connect each activity to ${collegeName} values
+✅ Connect activities to SPECIFIC ${collegeName} programs/professors (not just "innovation")
 ✅ Strong action verbs only (no "demonstrated", "participated", etc.)
-✅ Total CV length: 1000-1500 words
+✅ Total CV length: 1000-1500 words (2 pages max)
 ✅ NO DUPLICATE SECTIONS
+✅ Prioritize high-impact activities (>100 hours, unique outcomes, published work)
+✅ Omit activities <10 hours unless extraordinary
 
 Generate the CV now. Make it exceptional.`;
 
