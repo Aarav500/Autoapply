@@ -15,9 +15,15 @@ import {
     EnrichedActivity
 } from '@/lib/cv-intelligence';
 import {
+    extractExperienceGraph,
+    compileCV,
+    type CVTarget,
+    type CVCompilerOptions,
+    type ExperienceNode
+} from '@/lib/cv-compiler';
+import {
     deduplicateActivities,
     validateCVQuality,
-    generateEliteCollegeCVPrompt,
     postProcessCV
 } from '@/lib/cv-generator-elite';
 import {
@@ -188,16 +194,30 @@ export default function CVBuilderPage() {
             let userMessage: string;
 
             if (mode === 'college') {
-                // Use the new elite system for college CVs
-                const elitePrompt = generateEliteCollegeCVPrompt(
-                    profile,
-                    activities,
-                    achievements,
-                    college.name,
-                    college.research.values
-                );
-                systemPrompt = elitePrompt.systemPrompt;
-                userMessage = elitePrompt.userMessage;
+                // Use CV compiler for college CVs - direct compilation, no AI prompt
+                const experiences = extractExperienceGraph(activities, achievements);
+
+                const compilerOptions: CVCompilerOptions = {
+                    target: 'college' as CVTarget,
+                    pageLimit: 3, // MIT requires 2-4 pages, we target 3
+                    collegeId: selectedCollege,
+                    emphasis: 'research' // Emphasize research over leadership for elite colleges
+                };
+
+                const compiled = compileCV(experiences, profile, compilerOptions);
+
+                // Set the generated CV directly (skip AI call for college mode)
+                setGeneratedCV(compiled.content);
+
+                // Show validation warnings if any
+                if (compiled.metadata.warnings.length > 0) {
+                    compiled.metadata.warnings.forEach(warning => {
+                        toast.warning(warning);
+                    });
+                }
+
+                setIsGenerating(false);
+                return; // Exit early - no need for AI API call
             } else {
                 // For job CVs, use the existing intelligence engine
                 const enrichedActivities = processActivitiesForCV(activities, {
