@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Button, StatusBadge, Input, Textarea, Tag } from '@/components/ui';
 import { useS3Storage } from '@/lib/useS3Storage';
+import { STORAGE_KEYS } from '@/lib/s3-storage';
 import { toast } from '@/lib/error-handling';
 import { getAIConfig, AIConfig, AIProvider, setAPIKey } from '@/lib/ai-providers';
 import { targetColleges } from '@/lib/colleges-data';
@@ -104,17 +105,17 @@ export default function CVBuilderPage() {
     const [selectedCollege, setSelectedCollege] = useState('mit');
     const [jobDescription, setJobDescription] = useState('');
 
-    // User profile - fixed to use options object
-    const profileStorage = useS3Storage<UserProfile>('cv-profile', { defaultValue: defaultProfile });
+    // User profile - using centralized storage keys
+    const profileStorage = useS3Storage<UserProfile>(STORAGE_KEYS.CV_PROFILE, { defaultValue: defaultProfile });
     const profile = profileStorage.data;
     const setProfile = profileStorage.setData;
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [profileForm, setProfileForm] = useState<UserProfile>(defaultProfile);
 
-    // Data - fixed to use options object
-    const activitiesStorage = useS3Storage<ActivityItem[]>('activities', { defaultValue: [] });
+    // Data - using centralized storage keys
+    const activitiesStorage = useS3Storage<ActivityItem[]>(STORAGE_KEYS.ACTIVITIES, { defaultValue: [] });
     const activities = activitiesStorage.data;
-    const achievementsStorage = useS3Storage<Achievement[]>('achievements', { defaultValue: [] });
+    const achievementsStorage = useS3Storage<Achievement[]>(STORAGE_KEYS.ACHIEVEMENTS, { defaultValue: [] });
     const achievements = achievementsStorage.data;
 
     // Generation state

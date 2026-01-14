@@ -168,19 +168,26 @@ export const STORAGE_KEYS = {
     // User data
     USER_PROFILE: 'user/profile',
     USER_SETTINGS: 'user/settings',
+    CV_PROFILE: 'cv/profile', // Separate CV-specific profile data
 
     // Essays
     ESSAYS: 'essays/all',
     ESSAY_DRAFTS: 'essays/drafts',
 
     // Jobs
+    JOBS_ALL: 'jobs/all', // All enhanced jobs
     SAVED_JOBS: 'jobs/saved',
+    SAVED_JOB_IDS: 'jobs/saved-ids', // Just IDs for saved jobs
     APPLIED_JOBS: 'jobs/applied',
+    APPLIED_JOB_IDS: 'jobs/applied-ids', // Just IDs for applied jobs
     JOB_PREFERENCES: 'jobs/preferences',
 
     // Scholarships
+    SCHOLARSHIPS_ALL: 'scholarships/all', // All enhanced scholarships
     SAVED_SCHOLARSHIPS: 'scholarships/saved',
+    SAVED_SCHOLARSHIP_IDS: 'scholarships/saved-ids', // Just IDs
     APPLIED_SCHOLARSHIPS: 'scholarships/applied',
+    APPLIED_SCHOLARSHIP_IDS: 'scholarships/applied-ids', // Just IDs
 
     // Discovered Opportunities (from scrapers)
     DISCOVERED_OPPORTUNITIES: 'automation/opportunities',
@@ -198,8 +205,15 @@ export const STORAGE_KEYS = {
     TRANSCRIPT: 'grades/transcript',
     COURSES: 'grades/courses',
 
-    // Activities
+    // Activities & Achievements
     ACTIVITIES: 'activities/all',
+    ACHIEVEMENTS: 'achievements/all',
+
+    // Analytics
+    ANALYTICS_EVENTS: 'analytics/events',
+
+    // Deadlines
+    DEADLINES: 'deadlines/all',
 } as const;
 
 // ============================================

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Button } from '@/components/ui';
 import { useS3Storage } from '@/lib/useS3Storage';
+import { STORAGE_KEYS } from '@/lib/s3-storage';
 import {
     GraduationCap, Heart, Code, Music, Trophy, Star, Loader2,
     FileText, CheckCircle, Upload, File, Users, Briefcase, Award, Plus, X, Save,
@@ -69,21 +70,20 @@ export default function ActivitiesPage() {
     const [uploadContent, setUploadContent] = useState('');
     const [extractionResult, setExtractionResult] = useState<{ activities: Activity[], achievements: Achievement[] } | null>(null);
 
-    // Load from S3 - using SAME keys as dashboard
+    // Load from S3 - using centralized storage keys
     const {
         data: activities,
         setData: setActivities,
         save: saveActivitiesData,
         isLoading: activitiesLoading
-    } = useS3Storage<Activity[]>('activities', { defaultValue: [] });
-
+    } = useS3Storage<Activity[]>(STORAGE_KEYS.ACTIVITIES, { defaultValue: [] });
 
     const {
         data: achievements,
         setData: setAchievements,
         save: saveAchievementsData,
         isLoading: achievementsLoading
-    } = useS3Storage<Achievement[]>('achievements', { defaultValue: [] });
+    } = useS3Storage<Achievement[]>(STORAGE_KEYS.ACHIEVEMENTS, { defaultValue: [] });
 
 
     const isLoading = activitiesLoading || achievementsLoading;
