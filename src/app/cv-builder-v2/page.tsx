@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Button, StatusBadge, Input, Textarea } from '@/components/ui';
 import { useS3Storage } from '@/lib/useS3Storage';
+import { STORAGE_KEYS } from '@/lib/s3-storage';
 import { toast } from '@/lib/error-handling';
 import { targetColleges } from '@/lib/colleges-data';
 import {
@@ -100,10 +101,10 @@ export default function CVBuilderV2() {
     const profile = profileStorage.data;
     const setProfile = profileStorage.setData;
 
-    const activitiesStorage = useS3Storage<ActivityItem[]>('activities', { defaultValue: [] });
+    const activitiesStorage = useS3Storage<ActivityItem[]>(STORAGE_KEYS.ACTIVITIES, { defaultValue: [] });
     const activities = activitiesStorage.data;
 
-    const achievementsStorage = useS3Storage<Achievement[]>('achievements', { defaultValue: [] });
+    const achievementsStorage = useS3Storage<Achievement[]>(STORAGE_KEYS.ACHIEVEMENTS, { defaultValue: [] });
     const achievements = achievementsStorage.data;
 
     // Generated state
