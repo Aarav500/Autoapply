@@ -7,13 +7,23 @@ import { useS3Storage } from '@/lib/useS3Storage';
 import { toast } from '@/lib/error-handling';
 import { targetColleges } from '@/lib/colleges-data';
 import {
-    extractExperienceGraph,
-    compileCV,
+    CVCompiler,
     CVTarget,
-    PageLimit,
     ExperienceNode,
-    CVCompilerOptions
+    CompiledCV
+} from '@/lib/cv-compiler-v2';
+import {
+    extractExperienceGraph,
+    PageLimit
 } from '@/lib/cv-compiler';
+import {
+    RESEARCH_TARGETS,
+    INDUSTRY_TARGETS,
+    COLLEGE_TARGETS,
+    ALL_TARGETS,
+    getTargetById,
+    GOLD_STANDARD
+} from '@/lib/cv-targets';
 import {
     FileText,
     Briefcase,
@@ -25,8 +35,10 @@ import {
     User,
     X,
     Zap,
-    Target
+    Target,
+    ChevronDown
 } from 'lucide-react';
+
 
 interface ActivityItem {
     id: string;
@@ -76,9 +88,10 @@ const defaultProfile: UserProfile = {
 };
 
 export default function CVBuilderV2() {
-    // Target selection
-    const [target, setTarget] = useState<CVTarget>('industry');
-    const [pageLimit, setPageLimit] = useState<PageLimit>(1);
+    // Target selection - now uses predefined targets
+    const [targetMode, setTargetMode] = useState<'research' | 'industry' | 'college'>('industry');
+    const [selectedTargetId, setSelectedTargetId] = useState('google-ml');
+    const [pageLimit, setPageLimit] = useState<PageLimit>(2);
     const [jobDescription, setJobDescription] = useState('');
     const [selectedCollege, setSelectedCollege] = useState('mit');
 
@@ -97,11 +110,22 @@ export default function CVBuilderV2() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [generatedCV, setGeneratedCV] = useState('');
     const [experienceGraph, setExperienceGraph] = useState<ExperienceNode[]>([]);
-    const [metadata, setMetadata] = useState<any>(null);
+    const [compiledResult, setCompiledResult] = useState<CompiledCV | null>(null);
 
     // Profile modal
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [profileForm, setProfileForm] = useState<UserProfile>(defaultProfile);
+
+    // Get current targets based on mode
+    const currentTargets = targetMode === 'research' ? RESEARCH_TARGETS :
+        targetMode === 'industry' ? INDUSTRY_TARGETS : COLLEGE_TARGETS;
+
+    // Auto-select first target when mode changes
+    useEffect(() => {
+        if (currentTargets.length > 0) {
+            setSelectedTargetId(currentTargets[0].id);
+        }
+    }, [targetMode]);
 
     useEffect(() => {
         if (profile) setProfileForm(profile);
@@ -110,7 +134,10 @@ export default function CVBuilderV2() {
     const hasProfile = profile && profile.name && profile.email;
     const hasActivities = activities.length > 0;
 
-    // Generate CV using the compiler
+    // Get current target object
+    const currentTarget = getTargetById(selectedTargetId) || currentTargets[0];
+
+    // Generate CV using the new CVCompiler class
     const handleGenerateCV = () => {
         if (!hasProfile) {
             setShowProfileModal(true);
@@ -123,35 +150,42 @@ export default function CVBuilderV2() {
             return;
         }
 
+        if (!currentTarget) {
+            toast.error('No target selected');
+            return;
+        }
+
         setIsGenerating(true);
-        toast.info(`🚀 Compiling ${target} CV...`);
+        toast.info(`🚀 Compiling ${currentTarget.name} CV...`);
 
         try {
-            // Step 1: Extract experience graph
-            console.log('[CV Compiler] Extracting experience graph from activities...');
+            // Step 1: Extract experience graph from activities
+            console.log('[CV Compiler V2] Extracting experience graph from activities...');
             const graph = extractExperienceGraph(activities, achievements);
             setExperienceGraph(graph);
-            console.log(`[CV Compiler] Extracted ${graph.length} experience nodes`);
+            console.log(`[CV Compiler V2] Extracted ${graph.length} experience nodes`);
 
-            // Step 2: Compile CV
-            const options: CVCompilerOptions = {
-                target,
-                pageLimit,
-                jobDescription: target === 'industry' ? jobDescription : undefined,
-                collegeId: target === 'college' ? selectedCollege : undefined,
-                emphasis: target === 'research' ? 'research' : target === 'industry' ? 'technical' : 'impact'
-            };
-
-            console.log('[CV Compiler] Compiling CV with options:', options);
-            const result = compileCV(graph, profile, options);
+            // Step 2: Create compiler and compile
+            console.log('[CV Compiler V2] Creating compiler with target:', currentTarget);
+            const compiler = new CVCompiler(graph, profile);
+            const result = compiler.compile(currentTarget);
 
             setGeneratedCV(result.content);
-            setMetadata(result.metadata);
+            setCompiledResult(result);
 
-            toast.success(`✅ ${target.toUpperCase()} CV compiled successfully!`);
-            console.log('[CV Compiler] Metadata:', result.metadata);
+            // Show gold standard expectation
+            const goldStandard = GOLD_STANDARD[currentTarget.id];
+            if (goldStandard) {
+                console.log(`[CV Compiler V2] 🏆 Gold Standard: "${goldStandard}"`);
+            }
 
-            // Show warnings if any
+            toast.success(`✅ ${currentTarget.name} CV compiled!`);
+            console.log('[CV Compiler V2] Metadata:', result.metadata);
+
+            // Show warnings/violations if any
+            if (result.metadata.violations.length > 0) {
+                toast.warning(`⚠️ ${result.metadata.violations.length} ban list violations removed`);
+            }
             if (result.metadata.warnings.length > 0) {
                 result.metadata.warnings.forEach(w => toast.warning(w));
             }
@@ -210,34 +244,58 @@ export default function CVBuilderV2() {
                     Target Audience
                 </h3>
 
+                {/* Mode selection */}
                 <div className="grid grid-cols-3 gap-4 mb-6">
                     <Button
-                        variant={target === 'industry' ? 'primary' : 'secondary'}
-                        onClick={() => setTarget('industry')}
+                        variant={targetMode === 'industry' ? 'primary' : 'secondary'}
+                        onClick={() => setTargetMode('industry')}
                         icon={<Briefcase className="w-4 h-4" />}
                         className="flex flex-col items-center gap-2 h-auto py-4"
                     >
                         <span>Industry</span>
-                        <span className="text-xs opacity-70">Google • Meta • OpenAI</span>
+                        <span className="text-xs opacity-70">Google • OpenAI • Quant</span>
                     </Button>
                     <Button
-                        variant={target === 'research' ? 'primary' : 'secondary'}
-                        onClick={() => setTarget('research')}
+                        variant={targetMode === 'research' ? 'primary' : 'secondary'}
+                        onClick={() => setTargetMode('research')}
                         icon={<GraduationCap className="w-4 h-4" />}
                         className="flex flex-col items-center gap-2 h-auto py-4"
                     >
                         <span>Research</span>
-                        <span className="text-xs opacity-70">MIT CSAIL • Labs • PhD</span>
+                        <span className="text-xs opacity-70">MIT ORC • CSAIL • PhD</span>
                     </Button>
                     <Button
-                        variant={target === 'college' ? 'primary' : 'secondary'}
-                        onClick={() => setTarget('college')}
+                        variant={targetMode === 'college' ? 'primary' : 'secondary'}
+                        onClick={() => setTargetMode('college')}
                         icon={<FileText className="w-4 h-4" />}
                         className="flex flex-col items-center gap-2 h-auto py-4"
                     >
                         <span>College</span>
                         <span className="text-xs opacity-70">Undergrad Admissions</span>
                     </Button>
+                </div>
+
+                {/* Specific target selector */}
+                <div className="mb-4">
+                    <label className="block text-sm font-medium mb-2">
+                        Specific Target ({currentTargets.length} available)
+                    </label>
+                    <select
+                        value={selectedTargetId}
+                        onChange={e => setSelectedTargetId(e.target.value)}
+                        className="input-field w-full"
+                    >
+                        {currentTargets.map(t => (
+                            <option key={t.id} value={t.id}>
+                                {t.name}
+                            </option>
+                        ))}
+                    </select>
+                    {currentTarget && (
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                            {currentTarget.description || `${currentTarget.type} CV, max ${currentTarget.pageLimit} pages`}
+                        </p>
+                    )}
                 </div>
 
                 {/* Page limit selector */}
@@ -258,32 +316,15 @@ export default function CVBuilderV2() {
                 </div>
 
                 {/* Target-specific inputs */}
-                {target === 'industry' && (
+                {targetMode === 'industry' && (
                     <div>
-                        <label className="block text-sm font-medium mb-2">Job Description</label>
+                        <label className="block text-sm font-medium mb-2">Job Description (optional)</label>
                         <Textarea
-                            placeholder="Paste the job description here... Keywords will be automatically extracted."
+                            placeholder="Paste the job description here... Keywords will boost matching experiences."
                             value={jobDescription}
                             onChange={e => setJobDescription(e.target.value)}
-                            rows={6}
+                            rows={4}
                         />
-                    </div>
-                )}
-
-                {target === 'college' && (
-                    <div>
-                        <label className="block text-sm font-medium mb-2">Target College</label>
-                        <select
-                            value={selectedCollege}
-                            onChange={e => setSelectedCollege(e.target.value)}
-                            className="input-field w-full"
-                        >
-                            {targetColleges.map(c => (
-                                <option key={c.id} value={c.id}>
-                                    {c.name} - {c.fullName}
-                                </option>
-                            ))}
-                        </select>
                     </div>
                 )}
             </Card>
@@ -324,31 +365,44 @@ export default function CVBuilderV2() {
                     </Card>
 
                     {/* Metadata display */}
-                    {metadata && (
+                    {compiledResult && (
                         <Card className="p-4">
                             <h3 className="font-semibold mb-3">CV Metadata</h3>
                             <div className="space-y-2 text-sm">
                                 <div className="flex items-center justify-between">
                                     <span style={{ color: 'var(--text-secondary)' }}>Word Count</span>
-                                    <span>{metadata.wordCount}</span>
+                                    <span>{compiledResult.metadata.wordCount}</span>
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <span style={{ color: 'var(--text-secondary)' }}>Experiences</span>
-                                    <span>{metadata.experienceCount}</span>
+                                    <span>{compiledResult.metadata.experienceCount}</span>
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <span style={{ color: 'var(--text-secondary)' }}>Publications</span>
-                                    <span>{metadata.publicationCount}</span>
+                                    <span>{compiledResult.metadata.publicationCount}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span style={{ color: 'var(--text-secondary)' }}>Page Estimate</span>
+                                    <span>{compiledResult.metadata.pageEstimate}</span>
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <span style={{ color: 'var(--text-secondary)' }}>Signal Strength</span>
                                     <StatusBadge status={
-                                        metadata.signal === 'strong' ? 'success' :
-                                        metadata.signal === 'medium' ? 'warning' : 'error'
+                                        compiledResult.metadata.signal === 'elite' ? 'success' :
+                                            compiledResult.metadata.signal === 'strong' ? 'success' :
+                                                compiledResult.metadata.signal === 'medium' ? 'warning' : 'error'
                                     }>
-                                        {metadata.signal}
+                                        {compiledResult.metadata.signal}
                                     </StatusBadge>
                                 </div>
+                                {compiledResult.metadata.violations.length > 0 && (
+                                    <div className="flex items-center justify-between">
+                                        <span style={{ color: 'var(--text-secondary)' }}>Ban Violations</span>
+                                        <StatusBadge status="error">
+                                            {compiledResult.metadata.violations.length} removed
+                                        </StatusBadge>
+                                    </div>
+                                )}
                             </div>
                         </Card>
                     )}
@@ -361,7 +415,7 @@ export default function CVBuilderV2() {
                         disabled={isGenerating}
                         icon={<Sparkles className="w-5 h-5" />}
                     >
-                        {isGenerating ? 'Compiling...' : `Compile ${target.toUpperCase()} CV`}
+                        {isGenerating ? 'Compiling...' : `Compile ${currentTarget?.name || 'CV'}`}
                     </Button>
                 </div>
 
@@ -539,6 +593,6 @@ export default function CVBuilderV2() {
                     </motion.div>
                 )}
             </AnimatePresence>
-        </motion.div>
+        </motion.div >
     );
 }

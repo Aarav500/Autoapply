@@ -5,13 +5,47 @@
 
 /**
  * HARD BAN LIST - These phrases trigger IMMEDIATE rejection
+ * NO-ESSAY RULE: CVs must be factual, impersonal, compressed
  */
 const BANNED_PHRASES = [
-    'I', 'When', 'Because', 'Inspired', 'I realized', 'I watched',
-    'Aligns with', 'Mens et Manus', 'MIT', 'belief', 'passion',
-    'I believe', 'I was', 'I am', 'I became', 'I saw', 'I hope',
-    'I dream', 'my passion', 'fascinated', 'inspired me'
+    // Pronouns - ALL "I" variants forbidden
+    'I', 'I realized', 'I watched', 'I believe', 'I was', 'I am',
+    'I became', 'I saw', 'I hope', 'I dream', 'I learned', 'I discovered',
+    'I created', 'I built', 'I led', 'I developed', 'I implemented',
+    // Essay language - triggers immediate rejection
+    'When', 'Because', 'Inspired', 'Aligns with', 'Mens et Manus',
+    'belief', 'passion', 'my passion', 'fascinated', 'inspired me',
+    // Narrative triggers
+    'One day', 'Growing up', 'Ever since', 'As a child', 'From a young age',
+    'This experience taught me', 'Through this', 'This showed me',
+    // School/target name contamination
+    'MIT', 'Stanford', 'Harvard', 'Yale', 'Princeton',
+    // Philosophy/abstract language
+    'meaningful', 'impactful', 'transformative', 'journey', 'path',
+    'calling', 'destiny', 'dream', 'goal in life'
 ] as const;
+
+/**
+ * DROP KEYWORDS BY MODE
+ * Experiences containing these keywords are excluded per target type
+ */
+const DROP_KEYWORDS: Record<'research' | 'industry' | 'college', string[]> = {
+    research: [
+        // DROP: SAP, Hackathons, Community service, Leadership, Entrepreneurship
+        'hackathon', 'community service', 'rotary', 'volunteer', 'chess club',
+        'olympiad', 'farming', 'church', 'mentoring', 'tutoring', 'fundraising'
+    ],
+    industry: [
+        // DROP: Afghan curriculum, Rotary, Farming, Chess, Olympiads, Research narratives
+        'curriculum', 'rotary', 'farming', 'chess', 'olympiad', 'teaching',
+        'tutoring', 'essay', 'philosophy', 'humanities', 'literature'
+    ],
+    college: [
+        // DROP: Deep system architecture, Quantum math, Enterprise ML detail
+        'QUBO formulation', 'distributed consensus', 'Byzantine fault',
+        'enterprise architecture', 'microservice mesh', 'kernel module'
+    ]
+};
 
 /**
  * CANONICAL EXPERIENCE NODE
@@ -36,7 +70,7 @@ export interface ExperienceNode {
         team?: string;      // "Led team of 8"
         budget?: string;    // "$50K funding"
         geographic?: string; // "3 provinces"
-        temporal?: string;  // "5 years historical data"
+        temporal?: string;  // "5 years historical data" (legacy: not used by old compiler)
     };
 
     // Outcomes (MUST have at least one)
@@ -54,7 +88,14 @@ export interface ExperienceNode {
     hours: number;
     isPublished: boolean;
     isProduction: boolean;
-    priority: number; // 0-100, computed
+    priority?: number; // 0-100, computed (optional, added during ranking)
+
+    // Legacy fields (for compatibility with cv-compiler.ts)
+    description?: string;
+    impact?: string;
+    researchQuestion?: string;
+    businessContext?: string;
+    isUnique?: boolean;
 }
 
 /**
@@ -157,32 +198,50 @@ export class CVCompiler {
     // ========================================
 
     private filterByMode(mode: 'research' | 'industry' | 'college'): ExperienceNode[] {
+        // Get drop keywords for this mode
+        const dropKeywords = DROP_KEYWORDS[mode];
+
+        // Check if experience contains any drop keywords
+        const containsDropKeyword = (exp: ExperienceNode): boolean => {
+            const text = `${exp.title} ${exp.description || ''} ${exp.organization} ${exp.domain}`.toLowerCase();
+            return dropKeywords.some(kw => text.includes(kw.toLowerCase()));
+        };
+
         const rules: Record<typeof mode, (exp: ExperienceNode) => boolean> = {
             research: (exp) => {
-                // KEEP: Research, some industry (if production ML/systems)
-                // DROP: Volunteer, leadership, entrepreneurship
+                // DROP if contains drop keywords
+                if (containsDropKeyword(exp)) return false;
+                // DROP: Volunteer, leadership, entrepreneurship categories
+                if (['volunteer', 'leadership', 'entrepreneurship'].includes(exp.category)) return false;
+                // KEEP: Research projects
                 if (exp.category === 'research') return true;
+                // KEEP: Industry if production or published (systems/ML work)
                 if (exp.category === 'industry' && (exp.isProduction || exp.isPublished)) return true;
                 return false;
             },
 
             industry: (exp) => {
-                // KEEP: Industry, research with production
+                // DROP if contains drop keywords
+                if (containsDropKeyword(exp)) return false;
                 // DROP: Volunteer, most leadership
+                if (exp.category === 'volunteer') return false;
+                // KEEP: Industry and production research
                 if (exp.category === 'industry') return true;
                 if (exp.category === 'research' && exp.isProduction) return true;
                 return false;
             },
 
             college: (exp) => {
-                // KEEP: Everything except low-signal
-                // DROP: Only if <10 hours with no outcomes
+                // DROP if contains drop keywords (enterprise-level tech detail)
+                if (containsDropKeyword(exp)) return false;
+                // DROP: Only if <10 hours with no outcomes (low-signal)
                 if (exp.outcomes.metrics.length === 0 &&
                     !exp.outcomes.publications &&
                     !exp.outcomes.awards &&
                     exp.hours < 10) {
                     return false;
                 }
+                // KEEP: Leadership, Service, Research, Awards
                 return true;
             }
         };
@@ -494,16 +553,38 @@ export class CVCompiler {
         const violations: string[] = [];
 
         // Check ban list (case-insensitive, word boundary)
+        // CRITICAL: Any match triggers content removal
         BANNED_PHRASES.forEach(phrase => {
-            const regex = new RegExp(`\\b${phrase}\\b`, 'gi');
+            // Escape special regex characters in the phrase
+            const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`\\b${escaped}\\b`, 'gi');
             if (regex.test(validated)) {
                 violations.push(phrase);
-                validated = validated.replace(regex, '[REMOVED]');
+                // Remove the banned phrase entirely (not just mark it)
+                validated = validated.replace(regex, '');
             }
         });
 
+        // Signal preservation: Remove empty bullets after ban list cleanup
+        validated = validated.split('\n').map(line => {
+            // Skip empty lines
+            if (!line.trim()) return line;
+            // If bullet line, check it has substance
+            if (line.startsWith('-') || line.startsWith('•')) {
+                const content = line.replace(/^[-•]\s*/, '').trim();
+                // If bullet is now empty or just whitespace, remove it
+                if (!content || content.length < 5) return null;
+            }
+            return line;
+        }).filter(line => line !== null).join('\n');
+
+        // Clean up any double spaces or empty markers left behind
+        validated = validated.replace(/\s{2,}/g, ' ').replace(/\[\s*\]/g, '').trim();
+
         if (violations.length > 0) {
-            console.warn(`⚠️ Ban list violations removed: ${violations.join(', ')}`);
+            console.warn(`🚨 CV REGENERATION NEEDED - Ban list violations found: ${violations.join(', ')}`);
+            console.warn(`   Target: ${target.name} (${target.type})`);
+            console.warn(`   Violations removed from output. Review source content.`);
         }
 
         return validated;

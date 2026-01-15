@@ -72,14 +72,10 @@ Updated the most frequently used components to use centralized keys:
   ```
 
 ### 3. ✅ Created Migration Script
-File: [`scripts/migrate-storage-keys.ts`](scripts/migrate-storage-keys.ts)
+File: [`utils/migrate-storage-keys.txt`](utils/migrate-storage-keys.txt)
 
-Automatically moves data from old keys to new keys:
-```typescript
-// Run migration
-await runMigration({ deleteOldKeys: false });  // Safe - keeps old data
-await runMigration({ deleteOldKeys: true });   // Full - removes old keys
-```
+Reference script for migrating data from old keys to new keys.
+Can be adapted into an API endpoint or run manually.
 
 ### 4. ✅ Created Comprehensive Documentation
 
