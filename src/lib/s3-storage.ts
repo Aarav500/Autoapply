@@ -165,29 +165,29 @@ export const s3Storage = new S3Storage();
 // ============================================
 
 export const STORAGE_KEYS = {
-    // User data
-    USER_PROFILE: 'user/profile',
-    USER_SETTINGS: 'user/settings',
-    CV_PROFILE: 'cv/profile', // Separate CV-specific profile data
+    // User data (simple keys to match existing S3 data)
+    USER_PROFILE: 'user-profile',
+    USER_SETTINGS: 'user-settings',
+    CV_PROFILE: 'cv-profile',
 
     // Essays
-    ESSAYS: 'essays/all',
-    ESSAY_DRAFTS: 'essays/drafts',
+    ESSAYS: 'essays',
+    ESSAY_DRAFTS: 'essay-drafts',
 
-    // Jobs
-    JOBS_ALL: 'jobs/all', // All enhanced jobs
-    SAVED_JOBS: 'jobs/saved',
-    SAVED_JOB_IDS: 'jobs/saved-ids', // Just IDs for saved jobs
-    APPLIED_JOBS: 'jobs/applied',
-    APPLIED_JOB_IDS: 'jobs/applied-ids', // Just IDs for applied jobs
-    JOB_PREFERENCES: 'jobs/preferences',
+    // Jobs (use simple keys matching existing data)
+    JOBS_ALL: 'enhanced-jobs',
+    SAVED_JOBS: 'saved-jobs',
+    SAVED_JOB_IDS: 'saved-job-ids',
+    APPLIED_JOBS: 'applied-jobs',
+    APPLIED_JOB_IDS: 'applied-job-ids',
+    JOB_PREFERENCES: 'job-preferences',
 
-    // Scholarships
-    SCHOLARSHIPS_ALL: 'scholarships/all', // All enhanced scholarships
-    SAVED_SCHOLARSHIPS: 'scholarships/saved',
-    SAVED_SCHOLARSHIP_IDS: 'scholarships/saved-ids', // Just IDs
-    APPLIED_SCHOLARSHIPS: 'scholarships/applied',
-    APPLIED_SCHOLARSHIP_IDS: 'scholarships/applied-ids', // Just IDs
+    // Scholarships (use simple keys matching existing data)
+    SCHOLARSHIPS_ALL: 'enhanced-scholarships',
+    SAVED_SCHOLARSHIPS: 'saved-scholarships',
+    SAVED_SCHOLARSHIP_IDS: 'saved-scholarship-ids',
+    APPLIED_SCHOLARSHIPS: 'applied-scholarships',
+    APPLIED_SCHOLARSHIP_IDS: 'applied-scholarship-ids',
 
     // Discovered Opportunities (from scrapers)
     DISCOVERED_OPPORTUNITIES: 'automation/opportunities',
@@ -205,15 +205,15 @@ export const STORAGE_KEYS = {
     TRANSCRIPT: 'grades/transcript',
     COURSES: 'grades/courses',
 
-    // Activities & Achievements
-    ACTIVITIES: 'activities/all',
-    ACHIEVEMENTS: 'achievements/all',
+    // Activities & Achievements (use simple keys to match existing S3 data)
+    ACTIVITIES: 'activities',
+    ACHIEVEMENTS: 'achievements',
 
     // Analytics
-    ANALYTICS_EVENTS: 'analytics/events',
+    ANALYTICS_EVENTS: 'analytics-events',
 
     // Deadlines
-    DEADLINES: 'deadlines/all',
+    DEADLINES: 'deadlines',
 } as const;
 
 // ============================================
