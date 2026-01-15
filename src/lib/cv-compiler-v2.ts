@@ -234,14 +234,7 @@ export class CVCompiler {
             college: (exp) => {
                 // DROP if contains drop keywords (enterprise-level tech detail)
                 if (containsDropKeyword(exp)) return false;
-                // DROP: Only if <10 hours with no outcomes (low-signal)
-                if (exp.outcomes.metrics.length === 0 &&
-                    !exp.outcomes.publications &&
-                    !exp.outcomes.awards &&
-                    exp.hours < 10) {
-                    return false;
-                }
-                // KEEP: Leadership, Service, Research, Awards
+                // KEEP: All activities for college applications (admissions want to see everything)
                 return true;
             }
         };
@@ -508,38 +501,90 @@ export class CVCompiler {
         // Header
         lines.push(`# ${this.profile.name}`);
         lines.push(`${this.profile.email} | ${this.profile.location || ''}`);
+        if (this.profile.linkedin) lines.push(`[LinkedIn](${this.profile.linkedin})`);
         lines.push('');
         lines.push('---');
         lines.push('');
+
+        // Education section (if in profile)
+        if (this.profile.education) {
+            lines.push('## Education');
+            lines.push('');
+            lines.push(this.profile.education);
+            lines.push('');
+            lines.push('---');
+            lines.push('');
+        }
 
         // Leadership & significant activities
         lines.push('## Leadership & Significant Activities');
         lines.push('');
 
-        experiences.forEach(exp => {
-            lines.push(`### ${exp.title} | ${exp.role}`);
-            lines.push(`*${exp.dates.start} - ${exp.dates.end}* • ${exp.hours} total hours`);
+        experiences.forEach((exp, idx) => {
+            lines.push(`### ${idx + 1}. ${exp.title}`);
+            lines.push(`**${exp.role}** at ${exp.organization}`);
+            lines.push(`*${exp.dates.start} - ${exp.dates.end}* | ${exp.hours} hours`);
             lines.push('');
 
-            // Description (factual, no "I")
-            lines.push(`Led ${exp.title.toLowerCase()} at ${exp.organization}. `);
+            // Full description
+            if (exp.description) {
+                lines.push(exp.description);
+                lines.push('');
+            } else {
+                lines.push(`Led ${exp.title.toLowerCase()} initiatives at ${exp.organization}.`);
+                if (exp.methods.length > 0) {
+                    lines.push(`Applied ${exp.methods.join(', ')} methodology.`);
+                }
+                lines.push('');
+            }
 
-            if (exp.methods.length > 0) {
-                lines.push(`Applied ${exp.methods.join(', ')} to ${exp.domain.toLowerCase()}. `);
+            // Scale/Impact
+            if (exp.scale.users || exp.scale.team || exp.scale.geographic) {
+                lines.push('**Impact:**');
+                if (exp.scale.users) lines.push(`• Reached ${exp.scale.users}`);
+                if (exp.scale.team) lines.push(`• ${exp.scale.team}`);
+                if (exp.scale.geographic) lines.push(`• Geographic reach: ${exp.scale.geographic}`);
+                lines.push('');
             }
 
             // Key outcomes
-            if (exp.outcomes.metrics.length > 0 || exp.outcomes.publications) {
-                lines.push('');
+            if (exp.outcomes.metrics.length > 0 || exp.outcomes.publications || exp.outcomes.awards) {
                 lines.push('**Key Outcomes:**');
-                exp.outcomes.metrics.slice(0, 3).forEach(m => lines.push(`• ${m}`));
+                exp.outcomes.metrics.forEach(m => lines.push(`• ${m}`));
                 if (exp.outcomes.publications && exp.outcomes.publications.length > 0) {
-                    lines.push(`• Published: ${exp.outcomes.publications[0]}`);
+                    exp.outcomes.publications.forEach(p => lines.push(`• Published: ${p}`));
                 }
+                if (exp.outcomes.awards && exp.outcomes.awards.length > 0) {
+                    exp.outcomes.awards.forEach(a => lines.push(`• Award: ${a}`));
+                }
+                if (exp.outcomes.deployments && exp.outcomes.deployments.length > 0) {
+                    exp.outcomes.deployments.forEach(d => lines.push(`• ${d}`));
+                }
+                lines.push('');
             }
 
+            // Skills/Methods used
+            if (exp.methods.length > 0 || exp.tools.length > 0) {
+                const skills = [...exp.methods.slice(0, 3), ...exp.tools.slice(0, 3)];
+                lines.push(`**Skills:** ${skills.join(', ')}`);
+                lines.push('');
+            }
+
+            lines.push('---');
             lines.push('');
         });
+
+        // Separate Achievements/Awards section
+        const allAwards = experiences.flatMap(e => e.outcomes.awards || []);
+        const allPubs = experiences.flatMap(e => e.outcomes.publications || []);
+
+        if (allAwards.length > 0 || allPubs.length > 0) {
+            lines.push('## Honors & Awards');
+            lines.push('');
+            allAwards.forEach(a => lines.push(`• ${a}`));
+            allPubs.forEach(p => lines.push(`• Publication: ${p}`));
+            lines.push('');
+        }
 
         return lines.join('\n');
     }
