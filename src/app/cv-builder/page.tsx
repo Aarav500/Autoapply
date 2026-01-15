@@ -17,11 +17,20 @@ import {
 } from '@/lib/cv-intelligence';
 import {
     extractExperienceGraph,
-    compileCV,
-    type CVTarget,
-    type CVCompilerOptions,
-    type ExperienceNode
+    type PageLimit
 } from '@/lib/cv-compiler';
+import {
+    CVCompiler,
+    CVTarget,
+    ExperienceNode,
+    CompiledCV
+} from '@/lib/cv-compiler-v2';
+import {
+    RESEARCH_TARGETS,
+    INDUSTRY_TARGETS,
+    COLLEGE_TARGETS,
+    getTargetById
+} from '@/lib/cv-targets';
 import {
     deduplicateActivities,
     validateCVQuality,
@@ -195,17 +204,20 @@ export default function CVBuilderPage() {
             let userMessage: string;
 
             if (mode === 'college') {
-                // Use CV compiler for college CVs - direct compilation, no AI prompt
+                // Use CV compiler V2 for college CVs - direct compilation, no AI prompt
                 const experiences = extractExperienceGraph(activities, achievements);
 
-                const compilerOptions: CVCompilerOptions = {
-                    target: 'college' as CVTarget,
-                    pageLimit: 3, // MIT requires 2-4 pages, we target 3
-                    collegeId: selectedCollege,
-                    emphasis: 'research' // Emphasize research over leadership for elite colleges
-                };
+                // Find matching college target or use default
+                const collegeTarget = COLLEGE_TARGETS.find(t =>
+                    t.id.includes(selectedCollege) || t.name.toLowerCase().includes(selectedCollege)
+                ) || COLLEGE_TARGETS[0];
 
-                const compiled = compileCV(experiences, profile, compilerOptions);
+                // Create compiler and compile
+                const compiler = new CVCompiler(experiences, profile);
+                const compiled = compiler.compile({
+                    ...collegeTarget,
+                    pageLimit: 3 as PageLimit, // MIT requires 2-4 pages, we target 3
+                });
 
                 // Set the generated CV directly (skip AI call for college mode)
                 setGeneratedCV(compiled.content);
@@ -217,6 +229,12 @@ export default function CVBuilderPage() {
                     });
                 }
 
+                // Show any ban violations that were removed
+                if (compiled.metadata.violations.length > 0) {
+                    toast.info(`✅ Removed ${compiled.metadata.violations.length} banned phrases`);
+                }
+
+                toast.success(`✨ College CV compiled! Signal: ${compiled.metadata.signal}`);
                 setIsGenerating(false);
                 return; // Exit early - no need for AI API call
             } else {
@@ -509,10 +527,10 @@ ${profile.linkedin ? `[LinkedIn](${profile.linkedin})` : ''} ${profile.github ? 
 ${a.description || 'Contributed to team success through dedicated effort and collaboration.'}
 
 ${mode === 'job'
-    ? `- Demonstrated strong problem-solving abilities and technical expertise
+                        ? `- Demonstrated strong problem-solving abilities and technical expertise
 - Collaborated with cross-functional teams to achieve project goals
 - Delivered measurable results and drove continuous improvement`
-    : `- Total commitment: ${totalHours} hours annually
+                        : `- Total commitment: ${totalHours} hours annually
 - Developed leadership and organizational skills
 - Made meaningful impact on community and peers`}
 `;
