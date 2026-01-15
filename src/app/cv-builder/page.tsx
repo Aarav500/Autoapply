@@ -432,6 +432,38 @@ export default function CVBuilderV2() {
                                 <Button
                                     variant="ghost"
                                     size="sm"
+                                    onClick={async () => {
+                                        try {
+                                            const response = await fetch('/api/cv/download', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                    markdown: generatedCV,
+                                                    profile: profile
+                                                }),
+                                            });
+                                            if (!response.ok) throw new Error('Failed to generate PDF');
+                                            const blob = await response.blob();
+                                            const url = window.URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = url;
+                                            a.download = `CV_${profile?.name?.replace(/\s+/g, '_') || 'Professional'}.pdf`;
+                                            document.body.appendChild(a);
+                                            a.click();
+                                            window.URL.revokeObjectURL(url);
+                                            document.body.removeChild(a);
+                                            toast.success('✅ PDF downloaded!');
+                                        } catch (error) {
+                                            toast.error('Failed to download PDF');
+                                        }
+                                    }}
+                                    icon={<FileText className="w-4 h-4" />}
+                                >
+                                    Download PDF
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
                                     onClick={copyToClipboard}
                                     icon={<Copy className="w-4 h-4" />}
                                 >

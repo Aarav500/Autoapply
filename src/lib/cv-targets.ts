@@ -241,6 +241,66 @@ export const COLLEGE_TARGETS: CVTarget[] = [
         pageLimit: 3,
         maxExperiences: 10,
         description: 'University of Washington undergraduate transfer application'
+    },
+    {
+        id: 'nyu-undergrad',
+        name: 'NYU Undergraduate Admissions',
+        type: 'college',
+        domains: ['Business', 'Arts', 'Research'],
+        prioritySignals: ['creativity', 'leadership', 'impact'],
+        pageLimit: 3,
+        maxExperiences: 10,
+        description: 'New York University undergraduate transfer application'
+    },
+    {
+        id: 'usc-undergrad',
+        name: 'USC Undergraduate Admissions',
+        type: 'college',
+        domains: ['Engineering', 'Film', 'Business'],
+        prioritySignals: ['creativity', 'leadership', 'community'],
+        pageLimit: 3,
+        maxExperiences: 10,
+        description: 'University of Southern California undergraduate transfer application'
+    },
+    {
+        id: 'utaustin-undergrad',
+        name: 'UT Austin Undergraduate Admissions',
+        type: 'college',
+        domains: ['Engineering', 'CS', 'Business'],
+        prioritySignals: ['technical', 'leadership', 'research'],
+        pageLimit: 3,
+        maxExperiences: 10,
+        description: 'University of Texas at Austin undergraduate transfer application'
+    },
+    {
+        id: 'northeastern-undergrad',
+        name: 'Northeastern Undergraduate Admissions',
+        type: 'college',
+        domains: ['Co-op', 'Research', 'Engineering'],
+        prioritySignals: ['technical', 'work_experience', 'innovation'],
+        pageLimit: 3,
+        maxExperiences: 10,
+        description: 'Northeastern University undergraduate transfer application'
+    },
+    {
+        id: 'nus-undergrad',
+        name: 'NUS Undergraduate Admissions',
+        type: 'college',
+        domains: ['Research', 'Global', 'Innovation'],
+        prioritySignals: ['research', 'global', 'technical'],
+        pageLimit: 3,
+        maxExperiences: 10,
+        description: 'National University of Singapore undergraduate application'
+    },
+    {
+        id: 'umd-undergrad',
+        name: 'UMD Undergraduate Admissions',
+        type: 'college',
+        domains: ['Research', 'Engineering', 'Leadership'],
+        prioritySignals: ['research', 'leadership', 'community'],
+        pageLimit: 3,
+        maxExperiences: 10,
+        description: 'University of Maryland undergraduate transfer application'
     }
 ];
 
