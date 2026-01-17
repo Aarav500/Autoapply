@@ -29,12 +29,52 @@ interface CollegeApplication {
     collegeId: string;
     collegeName: string;
     deadline: Date;
-    platform: 'common_app' | 'coalition' | 'direct';
+    platform: 'common_app' | 'coalition' | 'direct' | 'applytexas';
     documents: DocumentItem[];
     applicationFee: number;
     feePaid: boolean;
     applicationStatus: 'not_started' | 'in_progress' | 'submitted' | 'accepted' | 'rejected' | 'waitlisted';
 }
+
+// Platform mapping based on verified research for transfer applications (2025)
+// Common App: Stanford, CMU, NYU, Cornell, USC, Northeastern, UMich
+// Direct Portal: MIT (MyMIT), UW (UW Application), UIUC (myIllini), Georgia Tech (GT Portal), Purdue (Purdue App), UMD (ApplyWeb), NUS
+// ApplyTexas: UT Austin
+const getPlatformForCollege = (collegeId: string): 'common_app' | 'coalition' | 'direct' | 'applytexas' => {
+    const directPortalColleges = ['mit', 'uwash', 'uiuc', 'gatech', 'purdue', 'umd', 'nus'];
+    const applyTexasColleges = ['utaustin'];
+
+    if (directPortalColleges.includes(collegeId)) {
+        return 'direct';
+    }
+    if (applyTexasColleges.includes(collegeId)) {
+        return 'applytexas';
+    }
+    // Default to Common App for: stanford, cmu, nyu, cornell, usc, northeastern, umich
+    return 'common_app';
+};
+
+// Application fee mapping based on college
+const getApplicationFee = (collegeId: string): number => {
+    const feeMap: Record<string, number> = {
+        'mit': 75,        // MIT application fee
+        'stanford': 90,   // Stanford application fee  
+        'cmu': 75,        // CMU application fee
+        'nyu': 85,        // NYU application fee
+        'cornell': 85,    // Cornell application fee
+        'uwash': 80,      // UW application fee
+        'uiuc': 70,       // UIUC application fee
+        'gatech': 85,     // Georgia Tech application fee
+        'usc': 90,        // USC application fee
+        'utaustin': 75,   // UT Austin application fee
+        'northeastern': 75, // Northeastern application fee
+        'nus': 50,        // NUS application fee (international)
+        'umich': 75,      // UMich application fee
+        'purdue': 60,     // Purdue application fee
+        'umd': 75,        // UMD application fee
+    };
+    return feeMap[collegeId] || 75;
+};
 
 // Generate checklist for each target college
 const generateApplications = (): CollegeApplication[] => {
@@ -42,8 +82,8 @@ const generateApplications = (): CollegeApplication[] => {
         collegeId: college.id,
         collegeName: college.name,
         deadline: college.deadline,
-        platform: college.id === 'nus' ? 'direct' : 'common_app',
-        applicationFee: college.id === 'nus' ? 50 : 75,
+        platform: getPlatformForCollege(college.id),
+        applicationFee: getApplicationFee(college.id),
         feePaid: false,
         applicationStatus: 'in_progress',
         documents: [
@@ -293,7 +333,12 @@ export default function ChecklistPage() {
                                     <h3 className="text-xl font-bold">{selectedApp.collegeName}</h3>
                                     <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                                         Deadline: {selectedApp.deadline.toLocaleDateString()} ·
-                                        Platform: {selectedApp.platform === 'common_app' ? 'Common App' : selectedApp.platform}
+                                        Platform: {
+                                            selectedApp.platform === 'common_app' ? 'Common App' :
+                                                selectedApp.platform === 'applytexas' ? 'ApplyTexas' :
+                                                    selectedApp.platform === 'coalition' ? 'Coalition App' :
+                                                        'Direct Portal'
+                                        }
                                     </p>
                                 </div>
                                 <div className="flex gap-2">
@@ -371,7 +416,7 @@ export default function ChecklistPage() {
                             </div>
 
                             {/* Quick Actions */}
-                            <div className="flex gap-2 mt-4 pt-4" style={{ borderTop: '1px solid var(--glass-border)' }}>
+                            <div className="flex flex-wrap gap-2 mt-4 pt-4" style={{ borderTop: '1px solid var(--glass-border)' }}>
                                 <Button variant="secondary" size="sm" icon={<Upload className="w-4 h-4" />}>
                                     Upload Document
                                 </Button>
@@ -379,9 +424,23 @@ export default function ChecklistPage() {
                                     Request LOR
                                 </Button>
                                 {selectedApp.platform === 'common_app' && (
-                                    <a href={`https://apply.commonapp.org/apply/${selectedApp.collegeName.toLowerCase().replace(/\s/g, '-')}`} target="_blank">
+                                    <a href="https://apply.commonapp.org" target="_blank" rel="noopener noreferrer">
                                         <Button variant="secondary" size="sm" icon={<ExternalLink className="w-4 h-4" />}>
-                                            Open in Common App
+                                            Open Common App
+                                        </Button>
+                                    </a>
+                                )}
+                                {selectedApp.platform === 'applytexas' && (
+                                    <a href="https://www.applytexas.org" target="_blank" rel="noopener noreferrer">
+                                        <Button variant="secondary" size="sm" icon={<ExternalLink className="w-4 h-4" />}>
+                                            Open ApplyTexas
+                                        </Button>
+                                    </a>
+                                )}
+                                {selectedApp.platform === 'direct' && (
+                                    <a href={targetColleges.find(c => c.id === selectedApp.collegeId)?.applicationUrl || '#'} target="_blank" rel="noopener noreferrer">
+                                        <Button variant="secondary" size="sm" icon={<ExternalLink className="w-4 h-4" />}>
+                                            Open Application Portal
                                         </Button>
                                     </a>
                                 )}

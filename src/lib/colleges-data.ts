@@ -124,22 +124,29 @@ export const targetColleges: CollegeInfo[] = [
         essays: [
             {
                 id: 'stanford-1',
-                title: 'Personal Statement',
+                title: 'Transfer Statement',
                 prompt: 'Please address your reasons for transferring to Stanford and the objectives you hope to achieve.',
                 wordLimit: 650,
                 required: true,
             },
             {
                 id: 'stanford-2',
+                title: 'Advice to Younger Self',
+                prompt: 'What piece of advice would you share with your younger self? Describe what experience or realization led you to this understanding.',
+                wordLimit: 150,
+                required: true,
+            },
+            {
+                id: 'stanford-3',
                 title: 'Excited About Learning',
                 prompt: 'The Stanford community is deeply curious and driven to learn in and out of the classroom. Reflect on an idea or experience that makes you genuinely excited about learning.',
                 wordLimit: 250,
                 required: true,
             },
             {
-                id: 'stanford-3',
-                title: 'Roommate Letter OR Distinctive Contribution',
-                prompt: 'Choose one: (A) Write a note to your future roommate that reveals something about you, or (B) Describe what aspects of your experiences would help you make a distinctive contribution as an undergraduate.',
+                id: 'stanford-4',
+                title: 'Roommate Letter OR Community',
+                prompt: 'Choose one: (A) Write a note to your future roommate that reveals something about you or that will help your roommate and us get to know you better, or (B) Stanford\'s community is an essential part of the undergraduate experience. How do you define community, and what contributions have you made to yours?',
                 wordLimit: 250,
                 required: true,
             },
@@ -228,10 +235,17 @@ export const targetColleges: CollegeInfo[] = [
         essays: [
             {
                 id: 'nyu-1',
-                title: 'Bridge Builders',
-                prompt: 'We are looking for bridge builders who can connect people, groups, and ideas. Reflect on your experiences helping others understand different perspectives and fostering collaboration within a diverse community.',
-                wordLimit: 250,
+                title: 'Transfer Statement',
+                prompt: 'Please provide a statement that addresses your reason(s) for seeking transfer and the objectives you hope to achieve. How can NYU and the particular school, college, program, and/or area of study you are applying to support those goals?',
+                wordLimit: 500,
                 required: true,
+            },
+            {
+                id: 'nyu-2',
+                title: 'Bridge Builders (Optional)',
+                prompt: 'NYU is looking for bridge builders who can connect people, groups, and ideas. Describe how your experiences have helped you understand the qualities and efforts needed to bridge divides and foster understanding.',
+                wordLimit: 250,
+                required: false,
             },
         ],
         research: {
@@ -267,14 +281,14 @@ export const targetColleges: CollegeInfo[] = [
             {
                 id: 'cornell-1',
                 title: 'Community Essay',
-                prompt: 'We all contribute to communities in a variety of ways. Thinking about your time in high school, how have you contributed to your community and how have those communities shaped your perspective?',
+                prompt: 'We all contribute to, and are influenced by, the communities that are meaningful to us. Share how you\'ve been shaped by one of the communities you belong to. You may define "community" broadly to include family, school, interests, or other groups.',
                 wordLimit: 350,
                 required: true,
             },
             {
                 id: 'cornell-2',
                 title: 'College-Specific Essay',
-                prompt: 'Tell us about the unique qualities that attract you to your chosen undergraduate college or school (e.g., CALS, Arts & Sciences, Engineering, Hotel Administration) and how that curriculum would support your interests.',
+                prompt: 'Tell us about the unique qualities that attract you to your chosen undergraduate college or school and how that curriculum would support your interests.',
                 wordLimit: 650,
                 required: true,
             },
@@ -312,16 +326,16 @@ export const targetColleges: CollegeInfo[] = [
             {
                 id: 'uwash-1',
                 title: 'Personal Statement',
-                prompt: 'Tell a story from your life, describing an experience that either demonstrates your character or helped to shape it.',
+                prompt: 'Describe your college career to date, including your educational path and choices. Explain what led you to choose your major and career aspirations. State the specific reasons you wish to transfer to UW and how UW will help you achieve your academic, career, and personal goals.',
                 wordLimit: 650,
                 required: true,
             },
             {
                 id: 'uwash-2',
-                title: 'Short Response',
-                prompt: 'Describe the community you come from and how has it shaped your world.',
+                title: 'Additional Information (Optional)',
+                prompt: 'You may describe any personal or imposed challenges or hardships that have affected your educational journey.',
                 wordLimit: 200,
-                required: true,
+                required: false,
             },
         ],
         research: {
@@ -356,17 +370,17 @@ export const targetColleges: CollegeInfo[] = [
         essays: [
             {
                 id: 'uiuc-1',
-                title: 'Why Major & Career Goals',
-                prompt: 'Describe your personal and/or career goals after graduating from UIUC and how your selected first-choice major will help you achieve them.',
-                wordLimit: 150,
+                title: 'Why Major',
+                prompt: 'Explain your interest in the major you selected. Describe how you have recently developed this interest, inside and/or outside of the classroom, and how this major relates to your professional goals.',
+                wordLimit: 350,
                 required: true,
             },
             {
                 id: 'uiuc-2',
-                title: 'Related Experience',
-                prompt: 'Explain, in detail, an experience you\'ve had in the past 3 to 4 years related to your first-choice major. This can be from an extracurricular activity, a class you\'ve taken, or something else.',
-                wordLimit: 150,
-                required: true,
+                title: 'Second-Choice Major (If Selected)',
+                prompt: 'You have selected a second-choice major. Please explain your interest in this major.',
+                wordLimit: 350,
+                required: false,
             },
         ],
         research: {
@@ -395,21 +409,14 @@ export const targetColleges: CollegeInfo[] = [
         name: 'Georgia Tech',
         fullName: 'Georgia Institute of Technology',
         location: 'Atlanta, GA',
-        deadline: new Date('2026-03-31T23:59:00-05:00'),
+        deadline: new Date('2026-03-02T23:59:00-05:00'),
         deadlineType: 'regular',
         timezone: 'America/New_York',
         essays: [
             {
                 id: 'gatech-1',
                 title: 'Why Georgia Tech',
-                prompt: 'Why do you want to study your chosen major specifically at Georgia Tech?',
-                wordLimit: 300,
-                required: true,
-            },
-            {
-                id: 'gatech-2',
-                title: 'Institute Values',
-                prompt: 'Georgia Tech\'s Strategic Plan outlines nine distinct Institute values. Select one and discuss how your past experiences have prepared you to contribute to our community.',
+                prompt: 'Why do you want to study your chosen major, and why do you want to study that major at Georgia Tech?',
                 wordLimit: 300,
                 required: true,
             },
@@ -446,8 +453,15 @@ export const targetColleges: CollegeInfo[] = [
         essays: [
             {
                 id: 'usc-1',
-                title: 'Why USC',
-                prompt: 'Describe how you plan to pursue your academic interests at USC. Please feel free to address your first- and second-choice major selections.',
+                title: 'Transfer Statement',
+                prompt: 'Please provide a statement that addresses your reasons for transferring and the objectives you hope to achieve.',
+                wordLimit: 650,
+                required: true,
+            },
+            {
+                id: 'usc-2',
+                title: 'Academic Interests',
+                prompt: 'Describe how you plan to pursue your academic interests and why you want to explore them at USC. Please feel free to address your first- and second-choice major selections.',
                 wordLimit: 250,
                 required: true,
             },
@@ -484,10 +498,24 @@ export const targetColleges: CollegeInfo[] = [
         essays: [
             {
                 id: 'ut-1',
-                title: 'Statement of Purpose',
-                prompt: 'Please share your interest in and preparation for your first-choice major. Use this opportunity to discuss any extenuating circumstances, unique aspects of your academic background, or valuable experiences related to your chosen academic discipline.',
-                wordLimit: 650,
+                title: 'Why Major',
+                prompt: 'Why are you interested in the major you indicated as your first-choice major?',
+                wordLimit: 300,
                 required: true,
+            },
+            {
+                id: 'ut-2',
+                title: 'Activity You Are Proud Of',
+                prompt: 'Think of all the activities — both in and outside of school — that you have been involved with. Which one are you most proud of and why? This can include extracurriculars, volunteer work, employment, or family responsibilities.',
+                wordLimit: 300,
+                required: true,
+            },
+            {
+                id: 'ut-3',
+                title: 'Special Circumstances (Optional)',
+                prompt: 'Please share background on events or special circumstances that you feel may have impacted your academic performance.',
+                wordLimit: 300,
+                required: false,
             },
         ],
         research: {
@@ -567,9 +595,16 @@ export const targetColleges: CollegeInfo[] = [
         essays: [
             {
                 id: 'nus-1',
-                title: 'Personal Statement',
-                prompt: 'Please tell us about yourself, including your interests, achievements, and aspirations.',
+                title: 'Motivation for Transfer',
+                prompt: 'Please tell us about your motivation for transferring to NUS, including your interests, achievements, and aspirations.',
                 wordLimit: 500,
+                required: true,
+            },
+            {
+                id: 'nus-2',
+                title: 'Short Response Questions',
+                prompt: 'You will answer five short response questions about your interests, aptitudes, and prior preparation as part of the holistic assessment.',
+                wordLimit: 200,
                 required: true,
             },
         ],
@@ -605,23 +640,16 @@ export const targetColleges: CollegeInfo[] = [
         essays: [
             {
                 id: 'umich-1',
-                title: 'Community and Contribution',
-                prompt: 'Everyone belongs to many different communities and/or groups. Share how you are prepared to contribute to the University of Michigan\'s focus on developing "leaders and citizens who will challenge the present and enrich the future."',
+                title: 'Leaders and Citizens',
+                prompt: 'At the University of Michigan, we are focused on developing leaders and citizens who will challenge the present and enrich the future. In your essay, share with us how you are prepared to contribute to these goals. This could include the people, places, experiences, or aspirations that have shaped your journey and future plans.',
                 wordLimit: 300,
                 required: true,
             },
             {
                 id: 'umich-2',
                 title: 'Why This College/School',
-                prompt: 'Describe the unique qualities that attract you to the specific undergraduate College or School (including preferred admission and dual degree programs) to which you are applying.',
+                prompt: 'Describe the unique qualities that attract you to the specific undergraduate College or School (including preferred admission and dual degree programs) to which you are applying. How would that curriculum support your interests?',
                 wordLimit: 550,
-                required: true,
-            },
-            {
-                id: 'umich-3',
-                title: 'Transfer Statement',
-                prompt: 'Please provide a statement that addresses your specific reasons for transferring to the University of Michigan and the objectives you hope to achieve.',
-                wordLimit: 500,
                 required: true,
             },
         ],

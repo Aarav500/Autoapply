@@ -1,15 +1,20 @@
 // ============================================
 // BATCH CV GENERATION API
 // Generate CVs for all targets at once
+// Now with Claude-powered projection engine
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { CVCompiler, ExperienceNode, CVTarget, buildTargetList } from '@/lib/cv-compiler-v2';
+import { CVCompiler, ExperienceNode, CVTarget, CompiledCV, buildTargetList } from '@/lib/cv-compiler-v2';
 import { extractExperienceGraph } from '@/lib/cv-compiler';
+import { CVProjectionEngine } from '@/lib/cv-projection-engine';
+import { getClaudeApiKey } from '@/lib/claude-api';
+
+export const maxDuration = 300; // 5 minutes for batch processing
 
 export async function POST(request: NextRequest) {
     try {
-        const { activities, achievements, profile, targets } = await request.json();
+        const { activities, achievements, profile, targets, useClaudeProjection } = await request.json();
 
         if (!activities || !profile || !targets) {
             return NextResponse.json(
@@ -24,16 +29,45 @@ export async function POST(request: NextRequest) {
         const experiences = extractExperienceGraph(activities, achievements || []);
         console.log(`[Batch CV] Extracted ${experiences.length} experiences`);
 
-        // Step 2: Initialize compiler
-        const compiler = new CVCompiler(experiences, profile);
+        // Step 2: Claude projection (if enabled)
+        const apiKey = getClaudeApiKey();
+        const shouldUseProjection = useClaudeProjection !== false && apiKey !== null;
+        let projections: Map<string, any> | null = null;
 
-        // Step 3: Compile all targets
-        const results = compiler.compileAll(targets);
+        if (shouldUseProjection && apiKey) {
+            try {
+                console.log('[Batch CV] Using Claude projection engine...');
+                const engine = new CVProjectionEngine(apiKey);
+                projections = await engine.projectForMultipleTargets(targets, experiences);
+                console.log(`[Batch CV] Claude projected ${projections.size} target-specific experience sets`);
+            } catch (error) {
+                console.error('[Batch CV] Claude projection failed, using fallback:', error);
+            }
+        } else {
+            console.log('[Batch CV] Using deterministic ranking (Claude projection disabled)');
+        }
+
+        // Step 3: Compile CVs for each target
+        const results = targets.map((target: CVTarget) => {
+            let targetExperiences = experiences;
+
+            // If Claude projection available, use projected experiences
+            if (projections && projections.has(target.id)) {
+                const projection = projections.get(target.id);
+                const experienceMap = new Map(experiences.map(exp => [exp.id, exp]));
+                targetExperiences = projection.rankedExperienceIds
+                    .map((id: string) => experienceMap.get(id))
+                    .filter((exp: ExperienceNode | undefined): exp is ExperienceNode => exp !== undefined);
+            }
+
+            const compiler = new CVCompiler(targetExperiences, profile);
+            return compiler.compile(target);
+        });
 
         // Step 4: Filter by quality
-        const elite = results.filter(r => r.metadata.signal === 'elite' || r.metadata.signal === 'strong');
-        const warnings = results.flatMap(r => r.metadata.warnings);
-        const violations = results.flatMap(r => r.metadata.violations);
+        const elite = results.filter((r: CompiledCV) => r.metadata.signal === 'elite' || r.metadata.signal === 'strong');
+        const warnings = results.flatMap((r: CompiledCV) => r.metadata.warnings);
+        const violations = results.flatMap((r: CompiledCV) => r.metadata.violations);
 
         console.log(`[Batch CV] Complete: ${results.length} CVs generated`);
         console.log(`[Batch CV] Elite: ${elite.length}, Warnings: ${warnings.length}, Violations: ${violations.length}`);
@@ -41,12 +75,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             success: true,
             cvs: results,
+            projectionUsed: shouldUseProjection && projections !== null,
             summary: {
                 total: results.length,
                 elite: elite.length,
-                strong: results.filter(r => r.metadata.signal === 'strong').length,
-                medium: results.filter(r => r.metadata.signal === 'medium').length,
-                weak: results.filter(r => r.metadata.signal === 'weak').length,
+                strong: results.filter((r: CompiledCV) => r.metadata.signal === 'strong').length,
+                medium: results.filter((r: CompiledCV) => r.metadata.signal === 'medium').length,
+                weak: results.filter((r: CompiledCV) => r.metadata.signal === 'weak').length,
                 totalWarnings: warnings.length,
                 totalViolations: violations.length
             }
