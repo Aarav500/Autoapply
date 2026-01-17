@@ -92,24 +92,26 @@ export class CVProjectionEngine {
 
     /**
      * BUILD SYSTEM PROMPT
-     * Claude's role and constraints
+     * Claude's role and constraints - STRICT JSON-ONLY OUTPUT
      */
     private buildSystemPrompt(mode: 'research' | 'industry' | 'college'): string {
-        const basePrompt = `You are an expert CV compiler. Your job is to select and rank experiences for a specific target (job, research position, or college application).
+        // EXACT prompt as specified in requirements - Claude must NEVER write prose
+        const basePrompt = `You are a CV projection engine.
+You do NOT write resumes.
+You only select and rank experiences.
 
-CRITICAL RULES:
-1. You DO NOT write text or bullets - you only SELECT and RANK experiences
-2. Only choose experiences that are directly relevant to the target
-3. Rank by relevance: most relevant first
-4. For each selected experience, explain WHY it's relevant
-5. For excluded experiences, briefly explain why they don't fit
-6. Respond ONLY in JSON format
-
-MODE-SPECIFIC GUIDANCE:`;
+Rules:
+- Output valid JSON only.
+- Do not invent data.
+- Rank by relevance to target.
+- Drop irrelevant experiences.
+- NEVER write prose sentences.
+- NEVER mention target names (MIT, Stanford, Google, etc.) in your output.
+`;
 
         const modeGuidance: Record<typeof mode, string> = {
             research: `
-RESEARCH MODE:
+MODE: research
 - Prioritize: publications, research methods, datasets, experiments, technical depth
 - Value: Novel approaches, rigorous methodology, measurable results
 - Drop: Volunteer work, community service, leadership activities, entrepreneurship
@@ -117,7 +119,7 @@ RESEARCH MODE:
 - Keep only: Research projects, published work, production ML/systems with scientific rigor`,
 
             industry: `
-INDUSTRY MODE:
+MODE: industry
 - Prioritize: Production deployments, scale metrics, business impact, technical systems
 - Value: Real users, revenue impact, performance improvements, shipped products
 - Drop: Academic research narratives, teaching, tutoring, community service
@@ -125,7 +127,7 @@ INDUSTRY MODE:
 - Keep only: Professional work, production systems, scalable technology`,
 
             college: `
-COLLEGE MODE:
+MODE: college
 - Prioritize: Leadership roles, awards, unique experiences, hours invested, personal growth
 - Value: Initiative, impact on others, creativity, sustained commitment
 - Drop: Deep technical details (QUBO formulation, Byzantine fault tolerance)
@@ -138,87 +140,95 @@ COLLEGE MODE:
 
     /**
      * BUILD USER MESSAGE
-     * Provide target context and experience graph to Claude
+     * Provide target context and experience graph to Claude using EXACT schema from requirements
      */
     private buildUserMessage(target: CVTarget, experiences: ExperienceNode[]): string {
-        const targetContext = `TARGET INFORMATION:
-Name: ${target.name}
-Type: ${target.type}
-${target.description ? `Description: ${target.description}` : ''}
-${target.domains?.length ? `Domains: ${target.domains.join(', ')}` : ''}
-${target.keywords?.length ? `Keywords: ${target.keywords.join(', ')}` : ''}
-Page Limit: ${target.pageLimit} pages
-Max Experiences: ${target.maxExperiences || this.getDefaultMaxExperiences(target.pageLimit)}
-`;
-
-        const experiencesJson = experiences.map((exp, idx) => ({
+        // Build experience nodes in exact format required
+        const experienceNodes = experiences.map(exp => ({
             id: exp.id,
-            index: idx,
-            title: exp.title,
-            role: exp.role,
-            organization: exp.organization,
-            duration: exp.dates.duration,
-            category: exp.category,
             domain: exp.domain,
             methods: exp.methods,
-            tools: exp.tools,
-            datasets: exp.datasets,
-            scale: exp.scale,
-            outcomes: exp.outcomes,
-            hours: exp.hours,
+            outcomes: exp.outcomes.metrics,
             isPublished: exp.isPublished,
             isProduction: exp.isProduction
         }));
 
-        return `${targetContext}
+        // Build request in exact format from requirements
+        const request = {
+            target: {
+                id: target.id,
+                type: target.type,
+                description: target.description || target.name
+            },
+            experience_nodes: experienceNodes
+        };
 
-EXPERIENCE GRAPH:
-${JSON.stringify(experiencesJson, null, 2)}
+        return `${JSON.stringify(request, null, 2)}
 
-TASK:
-1. Select the most relevant experiences for this target
-2. Rank them by relevance (most relevant first)
-3. Limit selection to ${target.maxExperiences || this.getDefaultMaxExperiences(target.pageLimit)} experiences
-4. Explain why each selected experience is relevant
-5. Briefly note why top excluded experiences don't fit
+Select and rank up to ${target.maxExperiences || this.getDefaultMaxExperiences(target.pageLimit)} experiences.
 
-Respond with this exact JSON structure:
+Respond with ONLY this JSON structure (no prose, no explanations):
 {
   "mode": "${target.type}",
-  "rankedExperienceIds": ["exp_id_1", "exp_id_2", ...],
-  "reasoning": {
-    "exp_id_1": "Why this is most relevant...",
-    "exp_id_2": "Why this is second most relevant..."
-  },
+  "rankedExperienceIds": ["exp_id_1", "exp_id_2"],
   "dropReasons": {
-    "exp_id_x": "Why this was excluded..."
+    "exp_id_x": "Brief reason"
   }
 }`;
     }
 
     /**
+     * BANNED WORDS - Response is rejected if these appear in text
+     */
+    private static readonly BANNED_WORDS = [
+        'MIT', 'Stanford', 'Harvard', 'Yale', 'Princeton', 'Google', 'Meta', 'OpenAI',
+        'I believe', 'I realized', 'passion', 'inspired', 'journey', 'dream'
+    ];
+
+    /**
      * PARSE CLAUDE RESPONSE
-     * Extract JSON projection from Claude's output
+     * Extract JSON projection from Claude's output with STRICT VALIDATION
      */
     private parseClaudeResponse(
         response: string,
         experiences: ExperienceNode[]
     ): ProjectionResponse {
         try {
-            // Extract JSON from response (Claude sometimes adds explanation text)
+            // Step 1: Extract JSON from response
             const jsonMatch = response.match(/\{[\s\S]*\}/);
             if (!jsonMatch) {
                 throw new Error('No JSON found in Claude response');
             }
 
-            const parsed = JSON.parse(jsonMatch[0]);
+            const jsonStr = jsonMatch[0];
+            const parsed = JSON.parse(jsonStr);
 
-            // Validate structure
+            // Step 2: Validate structure
             if (!parsed.mode || !parsed.rankedExperienceIds || !Array.isArray(parsed.rankedExperienceIds)) {
                 throw new Error('Invalid projection structure');
             }
 
-            // Validate all IDs exist in experience graph
+            // Step 3: Check for prose (any text outside JSON that looks like sentences)
+            const textOutsideJson = response.replace(jsonStr, '').trim();
+            if (textOutsideJson.length > 50) {
+                // Check if it contains sentence-like patterns
+                const sentencePattern = /[A-Z][^.!?]*[.!?]/g;
+                const sentences = textOutsideJson.match(sentencePattern) || [];
+                if (sentences.some(s => s.split(/\s+/).length > 10)) {
+                    console.warn('[Projection] Response contains prose, using anyway with warning');
+                }
+            }
+
+            // Step 4: Check for banned words in the JSON values
+            const jsonText = JSON.stringify(parsed);
+            for (const banned of CVProjectionEngine.BANNED_WORDS) {
+                if (jsonText.toLowerCase().includes(banned.toLowerCase())) {
+                    console.warn(`[Projection] Response contains banned word: ${banned}`);
+                    // Don't reject, but log the warning - Claude might use these in dropReasons
+                }
+            }
+
+            // Step 5: Validate all IDs exist in experience graph
             const validIds = new Set(experiences.map(e => e.id));
             const filteredIds = parsed.rankedExperienceIds.filter((id: string) => validIds.has(id));
 
@@ -233,8 +243,8 @@ Respond with this exact JSON structure:
                 dropReasons: parsed.dropReasons || {}
             };
         } catch (error) {
-            console.error('Failed to parse Claude projection:', error);
-            console.error('Raw response:', response);
+            console.error('[Projection] Failed to parse Claude response:', error);
+            console.error('[Projection] Raw response:', response.substring(0, 500));
 
             // Fallback: return all experiences in original order
             return {

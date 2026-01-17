@@ -48,20 +48,21 @@ export async function POST(request: NextRequest) {
         }
 
         // Step 3: Compile CVs for each target
+        // When Claude projection is available, use compileWithRankedIds
+        // This ensures Claude only ranks, compiler only renders
         const results = targets.map((target: CVTarget) => {
-            let targetExperiences = experiences;
+            const compiler = new CVCompiler(experiences, profile);
 
-            // If Claude projection available, use projected experiences
             if (projections && projections.has(target.id)) {
+                // Use Claude's ranking, then deterministic render
                 const projection = projections.get(target.id);
-                const experienceMap = new Map(experiences.map(exp => [exp.id, exp]));
-                targetExperiences = projection.rankedExperienceIds
-                    .map((id: string) => experienceMap.get(id))
-                    .filter((exp: ExperienceNode | undefined): exp is ExperienceNode => exp !== undefined);
+                console.log(`[Batch CV] Target ${target.id}: Using Claude projection (${projection.rankedExperienceIds.length} experiences)`);
+                return compiler.compileWithRankedIds(target, projection.rankedExperienceIds);
+            } else {
+                // Fallback: fully deterministic ranking + render
+                console.log(`[Batch CV] Target ${target.id}: Using deterministic ranking`);
+                return compiler.compile(target);
             }
-
-            const compiler = new CVCompiler(targetExperiences, profile);
-            return compiler.compile(target);
         });
 
         // Step 4: Filter by quality

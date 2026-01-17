@@ -193,6 +193,46 @@ export class CVCompiler {
         return targets.map(target => this.compile(target));
     }
 
+    /**
+     * COMPILE WITH PRE-RANKED IDS
+     * Use when Claude projection has already selected and ranked experiences.
+     * Skips filterByMode and rankForTarget — Claude already did this.
+     */
+    compileWithRankedIds(target: CVTarget, rankedIds: string[]): CompiledCV {
+        // Build experience map for O(1) lookup
+        const experienceMap = new Map(this.experiences.map(e => [e.id, e]));
+
+        // Map ranked IDs to experiences (preserving Claude's order)
+        const rankedExperiences = rankedIds
+            .map(id => experienceMap.get(id))
+            .filter((exp): exp is ExperienceNode => exp !== undefined);
+
+        if (rankedExperiences.length === 0) {
+            console.warn('[CVCompiler] No valid experiences from ranked IDs, falling back to compile()');
+            return this.compile(target);
+        }
+
+        // Step 1: Apply limits (deterministic)
+        const selected = this.applyLimits(rankedExperiences, target);
+
+        // Step 2: Render (deterministic)
+        const content = this.render(selected, target);
+
+        // Step 3: Validate (deterministic - enforces ban list)
+        const validated = this.validate(content, target);
+
+        // Step 4: Generate metadata
+        const metadata = this.generateMetadata(validated, selected, target);
+
+        return {
+            targetId: target.id,
+            targetName: target.name,
+            mode: target.type,
+            content: validated,
+            metadata
+        };
+    }
+
     // ========================================
     // FILTERING BY MODE
     // ========================================
