@@ -44,8 +44,6 @@ const mainNavItems = [
 ];
 
 const aiToolsItems = [
-  { icon: Brain, label: 'AI Automate', href: '/automate', badge: 'NEW' },
-  { icon: Search, label: 'Job Hub', href: '/job-hub', badge: 'NEW' },
   { icon: FileCheck, label: 'Documents', href: '/documents', badge: 'NEW' },
   { icon: BarChart3, label: 'Analytics', href: '/analytics', badge: 'NEW' },
   { icon: Clock, label: 'Deadlines', href: '/opportunity-deadlines', badge: 'NEW' },
