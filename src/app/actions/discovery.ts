@@ -7,8 +7,11 @@ export async function runDiscoveryScan(type: 'jobs' | 'scholarships' | 'all') {
     try {
         console.log(`Starting discovery scan for: ${type}`);
 
-        // Use ALL available scrapers for comprehensive coverage
-        const jobScrapers = ['linkedin', 'indeed', 'glassdoor', 'handshake', 'ziprecruiter', 'chegg', 'companies'];
+        // Job scrapers - LinkedIn DISABLED (brittle, often returns 0 results)
+        // Prioritize more reliable scrapers first
+        const jobScrapers = ['indeed', 'handshake', 'companies', 'glassdoor', 'ziprecruiter', 'chegg'];
+        // 'linkedin' - disabled temporarily until we fix its reliability issues
+
         const scholarshipScrapers = ['bold-org', 'fastweb', 'scholarships-com'];
 
         const platforms = type === 'all'
@@ -21,6 +24,8 @@ export async function runDiscoveryScan(type: 'jobs' | 'scholarships' | 'all') {
         // The service updates the OpportunityStore which the UI should poll or read
         const results = await discoveryService.scan(platforms as any);
 
+        // Revalidate all relevant pages to pick up new data
+        revalidatePath('/jobs');
         revalidatePath('/job-hub');
         revalidatePath('/scholarships');
 
@@ -30,3 +35,4 @@ export async function runDiscoveryScan(type: 'jobs' | 'scholarships' | 'all') {
         return { success: false, error: String(error) };
     }
 }
+

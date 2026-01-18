@@ -13,6 +13,7 @@ import {
     Building, X, Eye, Zap
 } from 'lucide-react';
 import { runDiscoveryScan } from '@/app/actions/discovery';
+import { convertToEnhancedJobs, EnhancedJob as ConvertedJob } from '@/lib/automation/job-converter';
 
 // ============================================
 // TYPES
@@ -65,143 +66,8 @@ type SortOption = 'match' | 'newest' | 'salary' | 'deadline';
 type TabType = 'discover' | 'saved' | 'applied';
 
 // ============================================
-// SAMPLE DATA (will be replaced by scrapers)
+// NO MORE MOCK DATA - Jobs come from API
 // ============================================
-
-const sampleJobs: EnhancedJob[] = [
-    {
-        id: 'job-google-swe-intern',
-        title: 'Software Engineering Intern',
-        company: 'Google',
-        companyLogo: 'https://logo.clearbit.com/google.com',
-        locations: ['Mountain View, CA', 'New York, NY'],
-        remoteType: 'hybrid',
-        employmentType: 'internship',
-        salary: { min: 8000, max: 10000, currency: 'USD', period: 'monthly' },
-        postedDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-        deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        description: 'Build next-generation technologies that impact billions of users. Join our team to work on cutting-edge projects.',
-        requiredSkills: ['Python', 'JavaScript', 'Data Structures', 'Algorithms'],
-        preferredSkills: ['React', 'TypeScript', 'Machine Learning'],
-        qualifications: ['Pursuing BS/MS in Computer Science', 'Strong problem-solving skills'],
-        responsibilities: ['Design and implement software features', 'Collaborate with cross-functional teams', 'Write clean, maintainable code'],
-        sponsorsVisa: true,
-        applyUrl: 'https://careers.google.com/jobs/results/',
-        sourceUrl: 'https://careers.google.com',
-        sourceName: 'Google Careers',
-        matchScore: 92,
-        matchExplanation: ['✓ Skills match: Python, JavaScript, React', '✓ Strong GPA: 3.9', '✓ Sponsors work visas', '✓ Posted recently (5 days ago)'],
-        applicationStatus: 'not_started',
-        saved: false,
-        hidden: false,
-        requiredDocuments: ['resume', 'cover_letter'],
-    },
-    {
-        id: 'job-meta-swe-intern',
-        title: 'Software Engineer Intern',
-        company: 'Meta',
-        companyLogo: 'https://logo.clearbit.com/meta.com',
-        locations: ['Menlo Park, CA'],
-        remoteType: 'hybrid',
-        employmentType: 'internship',
-        salary: { min: 8500, max: 9500, currency: 'USD', period: 'monthly' },
-        postedDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-        deadline: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
-        description: 'Join Meta to build products that bring the world closer together. Work on the metaverse and social platforms.',
-        requiredSkills: ['Python', 'C++', 'Data Structures'],
-        preferredSkills: ['React', 'GraphQL', 'Mobile Development'],
-        qualifications: ['Currently enrolled in BS/MS/PhD in CS or related field'],
-        responsibilities: ['Build new features for Meta products', 'Optimize existing systems', 'Participate in code reviews'],
-        sponsorsVisa: true,
-        applyUrl: 'https://www.metacareers.com/jobs/',
-        sourceUrl: 'https://www.metacareers.com',
-        sourceName: 'Meta Careers',
-        matchScore: 88,
-        matchExplanation: ['✓ Skills match: Python, React', '✓ Entry-level position', '✓ Sponsors work visas'],
-        applicationStatus: 'not_started',
-        saved: false,
-        hidden: false,
-        requiredDocuments: ['resume'],
-    },
-    {
-        id: 'job-amazon-sde-intern',
-        title: 'SDE Intern',
-        company: 'Amazon',
-        companyLogo: 'https://logo.clearbit.com/amazon.com',
-        locations: ['Seattle, WA', 'Austin, TX'],
-        remoteType: 'onsite',
-        employmentType: 'internship',
-        salary: { min: 7500, max: 8500, currency: 'USD', period: 'monthly' },
-        postedDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-        description: 'Build and innovate at Amazon. Work on products used by millions worldwide.',
-        requiredSkills: ['Java', 'Python', 'AWS', 'Distributed Systems'],
-        preferredSkills: ['Docker', 'Kubernetes'],
-        qualifications: ['Enrolled in CS or related degree program'],
-        responsibilities: ['Design scalable solutions', 'Work with AWS services', 'Ship features to production'],
-        sponsorsVisa: true,
-        applyUrl: 'https://www.amazon.jobs/',
-        sourceUrl: 'https://www.amazon.jobs',
-        sourceName: 'Amazon Jobs',
-        matchScore: 85,
-        matchExplanation: ['✓ Skills match: Python, AWS', '✓ Strong GPA', '✓ Remote available'],
-        applicationStatus: 'not_started',
-        saved: false,
-        hidden: false,
-        requiredDocuments: ['resume', 'cover_letter'],
-    },
-    {
-        id: 'job-microsoft-swe-intern',
-        title: 'Software Engineering Intern',
-        company: 'Microsoft',
-        companyLogo: 'https://logo.clearbit.com/microsoft.com',
-        locations: ['Redmond, WA'],
-        remoteType: 'hybrid',
-        employmentType: 'internship',
-        salary: { min: 8000, max: 9000, currency: 'USD', period: 'monthly' },
-        postedDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-        description: 'Empower every person and organization on the planet to achieve more.',
-        requiredSkills: ['C#', 'TypeScript', 'Azure'],
-        preferredSkills: ['React', '.NET', 'Cloud Computing'],
-        qualifications: ['Pursuing degree in CS, CE, or related field'],
-        responsibilities: ['Develop features for Microsoft products', 'Collaborate with PMs and designers'],
-        sponsorsVisa: true,
-        applyUrl: 'https://careers.microsoft.com/',
-        sourceUrl: 'https://careers.microsoft.com',
-        sourceName: 'Microsoft Careers',
-        matchScore: 82,
-        matchExplanation: ['✓ Skills match: TypeScript, React', '✓ Entry-level position', '✓ Sponsors visas'],
-        applicationStatus: 'not_started',
-        saved: false,
-        hidden: false,
-        requiredDocuments: ['resume'],
-    },
-    {
-        id: 'job-netflix-swe-intern',
-        title: 'Software Engineer Intern',
-        company: 'Netflix',
-        companyLogo: 'https://logo.clearbit.com/netflix.com',
-        locations: ['Los Gatos, CA'],
-        remoteType: 'remote',
-        employmentType: 'internship',
-        salary: { min: 9000, max: 11000, currency: 'USD', period: 'monthly' },
-        postedDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        description: 'Join Netflix to build the future of entertainment. Work on streaming technology.',
-        requiredSkills: ['Java', 'Python', 'Microservices'],
-        preferredSkills: ['Machine Learning', 'Data Engineering'],
-        qualifications: ['Currently pursuing CS degree'],
-        responsibilities: ['Build scalable streaming systems', 'Optimize content delivery'],
-        sponsorsVisa: false,
-        applyUrl: 'https://jobs.netflix.com/',
-        sourceUrl: 'https://jobs.netflix.com',
-        sourceName: 'Netflix Jobs',
-        matchScore: 78,
-        matchExplanation: ['✓ Skills match: Python', '✓ Remote work available', '⚠ Does not sponsor visas'],
-        applicationStatus: 'not_started',
-        saved: false,
-        hidden: false,
-        requiredDocuments: ['resume', 'cover_letter'],
-    },
-];
 
 // ============================================
 // MAIN COMPONENT
@@ -223,25 +89,139 @@ export default function EnhancedJobsPage() {
     });
     const [sortBy, setSortBy] = useState<SortOption>('match');
 
-    // S3 Storage for persistence
-    const { data: jobs, setData: setJobs, isLoading: jobsLoading } =
-        useS3Storage<EnhancedJob[]>('enhanced-jobs', { defaultValue: sampleJobs });
+    // Jobs state - now fetched from API (no more mock data!)
+    const [jobs, setJobs] = useState<EnhancedJob[]>([]);
+    const [jobsLoading, setJobsLoading] = useState(true);
 
+    // S3 Storage for saved/applied tracking only
     const { data: savedJobIds, setData: setSavedJobIds } =
         useS3Storage<string[]>('saved-job-ids', { defaultValue: [] });
 
     const { data: appliedJobIds, setData: setAppliedJobIds } =
         useS3Storage<string[]>('applied-job-ids', { defaultValue: [] });
 
-    // Scan for new jobs
+    // Fetch jobs from API (reads from OpportunityStore)
+    const fetchJobs = useCallback(async () => {
+        try {
+            setJobsLoading(true);
+            const res = await fetch('/api/jobs?type=jobs');
+            const data = await res.json();
+
+            if (data.jobs && Array.isArray(data.jobs)) {
+                // Convert from Opportunity format to EnhancedJob format
+                const enhancedJobs: EnhancedJob[] = data.jobs.map((opp: any) => ({
+                    id: opp.id,
+                    title: opp.title,
+                    company: opp.organization,
+                    companyLogo: `https://logo.clearbit.com/${opp.organization?.toLowerCase().replace(/\s+/g, '')}.com`,
+                    locations: [opp.location || 'Remote'],
+                    remoteType: detectLocationType(opp.location, opp.description),
+                    employmentType: detectEmploymentType(opp.title, opp.description),
+                    salary: opp.salary ? parseSalaryString(opp.salary) : undefined,
+                    postedDate: opp.discoveredAt || new Date().toISOString(),
+                    deadline: opp.deadline,
+                    description: opp.description || '',
+                    requiredSkills: opp.requirements || [],
+                    preferredSkills: [],
+                    qualifications: [],
+                    responsibilities: [],
+                    sponsorsVisa: (opp.description || '').toLowerCase().includes('visa'),
+                    applyUrl: opp.url,
+                    sourceUrl: opp.url,
+                    sourceName: extractSourceName(opp.url),
+                    matchScore: opp.matchScore || 0,
+                    matchExplanation: generateMatchExplanation(opp),
+                    applicationStatus: mapOpportunityStatus(opp.status),
+                    saved: savedJobIds.includes(opp.id),
+                    hidden: false,
+                    requiredDocuments: ['resume', 'cover_letter'],
+                    generatedDocuments: opp.tailoredCV || opp.tailoredCoverLetter
+                        ? { cv: opp.tailoredCV, coverLetter: opp.tailoredCoverLetter }
+                        : undefined,
+                }));
+                setJobs(enhancedJobs);
+                console.log(`[Jobs Page] Loaded ${enhancedJobs.length} jobs from API`);
+            }
+        } catch (error) {
+            console.error('Failed to fetch jobs:', error);
+            toast.error('Failed to load jobs');
+        } finally {
+            setJobsLoading(false);
+        }
+    }, [savedJobIds]);
+
+    // Helper functions for conversion
+    const detectLocationType = (location?: string, description?: string): LocationType => {
+        const text = `${location || ''} ${description || ''}`.toLowerCase();
+        if (text.includes('remote')) return 'remote';
+        if (text.includes('hybrid')) return 'hybrid';
+        return 'onsite';
+    };
+
+    const detectEmploymentType = (title: string, description?: string): EmploymentType => {
+        const text = `${title} ${description || ''}`.toLowerCase();
+        if (text.includes('intern')) return 'internship';
+        if (text.includes('part-time') || text.includes('part time')) return 'part-time';
+        if (text.includes('contract')) return 'contract';
+        return 'full-time';
+    };
+
+    const parseSalaryString = (salary: string): EnhancedJob['salary'] | undefined => {
+        const numbers = salary.match(/[\d,]+/g);
+        if (!numbers) return undefined;
+        const min = parseInt(numbers[0].replace(',', ''));
+        const max = numbers.length > 1 ? parseInt(numbers[1].replace(',', '')) : min;
+        const period = salary.toLowerCase().includes('hour') ? 'hourly' : 'yearly';
+        return { min, max, currency: 'USD', period };
+    };
+
+    const extractSourceName = (url: string): string => {
+        try {
+            const hostname = new URL(url).hostname;
+            if (hostname.includes('linkedin')) return 'LinkedIn';
+            if (hostname.includes('indeed')) return 'Indeed';
+            if (hostname.includes('glassdoor')) return 'Glassdoor';
+            if (hostname.includes('handshake')) return 'Handshake';
+            return hostname.replace('www.', '').split('.')[0];
+        } catch {
+            return 'Direct';
+        }
+    };
+
+    const generateMatchExplanation = (opp: any): string[] => {
+        const explanations: string[] = [];
+        if (opp.matchScore >= 80) explanations.push('✓ High match with your profile');
+        if (opp.requirements?.length > 0) {
+            explanations.push(`✓ Skills: ${opp.requirements.slice(0, 3).join(', ')}`);
+        }
+        return explanations;
+    };
+
+    const mapOpportunityStatus = (status: string): ApplicationStatus => {
+        switch (status) {
+            case 'applied': return 'applied';
+            case 'tailoring': return 'docs_generated';
+            case 'accepted': return 'offer';
+            case 'rejected': return 'rejected';
+            default: return 'not_started';
+        }
+    };
+
+    // Fetch jobs on mount
+    useEffect(() => {
+        fetchJobs();
+    }, []);
+
+    // Scan for new jobs - NOW REFETCHES AFTER SCAN!
     const handleScan = async () => {
         setIsScanning(true);
         toast.info('🔍 Scanning job platforms...');
         try {
             const result = await runDiscoveryScan('jobs');
             if (result.success) {
-                toast.success('✅ Scan complete! Found new opportunities.');
-                // In production, this would fetch from the opportunity store
+                toast.success('✅ Scan complete! Refreshing jobs...');
+                // CRITICAL: Actually refetch from the API!
+                await fetchJobs();
             }
         } catch (error) {
             toast.error('Scan failed');
@@ -249,6 +229,7 @@ export default function EnhancedJobsPage() {
             setIsScanning(false);
         }
     };
+
 
     // Generate documents for a job
     const handleGenerateDocuments = async (job: EnhancedJob) => {
@@ -733,12 +714,25 @@ export default function EnhancedJobsPage() {
                     {filteredJobs.length === 0 && (
                         <Card className="text-center py-12">
                             <Briefcase className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
-                            <h3 className="text-xl font-semibold mb-2">No jobs found</h3>
-                            <p style={{ color: 'var(--text-muted)' }}>
-                                Try adjusting your filters or scan for new opportunities
+                            <h3 className="text-xl font-semibold mb-2">No jobs discovered yet</h3>
+                            <p style={{ color: 'var(--text-muted)' }} className="mb-4">
+                                {jobs.length === 0
+                                    ? 'Click "Scan New Jobs" to discover opportunities from Indeed, Handshake, Glassdoor, and more.'
+                                    : 'Try adjusting your filters to see more results.'}
                             </p>
+                            {jobs.length === 0 && (
+                                <Button
+                                    variant="primary"
+                                    onClick={handleScan}
+                                    disabled={isScanning}
+                                    icon={isScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                >
+                                    {isScanning ? 'Scanning...' : 'Scan New Jobs'}
+                                </Button>
+                            )}
                         </Card>
                     )}
+
                 </div>
 
                 {/* Job Details Panel */}
