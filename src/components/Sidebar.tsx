@@ -29,12 +29,14 @@ import {
   ScrollText,
   FileCheck,
   BarChart3,
-  Clock
+  Clock,
+  Plane
 } from 'lucide-react';
 
 
 const mainNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
+  { icon: Plane, label: 'Transfer Hub', href: '/transfer', badge: 'HOT', badgeColor: 'bg-gradient-to-r from-red-500 to-orange-500' },
   { icon: FileText, label: 'Essays', href: '/essays' },
   { icon: ScrollText, label: 'CV Builder', href: '/cv-builder', badge: 'NEW' },
   { icon: Briefcase, label: 'Jobs', href: '/jobs' },
