@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
         // Browser health (with timeout)
         const browserPromise = validateBrowser();
         const browserTimeout = new Promise<{ success: boolean; error: string }>((resolve) =>
-            setTimeout(() => resolve({ success: false, error: 'Browser validation timeout' }), 15000)
+            setTimeout(() => resolve({ success: false, error: 'Browser validation timeout' }), 25000)
         );
 
         const browserResult = await Promise.race([browserPromise, browserTimeout]);

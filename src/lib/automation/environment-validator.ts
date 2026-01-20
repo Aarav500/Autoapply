@@ -64,7 +64,7 @@ export async function validateBrowser(): Promise<{ success: boolean; error?: str
         const browser = await puppeteer.default.launch({
             headless: 'shell',
             args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
-            timeout: 30000, // 30 second timeout
+            timeout: 20000, // 20 second timeout
         });
         await browser.close();
         return { success: true };
