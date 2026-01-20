@@ -69,6 +69,24 @@
 
 ---
 
+### 5. RetryConfig Type Error (FIXED)
+**Issue:** Build failing with "Type is missing the following properties from type 'RetryConfig': backoffMultiplier, jitter"
+- **File:** `src/lib/automation/discovery-service.ts` line 169
+- **Root Cause:** Partial retry config object missing required `backoffMultiplier` and `jitter` properties
+- **Symptoms:**
+  - TypeScript compilation failed during build
+  - Incomplete RetryConfig object passed to retryWithBackoff
+  - Missing exponential backoff configuration
+
+- **Fix:**
+  - Added `backoffMultiplier: 2` to retry config
+  - Added `jitter: true` to retry config
+  - Complete retry configuration: `{ maxAttempts: 3, initialDelay: 2000, maxDelay: 10000, backoffMultiplier: 2, jitter: true }`
+
+**Commit:** [21042c8](https://github.com/Aarav500/Autoapply/commit/21042c8)
+
+---
+
 ## Current System Status
 
 ### Health Check Results ✅
@@ -156,6 +174,9 @@ These warnings don't prevent the app from working:
 
 4. `src/lib/automation/environment-validator.ts`
    - Line 67: Reduced browser launch timeout to 20000ms
+
+5. `src/lib/automation/discovery-service.ts`
+   - Line 169: Added backoffMultiplier and jitter to retry config
 
 ---
 
