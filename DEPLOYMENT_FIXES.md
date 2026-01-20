@@ -32,6 +32,25 @@
 
 ---
 
+### 3. TypeScript Discriminated Union Type Error (FIXED)
+**Issue:** Build failing with "Property 'error' does not exist on type 'never'" error
+- **File:** `src/app/jobs/page.tsx` line 257
+- **Root Cause:** TypeScript couldn't properly narrow discriminated union types in `else if (result.error)` after checking `if (result.success)`
+- **Symptoms:**
+  - Build failed with type error during Docker image creation
+  - TypeScript inferred `result` as type `never` in else branch
+  - Prevented production deployment
+
+- **Fix:**
+  - Added explicit return types (`ScanSuccessResult | ScanErrorResult`) to `runDiscoveryScan` function
+  - Changed `else if (result.error)` to `else` block for proper type narrowing
+  - Used `'error' in result` for type-safe property access
+  - Added proper type annotations for discriminated unions
+
+**Commit:** [c69940f](https://github.com/Aarav500/Autoapply/commit/c69940f)
+
+---
+
 ## Current System Status
 
 ### Health Check Results ✅
@@ -103,13 +122,19 @@ These warnings don't prevent the app from working:
 
 ### Core Fixes
 1. `src/app/jobs/page.tsx`
-   - Lines 247-248: Fixed toast.warning() call
-   - Lines 265-266: Fixed toast.error() call
+   - Lines 247-248: Fixed toast.warning() call (removed onClick)
+   - Lines 255-267: Fixed discriminated union type narrowing (replaced else if with else)
+   - Added type-safe error property access
 
-2. `src/app/api/health/route.ts`
+2. `src/app/actions/discovery.ts`
+   - Lines 6-16: Added explicit return types (ScanSuccessResult | ScanErrorResult)
+   - Lines 44, 47: Added type assertions for return values
+   - Improved TypeScript type inference
+
+3. `src/app/api/health/route.ts`
    - Line 27: Increased browser timeout to 25000ms
 
-3. `src/lib/automation/environment-validator.ts`
+4. `src/lib/automation/environment-validator.ts`
    - Line 67: Reduced browser launch timeout to 20000ms
 
 ---
