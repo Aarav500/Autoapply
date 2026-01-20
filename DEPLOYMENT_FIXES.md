@@ -51,6 +51,24 @@
 
 ---
 
+### 4. ScraperErrorCode Enum Usage Error (FIXED)
+**Issue:** Build failing with "Argument of type '\"UNKNOWN\"' is not assignable to parameter of type 'ScraperErrorCode'"
+- **File:** `src/app/jobs/page.tsx` line 259
+- **Root Cause:** Passing string literal `'UNKNOWN'` instead of enum value `ScraperErrorCode.UNKNOWN`
+- **Symptoms:**
+  - TypeScript compilation failed during build
+  - String literal not assignable to enum type
+  - Missing enum import
+
+- **Fix:**
+  - Added `ScraperErrorCode` to imports from `@/lib/automation/errors`
+  - Changed `'UNKNOWN'` to `ScraperErrorCode.UNKNOWN`
+  - Ensures type safety for error codes
+
+**Commit:** [57c9d7c](https://github.com/Aarav500/Autoapply/commit/57c9d7c)
+
+---
+
 ## Current System Status
 
 ### Health Check Results ✅
@@ -122,8 +140,10 @@ These warnings don't prevent the app from working:
 
 ### Core Fixes
 1. `src/app/jobs/page.tsx`
+   - Line 18: Added ScraperErrorCode to imports
    - Lines 247-248: Fixed toast.warning() call (removed onClick)
    - Lines 255-267: Fixed discriminated union type narrowing (replaced else if with else)
+   - Line 259: Changed 'UNKNOWN' string to ScraperErrorCode.UNKNOWN enum
    - Added type-safe error property access
 
 2. `src/app/actions/discovery.ts`
