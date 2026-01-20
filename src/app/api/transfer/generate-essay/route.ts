@@ -12,12 +12,45 @@ const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 const getClaudeKey = () => process.env.CLAUDE_API_KEY || process.env.NEXT_PUBLIC_CLAUDE_API_KEY || '';
 
 interface Activity {
+    id?: string;
     name: string;
     role: string;
     organization: string;
+    category?: 'academic' | 'leadership' | 'work' | 'volunteer' | 'creative' | 'athletic' | 'other';
     description: string;
+    startDate?: string;
+    endDate?: string;
+    isOngoing?: boolean;
     hoursPerWeek: number;
     weeksPerYear: number;
+    achievements?: string[];
+}
+
+interface Achievement {
+    id: string;
+    title: string;
+    category: 'academic' | 'award' | 'publication' | 'certification' | 'other';
+    date: string;
+    description: string;
+    issuer?: string;
+}
+
+interface Course {
+    id: string;
+    name: string;
+    code: string;
+    grade: string;
+    credits: number;
+    semester: string;
+    learnings: string[];
+    storyPotential: string;
+    relevantEssays: string[];
+}
+
+interface TranscriptData {
+    gpa: number;
+    totalCredits: number;
+    courses: Course[];
 }
 
 interface GenerateEssayRequest {
@@ -38,6 +71,8 @@ interface GenerateEssayRequest {
         wordLimit: number;
     };
     activities: Activity[];
+    achievements?: Achievement[];
+    transcript?: TranscriptData;
     userProfile?: {
         name?: string;
         major?: string;
@@ -57,21 +92,81 @@ function formatActivitiesForAI(activities: Activity[]): string {
     return activities
         .map((activity, index) => {
             const totalHours = calculateTotalHours(activity);
+            const achievementsStr = activity.achievements?.length
+                ? `\n   Achievements: ${activity.achievements.join('; ')}`
+                : '';
             return `
 ${index + 1}. ${activity.name}
    Role: ${activity.role}
    Organization: ${activity.organization}
+   Category: ${activity.category || 'other'}
    Time Commitment: ${activity.hoursPerWeek} hrs/week × ${activity.weeksPerYear} weeks/year (${totalHours} total hours)
-   Description: ${activity.description}
+   Description: ${activity.description}${achievementsStr}
 `.trim();
         })
         .join('\n\n');
 }
 
+// Format achievements for AI prompt
+function formatAchievementsForAI(achievements: Achievement[]): string {
+    if (!achievements || achievements.length === 0) return '';
+
+    return achievements
+        .map((ach, index) => {
+            const issuerStr = ach.issuer ? ` - ${ach.issuer}` : '';
+            return `
+${index + 1}. ${ach.title}${issuerStr}
+   Category: ${ach.category}
+   Date: ${new Date(ach.date).toLocaleDateString()}
+   Description: ${ach.description}
+`.trim();
+        })
+        .join('\n\n');
+}
+
+// Format transcript/grades for AI prompt
+function formatTranscriptForAI(transcript: TranscriptData, collegeId: string): string {
+    if (!transcript || !transcript.courses || transcript.courses.length === 0) return '';
+
+    // Filter courses relevant to this college
+    const relevantCourses = transcript.courses
+        .filter(c => c.relevantEssays?.includes(collegeId) || c.grade.startsWith('A'))
+        .slice(0, 5); // Top 5 most relevant courses
+
+    if (relevantCourses.length === 0) {
+        return `
+ACADEMIC PERFORMANCE:
+- GPA: ${transcript.gpa.toFixed(2)}
+- Total Credits: ${transcript.totalCredits}
+`.trim();
+    }
+
+    const coursesStr = relevantCourses
+        .map((course, index) => {
+            const learningsStr = course.learnings.slice(0, 2).join('; ');
+            return `
+${index + 1}. ${course.name} (${course.code})
+   Grade: ${course.grade} | ${course.credits} credits | ${course.semester}
+   Key Learnings: ${learningsStr}
+   Story Potential: ${course.storyPotential}
+`.trim();
+        })
+        .join('\n\n');
+
+    return `
+ACADEMIC PERFORMANCE:
+- GPA: ${transcript.gpa.toFixed(2)}
+- Total Credits: ${transcript.totalCredits}
+
+RELEVANT COURSEWORK:
+${coursesStr}
+`.trim();
+}
+
 export async function POST(request: NextRequest) {
     try {
         const body: GenerateEssayRequest = await request.json();
-        const { college, essay, activities, userProfile } = body;
+        const { college, essay, activities, achievements, transcript, userProfile } = body;
 
         const claudeKey = getClaudeKey();
 
@@ -114,10 +209,19 @@ UNIQUE FEATURES: ${college.uniqueFeatures.join(', ')}
         const userContext = userProfile ? `
 APPLICANT PROFILE:
 - Major Interest: ${userProfile.major || 'Not specified'}
-- GPA: ${userProfile.gpa || 'Not specified'}
+- GPA: ${transcript?.gpa ? transcript.gpa.toFixed(2) : (userProfile.gpa || 'Not specified')}
 - Core Values: ${userProfile.values?.join(', ') || 'Not specified'}
 - Interests: ${userProfile.interests?.join(', ') || 'Not specified'}
 `.trim() : 'Applicant profile not provided.';
+
+        // Build transcript context
+        const transcriptContext = transcript ? formatTranscriptForAI(transcript, college.id) : '';
+
+        // Build achievements context
+        const achievementsContext = achievements && achievements.length > 0 ? `
+ACHIEVEMENTS & AWARDS:
+${formatAchievementsForAI(achievements)}
+`.trim() : '';
 
         // Create the AI prompt - ENHANCED FOR 100% QUALITY
         const systemPrompt = `You are THE WORLD'S #1 college essay consultant. Your essays have a 100% acceptance rate to Ivy League and top-tier universities. Admissions officers at MIT, Stanford, and Harvard specifically request your students.
@@ -138,7 +242,9 @@ YOUR MISSION: Write a FLAWLESS, admission-GUARANTEEING essay that makes ${colleg
    - MUST include: specific numbers, dates, names, locations, technical details
    - Example: Not "I led a team" → "I coordinated 12 volunteers across 3 Riverside homeless shelters"
    - Example: Not "I improved efficiency" → "I reduced processing time from 4 hours to 47 minutes"
-   - Every claim MUST have concrete evidence from their actual activities
+   - Every claim MUST have concrete evidence from their actual activities, coursework, and achievements
+   - Weave in academic performance naturally (e.g., "While earning an A in Data Science, I realized...")
+   - Reference specific courses when relevant (e.g., "My Calculus course taught me...")
    - Zero generic statements allowed
 
 3. **COLLEGE FIT - SHOW DEEP RESEARCH**:
@@ -218,6 +324,9 @@ ${collegeContext}
 
 ${userContext}
 
+${transcriptContext ? `\n---\n\n${transcriptContext}\n` : ''}
+${achievementsContext ? `\n---\n\n${achievementsContext}\n` : ''}
+
 ---
 
 STUDENT'S ACTIVITIES (from S3 bucket):
@@ -228,12 +337,14 @@ ${formatActivitiesForAI(sortedActivities)}
 INSTRUCTIONS:
 Write an exceptional essay that:
 1. Directly answers the prompt
-2. Draws from the student's ACTUAL activities (be specific - use details!)
-3. Shows why ${college.name} is the perfect fit based on their values: ${college.values.slice(0, 3).join(', ')}
-4. Stays within ${essay.wordLimit} words
-5. Feels authentically human (avoid AI-sounding phrases like "As a passionate..." or "Throughout my journey...")
+2. Draws from the student's ACTUAL activities, coursework, grades, and achievements (be specific - use details!)
+3. Weave in academic performance naturally - reference specific courses and learnings when relevant
+4. Mention awards/achievements organically within the narrative (don't list them)
+5. Shows why ${college.name} is the perfect fit based on their values: ${college.values.slice(0, 3).join(', ')}
+6. Stays within ${essay.wordLimit} words
+7. Feels authentically human (avoid AI-sounding phrases like "As a passionate..." or "Throughout my journey...")
 
-Remember: The goal is to make admissions officers FEEL something and remember this student.
+Remember: The goal is to make admissions officers FEEL something and remember this student. Your essay should demonstrate both intellectual curiosity (through coursework) and real-world impact (through activities/achievements).
 
 Write the essay now:`;
 

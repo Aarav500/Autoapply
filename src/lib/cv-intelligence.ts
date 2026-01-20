@@ -104,7 +104,7 @@ export function scoreActivityForCollege(
     });
 
     // Deep commitment (multi-year involvement)
-    const duration = calculateDurationYears(activity.startDate, activity.endDate);
+    const duration = calculateDurationYears(activity.startDate, activity.endDate || new Date().toISOString().split('T')[0]);
     if (duration >= 3) score += 15;
     else if (duration >= 2) score += 10;
     else if (duration >= 1) score += 5;
@@ -176,7 +176,7 @@ export function enrichActivityForCollege(
     score: number
 ): EnrichedActivity {
     const totalHours = activity.hoursPerWeek * activity.weeksPerYear;
-    const duration = calculateDurationYears(activity.startDate, activity.endDate);
+    const duration = calculateDurationYears(activity.startDate, activity.endDate || new Date().toISOString().split('T')[0]);
 
     const quantifiedImpact = `${activity.description} [Duration: ${duration.toFixed(1)} years | Commitment: ${totalHours} total hours]`;
 

@@ -40,7 +40,8 @@ export default function CollegeApplicationPage() {
     const [scholarships, setScholarships] = useState<ScholarshipMatch[]>([]);
 
     const { data: activities } = useS3Storage<any[]>('activities', { defaultValue: [] });
-    const { data: achievements } = useS3Storage<any[]>('user_achievements', { defaultValue: [] });
+    const { data: achievements } = useS3Storage<any[]>('achievements', { defaultValue: [] });
+    const { data: transcript } = useS3Storage<any>('grades/transcript', { defaultValue: null });
     const { data: userProfile } = useS3Storage<any>('user-profile', { defaultValue: {} });
 
     // Load college-specific essay drafts
@@ -110,17 +111,25 @@ export default function CollegeApplicationPage() {
                         wordLimit: selectedEssayData.wordLimit,
                     },
                     activities: prioritizedActivities.map(a => ({
+                        id: a.id,
                         name: a.name,
                         role: a.role,
                         organization: a.organization,
+                        category: a.category,
                         description: a.description,
+                        startDate: a.startDate,
+                        endDate: a.endDate,
+                        isOngoing: a.isOngoing,
                         hoursPerWeek: a.hoursPerWeek,
                         weeksPerYear: a.weeksPerYear,
+                        achievements: a.achievements,
                     })),
+                    achievements: achievements || [],
+                    transcript: transcript || null,
                     userProfile: {
                         name: userProfile.name,
                         major: userProfile.major,
-                        gpa: userProfile.gpa,
+                        gpa: transcript?.gpa || userProfile.gpa,
                         values: userProfile.values,
                         interests: userProfile.interests,
                     },
@@ -394,7 +403,14 @@ export default function CollegeApplicationPage() {
                                                 Generating with AI...
                                             </span>
                                         ) : (
-                                            `✨ Generate Essay (using ${activities.length} activities)`
+                                            <>
+                                                ✨ Generate Essay
+                                                <span className="text-xs opacity-90 ml-2">
+                                                    ({activities.length} activities
+                                                    {achievements?.length > 0 && `, ${achievements.length} achievements`}
+                                                    {transcript?.gpa && `, GPA ${transcript.gpa.toFixed(2)}`})
+                                                </span>
+                                            </>
                                         )}
                                     </button>
                                 )}

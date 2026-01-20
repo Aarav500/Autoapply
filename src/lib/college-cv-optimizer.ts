@@ -10,11 +10,14 @@ export interface ActivityItem {
     name: string;
     role: string;
     organization: string;
+    category?: 'academic' | 'leadership' | 'work' | 'volunteer' | 'creative' | 'athletic' | 'other';
     startDate: string;
-    endDate: string;
+    endDate?: string;
+    isOngoing?: boolean;
     description: string;
     hoursPerWeek: number;
     weeksPerYear: number;
+    achievements?: string[];
 }
 
 export interface Achievement {

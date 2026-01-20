@@ -9,6 +9,8 @@ import {
     CheckCircle2, Brain, MessageSquare
 } from 'lucide-react';
 import { toast } from '@/lib/error-handling';
+import { useS3Storage } from '@/lib/useS3Storage';
+import { STORAGE_KEYS } from '@/lib/s3-storage';
 
 interface Course {
     id: string;
@@ -108,11 +110,19 @@ const sampleCourses: Course[] = [
 ];
 
 export default function GradesPage() {
-    const [transcript, setTranscript] = useState<TranscriptData>({
-        gpa: 3.90,
-        totalCredits: 18,
-        courses: sampleCourses,
+    // Load transcript from S3
+    const {
+        data: transcript,
+        setData: setTranscript,
+        isLoading: transcriptLoading
+    } = useS3Storage<TranscriptData>(STORAGE_KEYS.TRANSCRIPT, {
+        defaultValue: {
+            gpa: 3.90,
+            totalCredits: 18,
+            courses: sampleCourses,
+        }
     });
+
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
     const [isAddingCourse, setIsAddingCourse] = useState(false);
