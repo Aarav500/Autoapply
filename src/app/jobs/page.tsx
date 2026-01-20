@@ -15,7 +15,7 @@ import {
 import { runDiscoveryScan } from '@/app/actions/discovery';
 import { convertToEnhancedJobs, EnhancedJob as ConvertedJob } from '@/lib/automation/job-converter';
 import { ScraperErrorModal } from '@/components/ScraperErrorModal';
-import { ScraperError } from '@/lib/automation/errors';
+import { ScraperError, ScraperErrorCode } from '@/lib/automation/errors';
 
 // ============================================
 // TYPES
@@ -256,7 +256,7 @@ export default function EnhancedJobsPage() {
                 // Environment validation or other critical error (result.success === false)
                 const errorMessage = 'error' in result ? result.error : 'Scan failed';
                 const err = new ScraperError(
-                    'UNKNOWN',
+                    ScraperErrorCode.UNKNOWN,
                     errorMessage,
                     'system',
                     true
