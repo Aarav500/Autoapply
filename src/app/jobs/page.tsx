@@ -244,9 +244,8 @@ export default function EnhancedJobsPage() {
 
                 if (errors.length > 0) {
                     setScraperErrors(errors);
-                    toast.warning(`⚠️ Scan completed with ${errors.length} error(s). Click to view details.`, {
-                        onClick: () => setShowErrorModal(true),
-                    });
+                    setShowErrorModal(true); // Automatically show error modal
+                    toast.warning(`⚠️ Scan completed with ${errors.length} error(s). View error details below.`);
                 } else {
                     toast.success('✅ Scan complete! Refreshing jobs...');
                 }
@@ -263,9 +262,8 @@ export default function EnhancedJobsPage() {
                     errorData.retryable !== false
                 );
                 setScraperErrors([err]);
-                toast.error(`❌ ${err.getUserMessage()}`, {
-                    onClick: () => setShowErrorModal(true),
-                });
+                setShowErrorModal(true); // Automatically show error modal
+                toast.error(`❌ ${err.getUserMessage()}`);
             }
         } catch (error) {
             console.error('Scan error:', error);
