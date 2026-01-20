@@ -75,15 +75,27 @@ export default function ActivitiesPage() {
         data: activities,
         setData: setActivities,
         save: saveActivitiesData,
-        isLoading: activitiesLoading
-    } = useS3Storage<Activity[]>(STORAGE_KEYS.ACTIVITIES, { defaultValue: [] });
+        isLoading: activitiesLoading,
+        isSaving: activitiesSaving,
+        lastSaved: activitiesLastSaved
+    } = useS3Storage<Activity[]>(STORAGE_KEYS.ACTIVITIES, {
+        defaultValue: [],
+        onSave: () => toast.success('✅ Activities saved to S3!'),
+        onError: (err) => toast.error(`Failed to save: ${err.message}`)
+    });
 
     const {
         data: achievements,
         setData: setAchievements,
         save: saveAchievementsData,
-        isLoading: achievementsLoading
-    } = useS3Storage<Achievement[]>(STORAGE_KEYS.ACHIEVEMENTS, { defaultValue: [] });
+        isLoading: achievementsLoading,
+        isSaving: achievementsSaving,
+        lastSaved: achievementsLastSaved
+    } = useS3Storage<Achievement[]>(STORAGE_KEYS.ACHIEVEMENTS, {
+        defaultValue: [],
+        onSave: () => toast.success('✅ Achievements saved to S3!'),
+        onError: (err) => toast.error(`Failed to save: ${err.message}`)
+    });
 
 
     const isLoading = activitiesLoading || achievementsLoading;
@@ -192,13 +204,41 @@ export default function ActivitiesPage() {
                     <p style={{ color: 'var(--text-secondary)' }}>
                         Add your activities to personalize essays and applications
                     </p>
+                    {/* S3 Save Status */}
+                    <div className="flex items-center gap-2 mt-1 text-xs">
+                        {(activitiesSaving || achievementsSaving) && (
+                            <span className="flex items-center gap-1" style={{ color: 'var(--primary-400)' }}>
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Saving to S3...
+                            </span>
+                        )}
+                        {!activitiesSaving && !achievementsSaving && (activitiesLastSaved || achievementsLastSaved) && (
+                            <span className="flex items-center gap-1" style={{ color: 'var(--success)' }}>
+                                <CheckCircle className="w-3 h-3" />
+                                Synced to S3 bucket
+                            </span>
+                        )}
+                    </div>
                 </div>
-                <Button
-                    icon={<Plus className="w-4 h-4" />}
-                    onClick={() => setIsAddingNew(true)}
-                >
-                    Add {activeTab === 'activities' ? 'Activity' : 'Achievement'}
-                </Button>
+                <div className="flex gap-2">
+                    <Button
+                        variant="secondary"
+                        icon={activitiesSaving || achievementsSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                        onClick={() => {
+                            saveActivitiesData();
+                            saveAchievementsData();
+                        }}
+                        disabled={activitiesSaving || achievementsSaving}
+                    >
+                        Save to S3
+                    </Button>
+                    <Button
+                        icon={<Plus className="w-4 h-4" />}
+                        onClick={() => setIsAddingNew(true)}
+                    >
+                        Add {activeTab === 'activities' ? 'Activity' : 'Achievement'}
+                    </Button>
+                </div>
             </div>
 
             {/* Stats */}
