@@ -166,7 +166,7 @@ export class DiscoveryService {
                     });
                 },
                 (error) => isRetryableError(error),
-                { maxAttempts: 3, initialDelay: 2000, maxDelay: 10000 },
+                { maxAttempts: 3, initialDelay: 2000, maxDelay: 10000, backoffMultiplier: 2, jitter: true },
                 (attempt, error) => {
                     browserManager.log(`⏳ ${platform} retry ${attempt}/3: ${error instanceof Error ? error.message : String(error)}`);
                 }
