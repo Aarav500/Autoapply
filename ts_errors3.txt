@@ -1,0 +1,2 @@
+﻿src/__tests__/reliability.test.ts(6,54): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+src/lib/automation/analytics-tracking.ts(6,10): error TS2724: '"@/lib/s3-storage"' has no exported member named 'S3Storage'. Did you mean 's3Storage'?

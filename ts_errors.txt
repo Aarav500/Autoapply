@@ -1,0 +1,9 @@
+﻿src/__tests__/reliability.test.ts(6,54): error TS2307: Cannot find module 'vitest' or its corresponding type declarations.
+src/lib/automation/opportunity-matcher.ts(776,5): error TS2322: Type '{ match_score: number; discovered_at?: string | undefined; deadline?: string | undefined; }[]' is not assignable to type 'MatchResult[]'.
+  Type '{ match_score: number; discovered_at?: string | undefined; deadline?: string | undefined; }' is missing the following properties from type 'MatchResult': opportunity, score, passed_hard_filters, hard_filter_failures, and 2 more.
+src/lib/automation/opportunity-matcher.ts(776,30): error TS2345: Argument of type 'MatchResult[]' is not assignable to parameter of type '{ match_score: number; discovered_at?: string | undefined; deadline?: string | undefined; }[]'.
+  Property 'match_score' is missing in type 'MatchResult' but required in type '{ match_score: number; discovered_at?: string | undefined; deadline?: string | undefined; }'.
+src/lib/automation/opportunity-matcher.ts(808,5): error TS2322: Type '{ match_score: number; discovered_at?: string | undefined; deadline?: string | undefined; }[]' is not assignable to type 'MatchResult[]'.
+  Type '{ match_score: number; discovered_at?: string | undefined; deadline?: string | undefined; }' is missing the following properties from type 'MatchResult': opportunity, score, passed_hard_filters, hard_filter_failures, and 2 more.
+src/lib/automation/opportunity-matcher.ts(808,30): error TS2345: Argument of type 'MatchResult[]' is not assignable to parameter of type '{ match_score: number; discovered_at?: string | undefined; deadline?: string | undefined; }[]'.
+  Property 'match_score' is missing in type 'MatchResult' but required in type '{ match_score: number; discovered_at?: string | undefined; deadline?: string | undefined; }'.
