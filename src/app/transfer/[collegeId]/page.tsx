@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { targetColleges, getTimeUntilDeadline, formatDeadline, CollegeInfo } from '@/lib/colleges-data';
-import { useS3Storage } from '@/lib/s3-storage';
+import { useS3Storage } from '@/lib/useS3Storage';
 import { calculateCollegeFitScore, prioritizeActivitiesForCollege } from '@/lib/college-cv-optimizer';
 
 // ============================================
