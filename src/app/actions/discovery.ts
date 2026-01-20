@@ -1,9 +1,21 @@
 'use server';
 
-import { discoveryService } from '@/lib/automation/discovery-service';
+import { discoveryService, ScanResult } from '@/lib/automation/discovery-service';
 import { revalidatePath } from 'next/cache';
 
-export async function runDiscoveryScan(type: 'jobs' | 'scholarships' | 'all') {
+type ScanSuccessResult = {
+    success: true;
+    results: ScanResult[];
+};
+
+type ScanErrorResult = {
+    success: false;
+    error: string;
+};
+
+type ScanResponse = ScanSuccessResult | ScanErrorResult;
+
+export async function runDiscoveryScan(type: 'jobs' | 'scholarships' | 'all'): Promise<ScanResponse> {
     try {
         console.log(`Starting discovery scan for: ${type}`);
 
@@ -29,10 +41,10 @@ export async function runDiscoveryScan(type: 'jobs' | 'scholarships' | 'all') {
         revalidatePath('/job-hub');
         revalidatePath('/scholarships');
 
-        return { success: true, results };
+        return { success: true, results } as ScanSuccessResult;
     } catch (error) {
         console.error('Scan failed:', error);
-        return { success: false, error: String(error) };
+        return { success: false, error: String(error) } as ScanErrorResult;
     }
 }
 

@@ -252,14 +252,14 @@ export default function EnhancedJobsPage() {
 
                 // CRITICAL: Actually refetch from the API!
                 await fetchJobs();
-            } else if (result.error) {
-                // Environment validation or other critical error
-                const errorData = typeof result.error === 'object' ? result.error : { message: result.error };
+            } else {
+                // Environment validation or other critical error (result.success === false)
+                const errorMessage = 'error' in result ? result.error : 'Scan failed';
                 const err = new ScraperError(
-                    errorData.code || 'UNKNOWN',
-                    errorData.message || 'Scan failed',
-                    errorData.scraper || 'system',
-                    errorData.retryable !== false
+                    'UNKNOWN',
+                    errorMessage,
+                    'system',
+                    true
                 );
                 setScraperErrors([err]);
                 setShowErrorModal(true); // Automatically show error modal
