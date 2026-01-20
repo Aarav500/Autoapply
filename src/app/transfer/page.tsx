@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { targetColleges, getTimeUntilDeadline, formatDeadline } from '@/lib/colleges-data';
-import { useS3Storage } from '@/lib/s3-storage';
+import { useS3Storage } from '@/lib/useS3Storage';
 import Link from 'next/link';
 
 // ============================================
