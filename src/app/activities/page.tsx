@@ -97,6 +97,24 @@ export default function ActivitiesPage() {
         onError: (err) => toast.error(`Failed to save: ${err.message}`)
     });
 
+    // Auto-load seed data if no activities/achievements exist
+    useEffect(() => {
+        const loadSeedDataIfEmpty = async () => {
+            if (!activitiesLoading && !achievementsLoading && activities.length === 0 && achievements.length === 0) {
+                try {
+                    const response = await fetch('/api/load-seed-data', { method: 'POST' });
+                    const result = await response.json();
+                    if (result.success) {
+                        // Reload the page to fetch fresh data from S3
+                        window.location.reload();
+                    }
+                } catch (error) {
+                    console.error('Failed to auto-load seed data:', error);
+                }
+            }
+        };
+        loadSeedDataIfEmpty();
+    }, [activitiesLoading, achievementsLoading, activities.length, achievements.length]);
 
     const isLoading = activitiesLoading || achievementsLoading;
 
