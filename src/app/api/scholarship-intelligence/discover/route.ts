@@ -91,16 +91,30 @@ export async function POST(request: NextRequest) {
         console.log('📊 Matching scholarships to user profile...');
 
         const profile: UserProfile = {
-            name: userProfile?.name || '',
+            firstName: userProfile?.firstName || '',
+            lastName: userProfile?.lastName || '',
+            fullName: userProfile?.fullName || userProfile?.name || '',
             email: userProfile?.email || '',
             phone: userProfile?.phone || '',
-            gpa: userProfile?.gpa || 3.0,
+            dateOfBirth: userProfile?.dateOfBirth || '',
+            address: userProfile?.address || '',
+            city: userProfile?.city || '',
+            state: userProfile?.state || '',
+            zipCode: userProfile?.zipCode || '',
+            country: userProfile?.country || '',
+            school: userProfile?.currentCollege || userProfile?.school || '',
             major: userProfile?.major || 'Computer Science',
-            university: userProfile?.currentCollege || '',
+            gpa: userProfile?.gpa || 3.0,
             graduationYear: userProfile?.graduationYear || new Date().getFullYear() + 2,
-            skills: userProfile?.skills || [],
+            graduationMonth: userProfile?.graduationMonth || 'June',
+            degree: userProfile?.degree || 'Bachelor of Science',
+            educationHistory: userProfile?.educationHistory || [],
+            citizenship: userProfile?.citizenship || '',
             workExperience: userProfile?.workExperience || [],
-            projects: userProfile?.projects || [],
+            skills: userProfile?.skills || [],
+            languages: userProfile?.languages || [],
+            linkedIn: userProfile?.linkedIn || '',
+            essayAnswers: userProfile?.essayAnswers || {},
         };
 
         const matchedScholarships = matchAndRankScholarships(
