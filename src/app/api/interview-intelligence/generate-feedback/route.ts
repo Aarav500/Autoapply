@@ -1,7 +1,6 @@
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
 
 // ============================================
 // AI INTERVIEW FEEDBACK GENERATOR
@@ -22,21 +21,34 @@ interface FeedbackRequest {
     };
 }
 
-const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY || '',
-});
+const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 
 async function callClaude(prompt: string, maxTokens: number = 2000): Promise<string> {
     try {
-        const response = await anthropic.messages.create({
-            model: 'claude-sonnet-4-5-20250929',
-            max_tokens: maxTokens,
-            temperature: 0.7,
-            messages: [{ role: 'user', content: prompt }],
+        const apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY || '';
+
+        const response = await fetch(CLAUDE_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify({
+                model: 'claude-sonnet-4-5-20250929',
+                max_tokens: maxTokens,
+                temperature: 0.7,
+                messages: [{ role: 'user', content: prompt }],
+            }),
         });
 
-        const textContent = response.content.find(c => c.type === 'text');
-        return textContent && 'text' in textContent ? textContent.text : '';
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(`Claude API error: ${error.error?.message || response.statusText}`);
+        }
+
+        const data = await response.json();
+        return data.content[0].text;
     } catch (error) {
         console.error('Claude API error:', error);
         throw error;

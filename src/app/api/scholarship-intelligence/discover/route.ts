@@ -2,8 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { scrapeBoldOrg } from '@/lib/automation/scrapers/bold-org-scraper';
-import { scrapeFastWeb } from '@/lib/automation/scrapers/fastweb-scraper';
-import { scrapeScholarshipsCom } from '@/lib/automation/scrapers/scholarships-com-scraper';
+import { scrapeFastweb } from '@/lib/automation/scrapers/fastweb-scraper';
+import { discoverScholarshipsCom } from '@/lib/automation/scrapers/scholarships-com-scraper';
 import { matchAndRankScholarships } from '@/lib/automation/opportunity-matcher';
 import { UserProfile } from '@/lib/automation/user-profile';
 
@@ -46,34 +46,17 @@ export async function POST(request: NextRequest) {
 
                 switch (source) {
                     case 'bold':
-                        scholarships = await scrapeBoldOrg({
-                            maxPages: 5,
-                            filters: {
-                                major: userProfile?.major,
-                                ethnicity: userProfile?.ethnicity,
-                                state: userProfile?.state,
-                            },
-                        });
+                        scholarships = await scrapeBoldOrg();
                         break;
 
                     case 'fastweb':
-                        scholarships = await scrapeFastWeb({
-                            profile: {
-                                gpa: userProfile?.gpa,
-                                major: userProfile?.major,
-                                gradYear: userProfile?.graduationYear,
-                                ethnicity: userProfile?.ethnicity,
-                            },
-                            maxResults: 50,
-                        });
+                        scholarships = await scrapeFastweb();
                         break;
 
                     case 'scholarships-com':
-                        scholarships = await scrapeScholarshipsCom({
-                            keywords: [userProfile?.major, 'transfer', 'international'],
-                            amount: { min: 1000 },
-                            maxResults: 50,
-                        });
+                        // discoverScholarshipsCom returns a count, not scholarships
+                        // For now, skip this source or return empty array
+                        scholarships = [];
                         break;
                 }
 
