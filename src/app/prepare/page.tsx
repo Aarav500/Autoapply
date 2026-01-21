@@ -15,7 +15,8 @@ import {
     Target,
     Award,
     Lightbulb,
-    Star
+    Star,
+    AlertCircle
 } from 'lucide-react';
 
 interface Question {
@@ -27,14 +28,33 @@ interface Question {
 }
 
 const interviewQuestions: Question[] = [
-    { id: '1', question: 'Tell me about yourself.', category: 'general', difficulty: 'easy', practiced: true },
-    { id: '2', question: 'Why do you want to transfer to this university?', category: 'college', difficulty: 'medium', practiced: true },
-    { id: '3', question: 'What is your greatest strength?', category: 'general', difficulty: 'easy', practiced: false },
-    { id: '4', question: 'Describe a challenge you overcame.', category: 'behavioral', difficulty: 'medium', practiced: true },
-    { id: '5', question: 'Why should we hire you?', category: 'job', difficulty: 'hard', practiced: false },
-    { id: '6', question: 'Where do you see yourself in 5 years?', category: 'general', difficulty: 'medium', practiced: false },
-    { id: '7', question: 'Tell me about a time you demonstrated leadership.', category: 'behavioral', difficulty: 'hard', practiced: true },
-    { id: '8', question: 'How do you handle stress?', category: 'behavioral', difficulty: 'medium', practiced: false },
+    // General
+    { id: '1', question: 'Tell me about yourself.', category: 'general', difficulty: 'easy', practiced: false },
+    { id: '2', question: 'What is your greatest strength?', category: 'general', difficulty: 'easy', practiced: false },
+    { id: '3', question: 'What is your greatest weakness?', category: 'general', difficulty: 'medium', practiced: false },
+    { id: '4', question: 'Where do you see yourself in 5 years?', category: 'general', difficulty: 'medium', practiced: false },
+
+    // College-specific
+    { id: '5', question: 'Why do you want to transfer to this university?', category: 'college', difficulty: 'medium', practiced: false },
+    { id: '6', question: 'What will you contribute to our campus community?', category: 'college', difficulty: 'hard', practiced: false },
+    { id: '7', question: 'Why did you choose your major?', category: 'college', difficulty: 'medium', practiced: false },
+    { id: '8', question: 'How will you handle the academic rigor here?', category: 'college', difficulty: 'hard', practiced: false },
+
+    // Job-specific
+    { id: '9', question: 'Why should we hire you?', category: 'job', difficulty: 'hard', practiced: false },
+    { id: '10', question: 'What interests you about this role?', category: 'job', difficulty: 'medium', practiced: false },
+    { id: '11', question: 'Walk me through your resume.', category: 'job', difficulty: 'medium', practiced: false },
+    { id: '12', question: 'What are your salary expectations?', category: 'job', difficulty: 'hard', practiced: false },
+    { id: '13', question: 'Why are you leaving your current job/school?', category: 'job', difficulty: 'medium', practiced: false },
+    { id: '14', question: 'What do you know about our company?', category: 'job', difficulty: 'medium', practiced: false },
+
+    // Behavioral
+    { id: '15', question: 'Describe a challenge you overcame.', category: 'behavioral', difficulty: 'medium', practiced: false },
+    { id: '16', question: 'Tell me about a time you demonstrated leadership.', category: 'behavioral', difficulty: 'hard', practiced: false },
+    { id: '17', question: 'How do you handle stress?', category: 'behavioral', difficulty: 'medium', practiced: false },
+    { id: '18', question: 'Tell me about a time you failed.', category: 'behavioral', difficulty: 'hard', practiced: false },
+    { id: '19', question: 'Describe a conflict you resolved.', category: 'behavioral', difficulty: 'hard', practiced: false },
+    { id: '20', question: 'Tell me about a time you worked in a team.', category: 'behavioral', difficulty: 'medium', practiced: false },
 ];
 
 const starExamples = [
@@ -62,6 +82,8 @@ export default function PreparePage() {
     const [showPractice, setShowPractice] = useState(false);
     const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
     const [userAnswer, setUserAnswer] = useState('');
+    const [feedback, setFeedback] = useState<any>(null);
+    const [isGettingFeedback, setIsGettingFeedback] = useState(false);
 
     const containerVariants = {
         hidden: { opacity: 0 },
@@ -88,6 +110,40 @@ export default function PreparePage() {
         setCurrentQuestion(question);
         setShowPractice(true);
         setUserAnswer('');
+        setFeedback(null);
+    };
+
+    const handleGetFeedback = async () => {
+        if (!currentQuestion || !userAnswer.trim()) {
+            alert('Please provide an answer first.');
+            return;
+        }
+
+        setIsGettingFeedback(true);
+
+        try {
+            const response = await fetch('/api/interview-intelligence/generate-feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    question: currentQuestion.question,
+                    answer: userAnswer,
+                    questionType: currentQuestion.category as any,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to get feedback');
+            }
+
+            const result = await response.json();
+            setFeedback(result);
+        } catch (error) {
+            console.error('Feedback error:', error);
+            alert('Failed to get AI feedback. Please check your API keys.');
+        } finally {
+            setIsGettingFeedback(false);
+        }
     };
 
     return (
@@ -377,16 +433,142 @@ export default function PreparePage() {
                         />
 
                         <div className="flex gap-3">
-                            <Button icon={<Lightbulb className="w-4 h-4" />}>
-                                Get AI Feedback
+                            <Button
+                                onClick={handleGetFeedback}
+                                disabled={isGettingFeedback || !userAnswer.trim()}
+                                icon={<Lightbulb className="w-4 h-4" />}
+                            >
+                                {isGettingFeedback ? 'Analyzing...' : 'Get AI Feedback'}
                             </Button>
                             <Button variant="secondary" icon={<CheckCircle2 className="w-4 h-4" />}>
                                 Mark as Practiced
                             </Button>
-                            <Button variant="ghost">
-                                Skip
+                            <Button variant="ghost" onClick={() => setShowPractice(false)}>
+                                Close
                             </Button>
                         </div>
+
+                        {/* AI Feedback */}
+                        {feedback && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="mt-6 space-y-4"
+                            >
+                                {/* Score */}
+                                <Card style={{ background: 'var(--gradient-primary)' }}>
+                                    <div className="flex items-center justify-between text-white">
+                                        <div>
+                                            <h3 className="font-bold text-lg">Overall Score</h3>
+                                            <p className="text-sm text-white/80">Based on STAR method and content quality</p>
+                                        </div>
+                                        <div className="text-5xl font-bold">{feedback.score}%</div>
+                                    </div>
+                                </Card>
+
+                                {/* Overall Assessment */}
+                                <Card>
+                                    <h4 className="font-semibold mb-2">Overall Assessment</h4>
+                                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                        {feedback.feedback.overallAssessment}
+                                    </p>
+                                </Card>
+
+                                {/* What Worked Well */}
+                                <Card style={{ background: 'rgba(34, 197, 94, 0.1)' }}>
+                                    <h4 className="font-semibold mb-3 flex items-center gap-2" style={{ color: 'var(--success)' }}>
+                                        <CheckCircle2 className="w-5 h-5" />
+                                        What Worked Well
+                                    </h4>
+                                    <ul className="space-y-2">
+                                        {feedback.feedback.whatWorkedWell?.map((item: string, i: number) => (
+                                            <li key={i} className="text-sm flex items-start gap-2">
+                                                <span style={{ color: 'var(--success)' }}>•</span>
+                                                <span>{item}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </Card>
+
+                                {/* Areas to Improve */}
+                                <Card style={{ background: 'rgba(245, 158, 11, 0.1)' }}>
+                                    <h4 className="font-semibold mb-3 flex items-center gap-2" style={{ color: 'var(--warning)' }}>
+                                        <Target className="w-5 h-5" />
+                                        Areas to Improve
+                                    </h4>
+                                    <ul className="space-y-2">
+                                        {feedback.feedback.areasToImprove?.map((item: string, i: number) => (
+                                            <li key={i} className="text-sm flex items-start gap-2">
+                                                <span style={{ color: 'var(--warning)' }}>•</span>
+                                                <span>{item}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </Card>
+
+                                {/* Suggested Revision */}
+                                {feedback.feedback.suggestedRevision && (
+                                    <Card>
+                                        <h4 className="font-semibold mb-3 flex items-center gap-2">
+                                            <Lightbulb className="w-5 h-5" style={{ color: 'var(--primary-400)' }} />
+                                            Suggested Revision
+                                        </h4>
+                                        <div className="p-4 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
+                                            <p className="text-sm whitespace-pre-line">
+                                                {feedback.feedback.suggestedRevision}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            className="mt-3"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => setUserAnswer(feedback.feedback.suggestedRevision)}
+                                        >
+                                            Use This Version
+                                        </Button>
+                                    </Card>
+                                )}
+
+                                {/* STAR Breakdown */}
+                                <Card>
+                                    <h4 className="font-semibold mb-3">STAR Method Analysis</h4>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {Object.entries(feedback.starAnalysis.starPresent).map(([key, value]: [string, any]) => (
+                                            <div
+                                                key={key}
+                                                className="flex items-center gap-2 p-2 rounded-lg"
+                                                style={{ background: value ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)' }}
+                                            >
+                                                {value ? (
+                                                    <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--success)' }} />
+                                                ) : (
+                                                    <AlertCircle className="w-4 h-4" style={{ color: 'var(--error)' }} />
+                                                )}
+                                                <span className="text-sm font-medium capitalize">{key}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </Card>
+
+                                {/* Quick Tips */}
+                                {feedback.improvementTips?.length > 0 && (
+                                    <Card style={{ background: 'rgba(91, 111, 242, 0.1)' }}>
+                                        <h4 className="font-semibold mb-3 flex items-center gap-2">
+                                            <Star className="w-5 h-5" style={{ color: 'var(--primary-400)' }} />
+                                            Quick Tips
+                                        </h4>
+                                        <ul className="space-y-1">
+                                            {feedback.improvementTips.map((tip: string, i: number) => (
+                                                <li key={i} className="text-sm flex items-start gap-2">
+                                                    <span style={{ color: 'var(--primary-400)' }}>•</span>
+                                                    <span>{tip}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </Card>
+                                )}
+                            </motion.div>
+                        )}
                     </motion.div>
                 </motion.div>
             )}

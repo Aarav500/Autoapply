@@ -272,24 +272,21 @@ export default function CollegeApplicationPage() {
                         </div>
                     </div>
 
-                    {/* Fit Analysis */}
-                    <div className="mt-6 grid grid-cols-4 gap-4">
-                        <div className="bg-blue-50 rounded-lg p-4">
-                            <div className="text-2xl font-bold text-blue-700">{fitScore.valueAlignment}%</div>
-                            <div className="text-sm text-blue-600">Value Alignment</div>
-                        </div>
-                        <div className="bg-green-50 rounded-lg p-4">
-                            <div className="text-2xl font-bold text-green-700">{fitScore.depthScore}%</div>
-                            <div className="text-sm text-green-600">Commitment Depth</div>
-                        </div>
-                        <div className="bg-purple-50 rounded-lg p-4">
-                            <div className="text-2xl font-bold text-purple-700">{fitScore.leadershipScore}%</div>
-                            <div className="text-sm text-purple-600">Leadership</div>
-                        </div>
-                        <div className="bg-orange-50 rounded-lg p-4">
-                            <div className="text-2xl font-bold text-orange-700">{fitScore.impactScore}%</div>
-                            <div className="text-sm text-orange-600">Impact & Awards</div>
-                        </div>
+                    {/* Activities Section - Navigate to dedicated page */}
+                    <div className="mt-6">
+                        <button
+                            onClick={() => router.push(`/transfer/${collegeId}/activities`)}
+                            className="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold hover:shadow-xl transition-all flex items-center justify-between"
+                        >
+                            <div className="flex items-center gap-3">
+                                <span className="text-2xl">📊</span>
+                                <div className="text-left">
+                                    <div className="font-bold">View Activities & Readiness</div>
+                                    <div className="text-sm text-white/80">Customize activities for {college.name} + get recommendations</div>
+                                </div>
+                            </div>
+                            <span className="text-2xl">→</span>
+                        </button>
                     </div>
                 </div>
             </div>
