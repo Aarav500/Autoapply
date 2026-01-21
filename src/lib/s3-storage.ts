@@ -293,6 +293,34 @@ export const STORAGE_KEYS = {
 
     // Story allocation across all essays for a college
     STORY_ALLOCATION: 'essay-intelligence/story-allocation',
+
+    // ============================================
+    // SCHOLARSHIP INTELLIGENCE SYSTEM (Peak Quality)
+    // ============================================
+
+    // Discovered scholarships from real-time scraping
+    SCHOLARSHIP_DISCOVERIES: 'scholarship-intelligence/discoveries',
+
+    // Scholarship application success predictions
+    SCHOLARSHIP_SUCCESS_PREDICTIONS: 'scholarship-intelligence/success-predictions',
+
+    // Story allocation across scholarship applications
+    SCHOLARSHIP_STORY_ALLOCATION: 'scholarship-intelligence/story-allocation',
+
+    // Generated scholarship documents (essays, CV, etc.)
+    SCHOLARSHIP_DOCUMENTS: 'scholarship-intelligence/documents',
+
+    // Auto-apply results and tracking
+    SCHOLARSHIP_AUTO_APPLY_RESULTS: 'scholarship-intelligence/auto-apply-results',
+
+    // Application strategy optimization
+    SCHOLARSHIP_STRATEGY: 'scholarship-intelligence/strategy',
+
+    // Financial projections and ROI analysis
+    SCHOLARSHIP_FINANCIAL_PROJECTIONS: 'scholarship-intelligence/financial-projections',
+
+    // Deadline tracking and reminders
+    SCHOLARSHIP_DEADLINE_INTELLIGENCE: 'scholarship-intelligence/deadline-intelligence',
 } as const;
 
 // ============================================
