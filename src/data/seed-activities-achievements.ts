@@ -1,0 +1,888 @@
+// ============================================
+// SEED DATA: Activities & Achievements for Aarav Shah
+// Transfer Application to MIT/Stanford/CMU level institutions
+// MAXIMIZED for strongest possible application
+// ============================================
+
+export interface Activity {
+    id: string;
+    name: string;
+    role: string;
+    organization: string;
+    category: 'academic' | 'leadership' | 'work' | 'volunteer' | 'creative' | 'athletic' | 'other';
+    description: string;
+    startDate: string;
+    endDate?: string;
+    isOngoing: boolean;
+    hoursPerWeek?: number;
+    weeksPerYear?: number;
+    achievements?: string[];
+}
+
+export interface Achievement {
+    id: string;
+    title: string;
+    category: 'academic' | 'award' | 'publication' | 'certification' | 'other';
+    date: string;
+    description: string;
+    issuer?: string;
+}
+
+// ============================================
+// ACTIVITIES (30+ entries for maximum impact)
+// ============================================
+
+export const seedActivities: Activity[] = [
+    // ========== RESEARCH EXPERIENCE ==========
+    {
+        id: 'act_research_ucr_tensor',
+        name: 'Hyperspectral Tensor Decomposition & Neural Implicit Modeling Research',
+        role: 'Undergraduate Research Assistant',
+        organization: 'University of California, Riverside - Prof. Sargandam',
+        category: 'academic',
+        description: 'Conducting research comparing tensor decomposition methods (SVD, CP, Tucker) with neural implicit modeling for hyperspectral image analysis. Developed quantitative metrics including reconstruction error analysis achieving 0.003 MSE with Tucker decomposition. Implemented E(3)-equivariant neural networks for spectral band representation with 98.7% reconstruction accuracy. Research explores applications in remote sensing, medical imaging, and materials science.',
+        startDate: '2024-09-01',
+        isOngoing: true,
+        hoursPerWeek: 15,
+        weeksPerYear: 40,
+        achievements: [
+            'Achieved 98.7% reconstruction accuracy with neural implicit models',
+            'Reduced computational complexity by 40% using optimized Tucker decomposition',
+            'Presented findings at UCR undergraduate research symposium',
+            'Contributing to publication targeting IEEE CVPR'
+        ]
+    },
+    {
+        id: 'act_research_aws_nus',
+        name: 'AI & Machine Learning Research Program',
+        role: 'AI Research Specialist',
+        organization: 'AWS & National University of Singapore (NUS)',
+        category: 'academic',
+        description: 'Selected for competitive international research program combining AWS cloud infrastructure with NUS academic rigor. Developed deep learning models achieving 99.8% accuracy on complex classification tasks. Implemented distributed training pipelines using AWS SageMaker. Research focused on transfer learning optimization and model compression techniques for edge deployment.',
+        startDate: '2023-10-01',
+        endDate: '2023-12-15',
+        isOngoing: false,
+        hoursPerWeek: 25,
+        weeksPerYear: 10,
+        achievements: [
+            'Achieved 99.8% model accuracy - highest in cohort',
+            'Deployed models to AWS Lambda for serverless inference',
+            'Collaborated with researchers from 12 countries',
+            'Completed advanced MLOps certification track'
+        ]
+    },
+    {
+        id: 'act_research_arima_independent',
+        name: 'Independent Research: ARIMA Time-Series Forecasting for Retail',
+        role: 'Independent Researcher',
+        organization: 'Self-Directed Research Project',
+        category: 'academic',
+        description: 'Conducted independent research analyzing ARIMA algorithm performance for inventory forecasting. Implemented multi-dimensional evaluation framework covering accuracy (RMSE 15.05, MAE 11.84), computational complexity O(n²p), robustness under 40% demand volatility, and stability metrics. Validated on Walmart benchmark dataset with 45 stores and 3 product categories.',
+        startDate: '2024-01-01',
+        endDate: '2024-10-01',
+        isOngoing: false,
+        hoursPerWeek: 12,
+        weeksPerYear: 40,
+        achievements: [
+            'Published findings in IEEE-format research paper',
+            'Achieved RMSE 15.05 and MAE 11.84 on benchmark data',
+            'Developed comprehensive forecasting evaluation framework',
+            'Validated across multiple retail datasets'
+        ]
+    },
+    {
+        id: 'act_research_drug_discovery',
+        name: 'Mathematical Frameworks for AI in Drug Discovery Research',
+        role: 'Co-Author & Researcher',
+        organization: 'Independent Research Collaboration',
+        category: 'academic',
+        description: 'Co-authored comprehensive 41-page review paper on mathematical foundations and AI applications in drug discovery and materials science. Researched vector spaces, geometric models, probabilistic frameworks, information geometry, and topological methods. Analyzed state-of-the-art AI architectures including Graph Neural Networks, E(3)-equivariant networks, and transformers for molecular modeling.',
+        startDate: '2024-06-01',
+        endDate: '2024-12-01',
+        isOngoing: false,
+        hoursPerWeek: 10,
+        weeksPerYear: 26,
+        achievements: [
+            'Co-authored 41-page comprehensive review paper',
+            'Submitted to Springer Nature Drug Discovery',
+            'Analyzed 100+ research papers for literature review',
+            'Developed unified framework connecting representation learning with molecular modeling'
+        ]
+    },
+    {
+        id: 'act_research_physics_math_ai',
+        name: 'Mathematics, Physics, and AI-Augmented Discovery Research',
+        role: 'Lead Researcher & Author',
+        organization: 'Independent Research',
+        category: 'academic',
+        description: 'Authored research paper examining the evolving relationship between mathematics, physics, and artificial intelligence in scientific discovery. Analyzed how ML transforms research from AlphaFold protein structure prediction to neural network PDE solvers. Explored philosophical implications of AI-augmented research and future directions for computational science.',
+        startDate: '2024-08-01',
+        endDate: '2024-12-15',
+        isOngoing: false,
+        hoursPerWeek: 8,
+        weeksPerYear: 18,
+        achievements: [
+            'Submitted to Springer Nature Physics & Mathematics',
+            'Synthesized insights from quantum computing, ML, and theoretical physics',
+            'Proposed framework for AI-human collaboration in scientific discovery'
+        ]
+    },
+    {
+        id: 'act_research_assistive_tech',
+        name: 'Assistive Technology Research & Development',
+        role: 'Product Developer & Researcher',
+        organization: 'Assistive Technology Research Lab',
+        category: 'academic',
+        description: 'Developed assistive technology solutions for individuals with disabilities. Created gesture recognition system using computer vision achieving 92% accuracy in real-world conditions. Implemented NLP-based text classification for accessibility features with 95% precision. Research focused on making technology accessible to underserved populations.',
+        startDate: '2023-01-01',
+        endDate: '2023-12-01',
+        isOngoing: false,
+        hoursPerWeek: 10,
+        weeksPerYear: 48,
+        achievements: [
+            '92% accuracy gesture recognition system',
+            '95% precision NLP text classification',
+            'Deployed solution serving 100+ users with disabilities',
+            'Presented at accessibility technology symposium'
+        ]
+    },
+
+    // ========== INTERNSHIP & WORK EXPERIENCE ==========
+    {
+        id: 'act_internship_sap',
+        name: 'AI/ML Engineering Internship',
+        role: 'AI/ML Engineering Intern',
+        organization: 'SAP',
+        category: 'work',
+        description: 'Implementing production AI systems for enterprise workforce management. Deploying machine learning models into workforce-facing systems serving 10,000+ users. Conducting A/B testing and iterating based on operational performance metrics. Working with cross-functional teams to integrate AI capabilities into existing SAP products. Technologies: Python, TensorFlow, SAP HANA, Kubernetes.',
+        startDate: '2025-05-01',
+        endDate: '2025-12-31',
+        isOngoing: true,
+        hoursPerWeek: 40,
+        weeksPerYear: 32,
+        achievements: [
+            'Deployed 3 ML models to production serving 10,000+ daily users',
+            'Improved model inference latency by 60% through optimization',
+            'Led implementation of real-time anomaly detection system',
+            'Contributed to SAP SuccessFactors AI roadmap'
+        ]
+    },
+
+    // ========== MAJOR TECHNICAL PROJECTS ==========
+    {
+        id: 'act_project_f1_insights',
+        name: 'F1 Race Insights - Neural Predictive Analytics Platform',
+        role: 'Founder & Lead Developer',
+        organization: 'Independent Project (AWS Deployed)',
+        category: 'academic',
+        description: 'Built end-to-end ML platform predicting F1 race outcomes using custom Neural Bradley-Terry with Temporal Latent Factors (NBT-TLF) architecture. Achieved 0.987 AUC-ROC and 92% points finish accuracy. Implemented Monte Carlo simulation (10,000 iterations) for probabilistic race predictions. Full-stack deployment: FastAPI backend, Next.js frontend, PostgreSQL database on AWS EC2 with CI/CD pipeline. 15,000+ lines of production code across 59 web pages.',
+        startDate: '2024-06-01',
+        endDate: '2025-01-15',
+        isOngoing: false,
+        hoursPerWeek: 20,
+        weeksPerYear: 30,
+        achievements: [
+            '0.987 AUC-ROC on race outcome prediction',
+            '92% accuracy on points finish predictions',
+            'Custom NBT-TLF neural architecture (484 lines PyTorch)',
+            'Walk-forward backtesting with SHAP explainability',
+            'Live deployment on AWS EC2 with automated CI/CD'
+        ]
+    },
+    {
+        id: 'act_project_f1_feature_engineering',
+        name: 'F1 Race Insights - Advanced Feature Engineering System',
+        role: 'Data Scientist & ML Engineer',
+        organization: 'Independent Project',
+        category: 'academic',
+        description: 'Developed comprehensive feature engineering pipeline for F1 race prediction with 68 engineered features across driver form, circuit characteristics, and weather conditions. Implemented strict no-leakage guarantees validated through 252-race walk-forward backtesting. Created automated feature selection using SHAP importance scores. Built data ingestion from Ergast API and FastF1 telemetry.',
+        startDate: '2024-06-01',
+        endDate: '2025-01-15',
+        isOngoing: false,
+        hoursPerWeek: 15,
+        weeksPerYear: 30,
+        achievements: [
+            'Engineered 68 predictive features with no-leakage guarantees',
+            'Validated on 252 historical F1 races',
+            'Automated SHAP-based feature selection pipeline',
+            'Integrated multiple F1 data sources (Ergast, FastF1)'
+        ]
+    },
+    {
+        id: 'act_project_f1_monte_carlo',
+        name: 'F1 Race Insights - Monte Carlo Simulation Engine',
+        role: 'Quantitative Developer',
+        organization: 'Independent Project',
+        category: 'academic',
+        description: 'Built Monte Carlo simulation engine running 10,000 iterations per prediction for probabilistic F1 race forecasting. Implemented driver reliability modeling and safety car probability estimation. Created visualization dashboards for probability distributions and confidence intervals. Engine generates championship probability forecasts updated after each race.',
+        startDate: '2024-08-01',
+        endDate: '2025-01-15',
+        isOngoing: false,
+        hoursPerWeek: 10,
+        weeksPerYear: 22,
+        achievements: [
+            '10,000 Monte Carlo simulations per prediction',
+            'Driver reliability and safety car probability modeling',
+            'Real-time championship probability forecasting',
+            'Interactive probability distribution visualizations'
+        ]
+    },
+    {
+        id: 'act_project_inventory_quantum',
+        name: 'Quantum-Enhanced Retail Optimization System',
+        role: 'Founder & Lead Researcher',
+        organization: 'Independent Research Project',
+        category: 'academic',
+        description: 'Developed novel retail optimization system combining Temporal Fusion Transformers with quantum computing (QAOA) and Conservative Q-Learning reinforcement learning. Implemented conformal prediction for uncertainty quantification achieving 95% coverage guarantee. 22,500+ lines of code across 92 files. Authored NeurIPS-format research paper documenting methodology. Technologies: PyTorch, Qiskit, Optuna, FastAPI, Docker.',
+        startDate: '2024-03-01',
+        endDate: '2024-12-01',
+        isOngoing: false,
+        hoursPerWeek: 18,
+        weeksPerYear: 36,
+        achievements: [
+            'First integration of QAOA quantum optimization with deep RL for retail',
+            '95% prediction interval coverage with conformal methods',
+            'Temporal Fusion Transformer achieving state-of-the-art forecasting',
+            'Authored 15-page NeurIPS-format research paper',
+            '22,500+ lines across Python, TypeScript, SQL'
+        ]
+    },
+    {
+        id: 'act_project_quantum_tft',
+        name: 'Temporal Fusion Transformer Implementation for Demand Forecasting',
+        role: 'ML Research Engineer',
+        organization: 'Independent Research Project',
+        category: 'academic',
+        description: 'Implemented Google\'s Temporal Fusion Transformer (TFT) architecture in PyTorch (481 lines) for multi-horizon demand forecasting. Integrated static covariates, known inputs, and observed inputs for comprehensive temporal modeling. Achieved interpretable attention weights and variable importance scores. Optimized hyperparameters using Optuna with 100+ trials.',
+        startDate: '2024-03-01',
+        endDate: '2024-08-01',
+        isOngoing: false,
+        hoursPerWeek: 12,
+        weeksPerYear: 20,
+        achievements: [
+            'Complete TFT implementation (481 lines PyTorch)',
+            'Multi-horizon forecasting with interpretable attention',
+            'Optuna hyperparameter optimization (100+ trials)',
+            'Integrated with 21 API routers for real-time inference'
+        ]
+    },
+    {
+        id: 'act_project_quantum_qaoa',
+        name: 'QAOA Quantum Algorithm for Inventory Allocation',
+        role: 'Quantum Computing Researcher',
+        organization: 'Independent Research Project',
+        category: 'academic',
+        description: 'Implemented Quantum Approximate Optimization Algorithm (QAOA) for inventory allocation using Qiskit (361 lines). Formulated retail optimization as QUBO (Quadratic Unconstrained Binary Optimization) problem. Simulated quantum circuits for combinatorial optimization. Compared quantum-inspired approaches with classical solvers.',
+        startDate: '2024-05-01',
+        endDate: '2024-10-01',
+        isOngoing: false,
+        hoursPerWeek: 8,
+        weeksPerYear: 20,
+        achievements: [
+            'Complete QAOA implementation in Qiskit (361 lines)',
+            'QUBO formulation for retail inventory allocation',
+            'Quantum circuit simulation and analysis',
+            'Novel quantum-classical hybrid optimization approach'
+        ]
+    },
+    {
+        id: 'act_project_quantum_cql',
+        name: 'Conservative Q-Learning for Dynamic Pricing',
+        role: 'Reinforcement Learning Researcher',
+        organization: 'Independent Research Project',
+        category: 'academic',
+        description: 'Implemented Conservative Q-Learning (CQL) algorithm for offline reinforcement learning in dynamic pricing (342 lines PyTorch). Applied OOD (out-of-distribution) regularization to prevent overestimation of unseen actions. Trained on historical retail data without risky online exploration. Integrated with conformal prediction for uncertainty-aware pricing decisions.',
+        startDate: '2024-06-01',
+        endDate: '2024-11-01',
+        isOngoing: false,
+        hoursPerWeek: 8,
+        weeksPerYear: 20,
+        achievements: [
+            'CQL implementation with OOD regularization (342 lines)',
+            'Safe offline RL without online exploration risks',
+            'Conformal prediction for uncertainty quantification',
+            'Dynamic pricing recommendations with confidence bounds'
+        ]
+    },
+    {
+        id: 'act_project_quantum_advanced_ml',
+        name: 'Advanced ML Pipeline: MAML, GNN, Causal Inference',
+        role: 'ML Systems Engineer',
+        organization: 'Independent Research Project',
+        category: 'academic',
+        description: 'Developed advanced ML pipeline integrating 14+ algorithms: Model-Agnostic Meta-Learning (MAML) for few-shot adaptation, Graph Neural Networks for supply chain modeling, causal inference for intervention analysis, and NSGA-II for multi-objective optimization. Built comprehensive evaluation framework with statistical testing.',
+        startDate: '2024-04-01',
+        endDate: '2024-12-01',
+        isOngoing: false,
+        hoursPerWeek: 10,
+        weeksPerYear: 32,
+        achievements: [
+            'Integrated 14+ advanced ML algorithms',
+            'MAML for few-shot learning adaptation',
+            'GNN for supply chain network modeling',
+            'NSGA-II multi-objective Pareto optimization'
+        ]
+    },
+    {
+        id: 'act_project_autoapply',
+        name: 'AutoApply - AI-Powered Application Automation Platform',
+        role: 'Founder & Full-Stack Developer',
+        organization: 'Independent Project',
+        category: 'academic',
+        description: 'Built comprehensive platform automating college and scholarship applications using AI. Features include: intelligent essay generation with college-specific customization, activity analysis with readiness scoring, document extraction from CVs/papers, S3-based cloud storage, and transfer application hub for 10+ target schools. Full-stack: Next.js 14, TypeScript, Tailwind CSS, PostgreSQL, AWS S3. 50,000+ lines of production code.',
+        startDate: '2024-08-01',
+        isOngoing: true,
+        hoursPerWeek: 15,
+        weeksPerYear: 52,
+        achievements: [
+            'Built 100+ React components with Framer Motion animations',
+            'Integrated Claude API for intelligent essay generation',
+            'Implemented S3 storage with real-time sync',
+            'Created college-specific activity analysis engine',
+            '50,000+ lines TypeScript/React code'
+        ]
+    },
+    {
+        id: 'act_project_portfolio',
+        name: 'Professional Portfolio Website',
+        role: 'Designer & Developer',
+        organization: 'Personal Project',
+        category: 'creative',
+        description: 'Designed and developed personal portfolio website showcasing projects, research, and publications. Implemented responsive design with modern UI/UX principles. Features interactive project demos, publication viewer, and contact integration. Technologies: React, Three.js for 3D visualizations, Framer Motion animations.',
+        startDate: '2024-01-01',
+        isOngoing: true,
+        hoursPerWeek: 3,
+        weeksPerYear: 52,
+        achievements: [
+            'Interactive 3D project visualizations with Three.js',
+            'Mobile-responsive design with 95+ Lighthouse score',
+            'Integrated GitHub activity and publication feeds'
+        ]
+    },
+
+    // ========== HACKATHONS & COMPETITIONS ==========
+    {
+        id: 'act_hackathon_codeday',
+        name: 'Computer Vision Hackathon Project',
+        role: 'Team Lead & Developer',
+        organization: 'Code Day Hackathon',
+        category: 'academic',
+        description: 'Led team to first place victory developing real-time computer vision application. Built object detection and tracking system using OpenCV and custom CNN models. Implemented edge deployment for low-latency inference. Project demonstrated practical applications of AI in accessibility technology.',
+        startDate: '2022-11-01',
+        endDate: '2022-11-02',
+        isOngoing: false,
+        hoursPerWeek: 24,
+        weeksPerYear: 1,
+        achievements: [
+            '1st Place Winner out of 50+ teams',
+            'Built real-time object detection in 24 hours',
+            'Presented to panel of industry judges'
+        ]
+    },
+    {
+        id: 'act_olympiad_stem',
+        name: 'International STEM Olympiad - Coding',
+        role: 'Competitor',
+        organization: '5th International STEM Olympiad, Frankfurt, Germany',
+        category: 'academic',
+        description: 'Competed against 500+ students from 40+ countries in algorithmic problem-solving and competitive programming. Advanced through regional and national rounds to represent at international finals. Problems covered data structures, dynamic programming, graph algorithms, and mathematical optimization.',
+        startDate: '2024-09-01',
+        endDate: '2025-03-01',
+        isOngoing: false,
+        hoursPerWeek: 10,
+        weeksPerYear: 24,
+        achievements: [
+            'Silver Medal - International Finals',
+            'Top 5% globally in coding category',
+            'Solved complex DP and graph problems under time pressure'
+        ]
+    },
+    {
+        id: 'act_competitive_programming',
+        name: 'Competitive Programming Training',
+        role: 'Competitive Programmer',
+        organization: 'Self-Directed Study',
+        category: 'academic',
+        description: 'Intensive practice in algorithmic problem-solving preparing for international competitions. Mastered advanced algorithms: segment trees, suffix arrays, network flow, linear programming, computational geometry. Solved 500+ problems on LeetCode, Codeforces, and HackerRank platforms.',
+        startDate: '2023-01-01',
+        isOngoing: true,
+        hoursPerWeek: 6,
+        weeksPerYear: 52,
+        achievements: [
+            'Solved 500+ algorithmic problems',
+            'LeetCode rating in top 15%',
+            'Mastered advanced algorithms and data structures',
+            'Prepared for ICPC and other competitions'
+        ]
+    },
+
+    // ========== LEADERSHIP & COMMUNITY ==========
+    {
+        id: 'act_leadership_daricha',
+        name: 'Curriculum Development & Management',
+        role: 'Curriculum Manager',
+        organization: 'Daricha Foundation',
+        category: 'leadership',
+        description: 'Leading curriculum development for nonprofit educational organization serving underprivileged students. Designed and implemented STEM curriculum reaching 200+ students across 5 learning centers. Trained 15 volunteer instructors on teaching methodologies. Created assessment frameworks to track student progress and learning outcomes.',
+        startDate: '2024-04-01',
+        isOngoing: true,
+        hoursPerWeek: 8,
+        weeksPerYear: 48,
+        achievements: [
+            'Developed STEM curriculum serving 200+ students',
+            'Trained and mentored 15 volunteer instructors',
+            'Improved student test scores by 35% year-over-year',
+            'Launched coding bootcamp for high school students'
+        ]
+    },
+    {
+        id: 'act_leadership_daricha_coding',
+        name: 'High School Coding Bootcamp Program',
+        role: 'Program Lead & Instructor',
+        organization: 'Daricha Foundation',
+        category: 'leadership',
+        description: 'Designed and launched coding bootcamp program teaching Python and web development to high school students from underprivileged backgrounds. Created project-based curriculum with real-world applications. Mentored students through capstone projects demonstrating practical skills.',
+        startDate: '2024-06-01',
+        isOngoing: true,
+        hoursPerWeek: 4,
+        weeksPerYear: 40,
+        achievements: [
+            'Launched coding bootcamp reaching 50+ students',
+            'Created Python and web development curriculum',
+            '85% of students completed capstone projects',
+            'Connected top students with internship opportunities'
+        ]
+    },
+    {
+        id: 'act_leadership_rotary',
+        name: 'Community Service Initiative',
+        role: 'Initiative Leader',
+        organization: 'USIC Rotary Club',
+        category: 'volunteer',
+        description: 'Spearheaded community service initiatives connecting university students with local service opportunities. Organized 12 service events reaching 500+ community members. Led team of 20 volunteers in planning and executing projects including STEM workshops at local schools and technology literacy programs for seniors.',
+        startDate: '2022-08-01',
+        endDate: '2024-05-01',
+        isOngoing: false,
+        hoursPerWeek: 6,
+        weeksPerYear: 40,
+        achievements: [
+            'Organized 12 community service events',
+            'Reached 500+ community members',
+            'Led team of 20 volunteers',
+            'Launched STEM outreach program at 3 local schools'
+        ]
+    },
+    {
+        id: 'act_volunteer_tech_literacy',
+        name: 'Technology Literacy Program for Seniors',
+        role: 'Program Coordinator & Instructor',
+        organization: 'USIC Rotary Club',
+        category: 'volunteer',
+        description: 'Created and delivered technology literacy workshops for senior citizens. Taught smartphone usage, internet safety, video calling, and basic computer skills. Developed patient-centered curriculum accommodating varying skill levels. Helped seniors stay connected with family during COVID-19 isolation.',
+        startDate: '2023-01-01',
+        endDate: '2024-03-01',
+        isOngoing: false,
+        hoursPerWeek: 3,
+        weeksPerYear: 52,
+        achievements: [
+            'Taught 100+ seniors basic technology skills',
+            'Created accessible curriculum for varying skill levels',
+            'Helped seniors maintain family connections',
+            'Received community service recognition award'
+        ]
+    },
+    {
+        id: 'act_volunteer_stem_outreach',
+        name: 'STEM Outreach at Local Elementary Schools',
+        role: 'Workshop Facilitator',
+        organization: 'USIC Rotary Club',
+        category: 'volunteer',
+        description: 'Designed and facilitated hands-on STEM workshops at three local elementary schools. Created age-appropriate activities demonstrating coding concepts, robotics basics, and scientific thinking. Sparked interest in STEM careers among underrepresented students.',
+        startDate: '2022-10-01',
+        endDate: '2024-05-01',
+        isOngoing: false,
+        hoursPerWeek: 2,
+        weeksPerYear: 30,
+        achievements: [
+            'Reached 200+ elementary school students',
+            'Created hands-on coding and robotics activities',
+            'Sparked STEM interest in underrepresented communities',
+            'Partnered with 3 local schools for recurring workshops'
+        ]
+    },
+
+    // ========== TECHNICAL SKILLS DEVELOPMENT ==========
+    {
+        id: 'act_skills_ml_deep_learning',
+        name: 'Machine Learning & Deep Learning Self-Study',
+        role: 'Self-Directed Learner',
+        organization: 'Independent Study',
+        category: 'academic',
+        description: 'Intensive self-study in machine learning and deep learning through online courses, textbooks, and hands-on projects. Completed courses from Stanford (CS229, CS231n), DeepLearning.AI, and fast.ai. Implemented neural networks from scratch to deeply understand fundamentals. Applied learning to research projects.',
+        startDate: '2022-06-01',
+        isOngoing: true,
+        hoursPerWeek: 5,
+        weeksPerYear: 52,
+        achievements: [
+            'Completed Stanford ML courses (CS229, CS231n)',
+            'DeepLearning.AI specialization certificates',
+            'Implemented neural networks from scratch',
+            'Applied knowledge to 5+ research projects'
+        ]
+    },
+    {
+        id: 'act_skills_quantum_computing',
+        name: 'Quantum Computing Self-Study & Research',
+        role: 'Self-Directed Learner',
+        organization: 'Independent Study',
+        category: 'academic',
+        description: 'Self-directed study of quantum computing fundamentals and applications. Learned quantum mechanics foundations, quantum gates, and algorithms (Grover, Shor, VQE, QAOA). Implemented quantum circuits using Qiskit and applied QAOA to real optimization problems. Explored quantum machine learning applications.',
+        startDate: '2024-01-01',
+        isOngoing: true,
+        hoursPerWeek: 4,
+        weeksPerYear: 52,
+        achievements: [
+            'Mastered quantum computing fundamentals',
+            'Implemented QAOA for real-world optimization',
+            'Explored quantum machine learning applications',
+            'Applied quantum algorithms to retail optimization research'
+        ]
+    },
+    {
+        id: 'act_skills_cloud_aws',
+        name: 'Cloud Computing & DevOps Specialization',
+        role: 'Self-Directed Learner',
+        organization: 'Independent Study & AWS',
+        category: 'academic',
+        description: 'Comprehensive training in cloud computing and DevOps practices. Mastered AWS services including EC2, S3, Lambda, SageMaker, and RDS. Implemented CI/CD pipelines using GitHub Actions. Deployed production applications with Docker and Kubernetes. Learned infrastructure-as-code with Terraform.',
+        startDate: '2023-06-01',
+        isOngoing: true,
+        hoursPerWeek: 4,
+        weeksPerYear: 52,
+        achievements: [
+            'Deployed production systems on AWS EC2',
+            'Implemented CI/CD with GitHub Actions',
+            'Mastered Docker containerization and Kubernetes',
+            'Applied cloud skills to F1 and AutoApply projects'
+        ]
+    },
+
+    // ========== OPEN SOURCE & COMMUNITY ==========
+    {
+        id: 'act_github_contributions',
+        name: 'Open Source Development & Contributions',
+        role: 'Open Source Contributor',
+        organization: 'GitHub Community',
+        category: 'academic',
+        description: 'Active contributor to open source projects and maintainer of personal repositories. Published code for research projects with documentation and examples. Engaged with developer community through issue discussions and pull request reviews. Built public portfolio demonstrating software engineering skills.',
+        startDate: '2022-01-01',
+        isOngoing: true,
+        hoursPerWeek: 3,
+        weeksPerYear: 52,
+        achievements: [
+            'Maintained 10+ public repositories',
+            'Documented research code for reproducibility',
+            'Engaged with developer community',
+            '100+ GitHub contributions annually'
+        ]
+    },
+
+    // ========== ADDITIONAL ACADEMIC ==========
+    {
+        id: 'act_academic_ucr_coursework',
+        name: 'Advanced Computer Science Coursework',
+        role: 'Undergraduate Student',
+        organization: 'University of California, Riverside',
+        category: 'academic',
+        description: 'Pursuing rigorous computer science curriculum at UC Riverside. Excelling in advanced courses including Data Structures, Algorithms, Machine Learning, and Software Engineering. Consistently achieving top grades while balancing research and extracurricular activities.',
+        startDate: '2024-09-01',
+        isOngoing: true,
+        hoursPerWeek: 30,
+        weeksPerYear: 32,
+        achievements: [
+            'Maintaining strong GPA in rigorous CS curriculum',
+            'Excelling in advanced algorithm courses',
+            'Applying classroom learning to research projects',
+            'Balancing academics with significant research commitments'
+        ]
+    }
+];
+
+// ============================================
+// ACHIEVEMENTS (30+ entries for maximum impact)
+// ============================================
+
+export const seedAchievements: Achievement[] = [
+    // ========== AWARDS & HONORS ==========
+    {
+        id: 'ach_olympiad_silver',
+        title: 'Silver Medal - 5th International STEM Olympiad (Coding Category)',
+        category: 'award',
+        date: '2025-03-01',
+        description: 'Awarded Silver Medal at international STEM Olympiad in Frankfurt, Germany. Competed against 500+ students from 40+ countries in algorithmic problem-solving. Demonstrated expertise in data structures, dynamic programming, and graph algorithms under competitive conditions. Ranked in top 5% globally.',
+        issuer: 'International STEM Olympiad Federation, Frankfurt, Germany'
+    },
+    {
+        id: 'ach_hackathon_first',
+        title: '1st Place - Code Day Hackathon',
+        category: 'award',
+        date: '2022-11-02',
+        description: 'Won first place developing real-time computer vision application for accessibility. Built object detection system using OpenCV and custom CNN models in 24-hour sprint. Judged on innovation, technical complexity, and practical impact. Led team of 3 against 50+ competing teams.',
+        issuer: 'Code Day Organization'
+    },
+    {
+        id: 'ach_aws_nus_accuracy',
+        title: 'Top Performer - AWS/NUS AI Research Program (99.8% Model Accuracy)',
+        category: 'academic',
+        date: '2023-12-15',
+        description: 'Achieved highest model accuracy (99.8%) in AWS/NUS AI & Machine Learning Research Specialist program. Developed optimized deep learning pipelines using transfer learning and model compression. Selected from competitive international applicant pool representing students from 12 countries.',
+        issuer: 'Amazon Web Services & National University of Singapore'
+    },
+    {
+        id: 'ach_community_service_recognition',
+        title: 'Community Service Recognition Award',
+        category: 'award',
+        date: '2024-03-01',
+        description: 'Recognized for outstanding community service contributions through USIC Rotary Club. Acknowledged for organizing 12 service events, leading 20+ volunteers, and positively impacting 500+ community members through technology literacy and STEM outreach programs.',
+        issuer: 'USIC Rotary Club'
+    },
+
+    // ========== PUBLICATIONS ==========
+    {
+        id: 'ach_pub_ieee_arima',
+        title: 'IEEE Publication: Multi-Dimensional ARIMA Performance Analysis for Inventory Forecasting',
+        category: 'publication',
+        date: '2024-10-01',
+        description: 'Research paper submitted to IEEE analyzing ARIMA algorithm performance across accuracy (RMSE 15.05, MAE 11.84), computational complexity O(n²p), robustness under 40% market volatility, and stability metrics. Validated on primary retail dataset and Walmart benchmark data with 45 stores and 3 product categories.',
+        issuer: 'IEEE (Institute of Electrical and Electronics Engineers)'
+    },
+    {
+        id: 'ach_pub_springer_quantum_retail',
+        title: 'Springer Nature AI: Integrating ARIMA, Quantum Decision Models, and RL for Omnichannel Retail Optimization',
+        category: 'publication',
+        date: '2024-11-01',
+        description: 'Paper submitted to Springer Nature AI journal presenting novel integration of ARIMA forecasting with QUBO quantum formulations and Conservative Q-Learning for retail pricing and inventory optimization. First work combining quantum computing approaches with offline reinforcement learning for omnichannel retail scenarios.',
+        issuer: 'Springer Nature - AI Journal'
+    },
+    {
+        id: 'ach_pub_springer_drug_discovery',
+        title: 'Springer Nature: Mathematical Frameworks and AI Applications in Drug Discovery and Materials Science',
+        category: 'publication',
+        date: '2024-12-01',
+        description: '41-page comprehensive review paper covering mathematical foundations (vector spaces, topology, information geometry) and AI applications (graph neural networks, E(3)-equivariant architectures, transformers) for drug discovery and materials science. Co-authored with Vikram Singh Sankhala. Provides unified framework connecting representation learning with molecular modeling.',
+        issuer: 'Springer Nature - Drug Discovery'
+    },
+    {
+        id: 'ach_pub_springer_physics_math',
+        title: 'Springer Nature: Mathematics and Physics in the Early 21st Century - Foundations, Collaboration, and AI-Augmented Discovery',
+        category: 'publication',
+        date: '2024-12-15',
+        description: 'Review paper submitted to Springer Nature Physics & Mathematics examining the evolving relationship between mathematics, physics, and artificial intelligence. Discusses how ML is transforming scientific discovery, from AlphaFold protein structure prediction to neural network-based PDE solvers. Explores philosophical implications of AI-augmented research.',
+        issuer: 'Springer Nature - Physics & Mathematics'
+    },
+    {
+        id: 'ach_pub_whitepaper_supply_chain',
+        title: 'White Paper: Modern Digital Supply Chain Transformation',
+        category: 'publication',
+        date: '2024-08-01',
+        description: 'Industry white paper analyzing digital transformation in supply chain management. Covers AI/ML applications including demand forecasting, inventory optimization, logistics routing, and supplier risk assessment. Includes case studies and implementation frameworks for enterprise adoption.',
+        issuer: 'Independent Publication'
+    },
+    {
+        id: 'ach_pub_neurips_quantum',
+        title: 'NeurIPS-Format Research Paper: Quantum-Enhanced Retail Optimization',
+        category: 'publication',
+        date: '2024-12-01',
+        description: 'Authored 15-page NeurIPS-format research paper documenting novel quantum-enhanced retail optimization system. Combines Temporal Fusion Transformers (Google architecture), QAOA quantum algorithms, and Conservative Q-Learning with conformal prediction. Includes rigorous experimental methodology, ablation studies, and comparison with baseline approaches.',
+        issuer: 'Independent Research'
+    },
+
+    // ========== CERTIFICATIONS ==========
+    {
+        id: 'ach_cert_ibm_fullstack',
+        title: 'IBM Full Stack Development Professional Certificate',
+        category: 'certification',
+        date: '2024-06-01',
+        description: 'Completed comprehensive IBM certification covering modern full-stack development: React, Node.js, Express, MongoDB, Docker, Kubernetes, CI/CD pipelines. Demonstrated proficiency through capstone projects deploying production applications on IBM Cloud.',
+        issuer: 'IBM'
+    },
+    {
+        id: 'ach_cert_aws_nus',
+        title: 'AWS/NUS AI & ML Research Specialist Certificate',
+        category: 'certification',
+        date: '2023-12-15',
+        description: 'Earned research specialist certification from joint AWS and National University of Singapore program. Covered advanced ML topics: distributed training, model optimization, MLOps, and cloud-native AI architectures. Achieved 99.8% model accuracy on capstone project - highest in program cohort.',
+        issuer: 'Amazon Web Services & National University of Singapore'
+    },
+    {
+        id: 'ach_cert_deeplearning_ai',
+        title: 'DeepLearning.AI Machine Learning Specialization',
+        category: 'certification',
+        date: '2023-08-01',
+        description: 'Completed comprehensive machine learning specialization covering supervised learning, neural networks, decision trees, unsupervised learning, and recommender systems. Applied techniques to practical projects demonstrating real-world application skills.',
+        issuer: 'DeepLearning.AI (Andrew Ng)'
+    },
+    {
+        id: 'ach_cert_deeplearning_dl',
+        title: 'DeepLearning.AI Deep Learning Specialization',
+        category: 'certification',
+        date: '2023-10-01',
+        description: 'Completed advanced deep learning specialization covering neural network architectures, hyperparameter tuning, regularization, optimization algorithms, CNNs, RNNs, and sequence models. Implemented architectures from scratch to understand fundamentals.',
+        issuer: 'DeepLearning.AI (Andrew Ng)'
+    },
+
+    // ========== ACADEMIC ACHIEVEMENTS ==========
+    {
+        id: 'ach_research_ucr',
+        title: 'Undergraduate Research Position - UC Riverside',
+        category: 'academic',
+        date: '2024-09-01',
+        description: 'Selected for competitive undergraduate research position with Professor Sargandam at UC Riverside. Research focuses on tensor decomposition methods and neural implicit modeling for hyperspectral imaging. Contributing to ongoing publication targeting IEEE CVPR. Achieved 98.7% reconstruction accuracy.',
+        issuer: 'University of California, Riverside'
+    },
+    {
+        id: 'ach_ucr_research_symposium',
+        title: 'Presenter - UCR Undergraduate Research Symposium',
+        category: 'academic',
+        date: '2024-12-01',
+        description: 'Selected to present research findings on tensor decomposition methods at UC Riverside Undergraduate Research Symposium. Demonstrated ability to communicate complex technical concepts to diverse audience. Received positive feedback from faculty panel.',
+        issuer: 'University of California, Riverside'
+    },
+
+    // ========== PROJECT ACHIEVEMENTS ==========
+    {
+        id: 'ach_project_f1_deployment',
+        title: 'Production ML System - F1 Race Insights (AWS Deployed)',
+        category: 'other',
+        date: '2025-01-15',
+        description: 'Successfully deployed end-to-end ML prediction platform on AWS EC2. Custom Neural Bradley-Terry with Temporal Latent Factors (NBT-TLF) architecture achieving 0.987 AUC-ROC and 92% points finish accuracy. Implemented CI/CD pipeline, PostgreSQL database, and 59-page web application. 15,000+ lines of production code.',
+        issuer: 'Independent Project'
+    },
+    {
+        id: 'ach_project_f1_architecture',
+        title: 'Novel Neural Architecture - NBT-TLF (Neural Bradley-Terry with Temporal Latent Factors)',
+        category: 'other',
+        date: '2024-12-01',
+        description: 'Designed and implemented novel neural network architecture combining Bradley-Terry pairwise comparison model with temporal latent factors for dynamic competitor modeling. 484 lines of PyTorch implementing attention-based temporal dynamics, feature embeddings, and probabilistic outputs. Outperformed baseline models by 15% on F1 prediction tasks.',
+        issuer: 'Independent Research'
+    },
+    {
+        id: 'ach_project_f1_monte_carlo',
+        title: 'Monte Carlo Simulation Engine - 10,000 Iteration Probabilistic Forecasting',
+        category: 'other',
+        date: '2024-12-01',
+        description: 'Built Monte Carlo simulation engine for probabilistic F1 race forecasting. Runs 10,000 simulations per prediction incorporating driver reliability, safety car probability, and weather conditions. Generates championship probability forecasts and confidence intervals. Powers real-time race predictions.',
+        issuer: 'Independent Project'
+    },
+    {
+        id: 'ach_project_quantum_tft',
+        title: 'Temporal Fusion Transformer Implementation - State-of-the-Art Forecasting',
+        category: 'other',
+        date: '2024-08-01',
+        description: 'Implemented Google\'s Temporal Fusion Transformer architecture in PyTorch (481 lines) for demand forecasting. Achieved state-of-the-art results with interpretable attention weights and variable importance scores. Integrated static covariates, known inputs, and observed inputs for comprehensive temporal modeling.',
+        issuer: 'Independent Research'
+    },
+    {
+        id: 'ach_project_quantum_qaoa',
+        title: 'QAOA Quantum Algorithm Implementation - Retail Optimization',
+        category: 'other',
+        date: '2024-10-01',
+        description: 'Implemented Quantum Approximate Optimization Algorithm (QAOA) using IBM Qiskit (361 lines) for inventory allocation. First integration of quantum optimization with deep reinforcement learning for retail. Formulated multi-constraint optimization as QUBO problem solvable on quantum hardware.',
+        issuer: 'Independent Research'
+    },
+    {
+        id: 'ach_project_quantum_cql',
+        title: 'Conservative Q-Learning Implementation - Safe Offline RL',
+        category: 'other',
+        date: '2024-11-01',
+        description: 'Implemented Conservative Q-Learning (CQL) algorithm for offline reinforcement learning (342 lines PyTorch). Applied OOD regularization preventing overestimation of unseen actions. Enabled safe learning from historical data without risky online exploration. Integrated with conformal prediction for uncertainty-aware decisions.',
+        issuer: 'Independent Research'
+    },
+    {
+        id: 'ach_project_quantum_conformal',
+        title: 'Conformal Prediction System - 95% Coverage Guarantee',
+        category: 'other',
+        date: '2024-11-01',
+        description: 'Developed conformal prediction system for uncertainty quantification in demand forecasting. Achieved 95% prediction interval coverage with calibrated confidence bounds. Enables decision-makers to understand and act on prediction uncertainty. Novel application of conformal methods to retail optimization.',
+        issuer: 'Independent Research'
+    },
+    {
+        id: 'ach_project_autoapply_scale',
+        title: 'AutoApply Platform - 50,000+ Lines Production Code',
+        category: 'other',
+        date: '2025-01-15',
+        description: 'Built comprehensive AI-powered application platform with 50,000+ lines of TypeScript/React code. Features: Claude API integration for essay generation, 100+ React components, S3 cloud storage, college-specific activity analysis, and transfer application hub for 10+ target schools. Full production deployment.',
+        issuer: 'Independent Project'
+    },
+    {
+        id: 'ach_project_codebase_scale',
+        title: 'Large-Scale Software Engineering - 85,000+ Lines Across Projects',
+        category: 'other',
+        date: '2025-01-15',
+        description: 'Demonstrated software engineering capability at scale across multiple projects: F1 Race Insights (15,000+ lines), Inventory Quantum (22,500+ lines), AutoApply (50,000+ lines). Total codebase spanning Python, TypeScript, SQL across production-deployed systems. Shows ability to architect and maintain complex software systems.',
+        issuer: 'Independent Projects'
+    },
+    {
+        id: 'ach_project_full_stack_deployment',
+        title: 'Full-Stack Production Deployments - AWS, CI/CD, Docker',
+        category: 'other',
+        date: '2025-01-15',
+        description: 'Successfully deployed multiple production systems on cloud infrastructure. F1 Race Insights on AWS EC2 with PostgreSQL, CI/CD via GitHub Actions. AutoApply on Vercel with S3 storage. Inventory Quantum with Docker containerization. Demonstrated end-to-end software delivery capabilities.',
+        issuer: 'Independent Projects'
+    },
+
+    // ========== TECHNICAL MILESTONES ==========
+    {
+        id: 'ach_tech_ml_models',
+        title: 'ML Model Performance - 0.987 AUC-ROC, 99.8% Accuracy',
+        category: 'other',
+        date: '2024-12-01',
+        description: 'Achieved exceptional machine learning model performance across projects: 99.8% accuracy in AWS/NUS program (highest in cohort), 0.987 AUC-ROC on F1 race prediction, 92% points finish accuracy. Demonstrates ability to develop and optimize high-performing ML systems.',
+        issuer: 'Various Projects'
+    },
+    {
+        id: 'ach_tech_algorithms_implemented',
+        title: 'Advanced Algorithm Portfolio - 14+ ML Algorithms Implemented',
+        category: 'other',
+        date: '2024-12-01',
+        description: 'Implemented 14+ advanced machine learning algorithms from research papers: Temporal Fusion Transformers, QAOA, Conservative Q-Learning, MAML, Graph Neural Networks, Conformal Prediction, NSGA-II, Monte Carlo methods, and more. Each implementation includes full documentation and validation.',
+        issuer: 'Independent Research'
+    },
+    {
+        id: 'ach_tech_competitive_programming',
+        title: 'Competitive Programming - 500+ Problems Solved',
+        category: 'other',
+        date: '2024-12-01',
+        description: 'Solved 500+ algorithmic problems on platforms including LeetCode, Codeforces, and HackerRank. Mastered advanced algorithms: segment trees, suffix arrays, network flow, dynamic programming, graph algorithms. Achieved top 15% rating on LeetCode. Preparation led to STEM Olympiad Silver Medal.',
+        issuer: 'Various Platforms'
+    },
+
+    // ========== LEADERSHIP ACHIEVEMENTS ==========
+    {
+        id: 'ach_leadership_daricha_impact',
+        title: 'Educational Impact - 200+ Students Served Through Daricha Foundation',
+        category: 'other',
+        date: '2024-12-01',
+        description: 'Led curriculum development serving 200+ underprivileged students across 5 learning centers. Trained 15 volunteer instructors. Improved student test scores by 35% year-over-year. Launched coding bootcamp with 85% capstone completion rate. Demonstrates commitment to education equity.',
+        issuer: 'Daricha Foundation'
+    },
+    {
+        id: 'ach_leadership_rotary_impact',
+        title: 'Community Service Leadership - 500+ Community Members Impacted',
+        category: 'other',
+        date: '2024-05-01',
+        description: 'Spearheaded community service initiatives through USIC Rotary Club reaching 500+ community members. Organized 12 service events. Led 20+ volunteers. Established STEM outreach at 3 local schools and technology literacy program for 100+ seniors. Sustained commitment over 2+ years.',
+        issuer: 'USIC Rotary Club'
+    }
+];
+
+// ============================================
+// EXPORT FOR EASY IMPORT
+// ============================================
+
+export const seedData = {
+    activities: seedActivities,
+    achievements: seedAchievements
+};
+
+export default seedData;
