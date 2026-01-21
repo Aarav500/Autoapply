@@ -16,7 +16,6 @@ import {
   ChevronRight,
   Sparkles,
   Calendar,
-  Map,
   Focus,
   Recycle,
   Brain,
@@ -53,7 +52,6 @@ const aiToolsItems = [
   { icon: Linkedin, label: 'LinkedIn', href: '/linkedin', badge: 'NEW' },
   { icon: BookOpen, label: 'My Grades', href: '/grades' },
   { icon: Calendar, label: 'Calendar', href: '/calendar' },
-  { icon: Map, label: 'Strength Map', href: '/strength-map' },
   { icon: Recycle, label: 'Recycler', href: '/recycler' },
   { icon: Focus, label: 'Focus Mode', href: '/focus' },
 ];
