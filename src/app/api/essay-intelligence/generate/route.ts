@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
                 essay: currentEssay,
                 feedback,
                 context,
-                essay: essay,
+                essayConfig: essay,
             });
 
             // Re-evaluate
@@ -331,7 +331,7 @@ Labs: ${research.labs?.map((l: any) => l.name).join(', ') || 'None added'}
     if (activities && activities.length > 0) {
         context += `
 ACTIVITIES:
-${activities.map((a, i) => `${i + 1}. ${a.name} - ${a.role} (${a.hoursPerWeek}hrs/week)`).join('\n')}
+${activities.map((a: any, i: number) => `${i + 1}. ${a.name} - ${a.role} (${a.hoursPerWeek}hrs/week)`).join('\n')}
 
 ---
 `;

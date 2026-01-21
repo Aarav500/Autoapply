@@ -286,8 +286,8 @@ Return ONLY the JSON object.`;
                 contradictionsFound: contradictions.length,
                 narrativeCompleteness: narrativeArc.completeness,
                 recommendationsGenerated: recommendations.length,
-                criticalIssues: contradictions.filter(c => c.severity === 'critical').length,
-                highPriorityRecommendations: recommendations.filter(r => r.priority === 'high').length
+                criticalIssues: contradictions.filter((c: any) => c.severity === 'critical').length,
+                highPriorityRecommendations: recommendations.filter((r: any) => r.priority === 'high').length
             }
         });
 

@@ -190,24 +190,24 @@ function PersonalProfileSection() {
                     <Input
                         label="Full Name"
                         value={profile.name}
-                        onChange={(v) => updateField('name', v)}
+                        onChange={(v: string) => updateField('name', v)}
                         placeholder="Your full name"
                     />
                     <Input
                         label="Email"
                         value={profile.email}
-                        onChange={(v) => updateField('email', v)}
+                        onChange={(v: string) => updateField('email', v)}
                         placeholder="your.email@example.com"
                     />
                     <Input
                         label="Current School"
                         value={profile.currentSchool}
-                        onChange={(v) => updateField('currentSchool', v)}
+                        onChange={(v: string) => updateField('currentSchool', v)}
                     />
                     <Input
                         label="Major"
                         value={profile.major}
-                        onChange={(v) => updateField('major', v)}
+                        onChange={(v: string) => updateField('major', v)}
                     />
                 </div>
             </Section>
@@ -218,20 +218,20 @@ function PersonalProfileSection() {
                     <Input
                         label="Home Country"
                         value={profile.background.homeCountry || ''}
-                        onChange={(v) => updateField('background.homeCountry', v)}
+                        onChange={(v: string) => updateField('background.homeCountry', v)}
                         placeholder="e.g., India, China, Mexico..."
                     />
                     <TextArea
                         label="Immigration Story (if applicable)"
                         value={profile.background.immigrationStory || ''}
-                        onChange={(v) => updateField('background.immigrationStory', v)}
+                        onChange={(v: string) => updateField('background.immigrationStory', v)}
                         placeholder="Share your immigration journey, challenges, and how it shaped you..."
                         rows={4}
                     />
                     <TagInput
                         label="Languages You Speak"
                         values={profile.background.languages}
-                        onChange={(v) => updateField('background.languages', v)}
+                        onChange={(v: string) => updateField('background.languages', v)}
                         placeholder="Add language..."
                     />
                 </div>
@@ -247,7 +247,7 @@ function PersonalProfileSection() {
                     <TextArea
                         label="Why are you leaving your current school?"
                         value={profile.transferReason.whyLeaving}
-                        onChange={(v) => updateField('transferReason.whyLeaving', v)}
+                        onChange={(v: string) => updateField('transferReason.whyLeaving', v)}
                         placeholder="Be honest and specific. What's not working at your current school?"
                         rows={4}
                         hint="Example: 'UCR's CS program focuses heavily on theory, but lacks hands-on research opportunities in AI/ML that align with my career goals.'"
@@ -255,7 +255,7 @@ function PersonalProfileSection() {
                     <TextArea
                         label="What's missing at your current school?"
                         value={profile.transferReason.whatsMissing}
-                        onChange={(v) => updateField('transferReason.whatsMissing', v)}
+                        onChange={(v: string) => updateField('transferReason.whatsMissing', v)}
                         placeholder="What specific resources, programs, or opportunities are you lacking?"
                         rows={4}
                         hint="Be specific: mention labs, professors, courses, culture, etc."
@@ -263,7 +263,7 @@ function PersonalProfileSection() {
                     <TagInput
                         label="Specific needs from target schools"
                         values={profile.transferReason.specificNeeds}
-                        onChange={(v) => updateField('transferReason.specificNeeds', v)}
+                        onChange={(v: string) => updateField('transferReason.specificNeeds', v)}
                         placeholder="e.g., AI research labs, entrepreneurship ecosystem, specific professors..."
                     />
                 </div>
@@ -275,35 +275,35 @@ function PersonalProfileSection() {
                     <TextArea
                         label="Family Background"
                         value={profile.personalStory.familyBackground || ''}
-                        onChange={(v) => updateField('personalStory.familyBackground', v)}
+                        onChange={(v: string) => updateField('personalStory.familyBackground', v)}
                         placeholder="Tell us about your family, their influence on you, and any challenges or unique circumstances..."
                         rows={4}
                     />
                     <TextArea
                         label="Cultural Identity"
                         value={profile.personalStory.culturalIdentity || ''}
-                        onChange={(v) => updateField('personalStory.culturalIdentity', v)}
+                        onChange={(v: string) => updateField('personalStory.culturalIdentity', v)}
                         placeholder="How does your cultural background shape your perspective and goals?"
                         rows={4}
                     />
                     <TagInput
                         label="Major Challenges You've Overcome"
                         values={profile.personalStory.challenges}
-                        onChange={(v) => updateField('personalStory.challenges', v)}
+                        onChange={(v: string) => updateField('personalStory.challenges', v)}
                         placeholder="Add challenge..."
                         hint="Financial hardship, language barriers, family obligations, health issues, etc."
                     />
                     <TagInput
                         label="Pivotal Life Moments"
                         values={profile.personalStory.pivotalMoments}
-                        onChange={(v) => updateField('personalStory.pivotalMoments', v)}
+                        onChange={(v: string) => updateField('personalStory.pivotalMoments', v)}
                         placeholder="Add moment..."
                         hint="Life-changing experiences that shaped who you are today"
                     />
                     <TextArea
                         label="What Makes You Unique?"
                         value={profile.personalStory.uniquePerspective || ''}
-                        onChange={(v) => updateField('personalStory.uniquePerspective', v)}
+                        onChange={(v: string) => updateField('personalStory.uniquePerspective', v)}
                         placeholder="What perspective or experience do you bring that most students don't have?"
                         rows={4}
                     />
@@ -316,32 +316,32 @@ function PersonalProfileSection() {
                     <TagInput
                         label="Career Goals"
                         values={profile.goals.careerGoals}
-                        onChange={(v) => updateField('goals.careerGoals', v)}
+                        onChange={(v: string) => updateField('goals.careerGoals', v)}
                         placeholder="e.g., AI Research Scientist, Tech Entrepreneur, Product Manager..."
                     />
                     <TagInput
                         label="Dream Companies / Organizations"
                         values={profile.goals.dreamCompanies || []}
-                        onChange={(v) => updateField('goals.dreamCompanies', v)}
+                        onChange={(v: string) => updateField('goals.dreamCompanies', v)}
                         placeholder="e.g., Google DeepMind, OpenAI, NASA, own startup..."
                     />
                     <TagInput
                         label="Problems You Want to Solve"
                         values={profile.goals.problemsToSolve}
-                        onChange={(v) => updateField('goals.problemsToSolve', v)}
+                        onChange={(v: string) => updateField('goals.problemsToSolve', v)}
                         placeholder="e.g., AI safety, climate change, healthcare access..."
                     />
                     <TextArea
                         label="Impact Vision - How do you want to change the world?"
                         value={profile.goals.impactVision}
-                        onChange={(v) => updateField('goals.impactVision', v)}
+                        onChange={(v: string) => updateField('goals.impactVision', v)}
                         placeholder="Describe the impact you want to have on the world..."
                         rows={4}
                     />
                     <TextArea
                         label="5-Year Plan"
                         value={profile.goals.fiveYearPlan || ''}
-                        onChange={(v) => updateField('goals.fiveYearPlan', v)}
+                        onChange={(v: string) => updateField('goals.fiveYearPlan', v)}
                         placeholder="Where do you see yourself in 5 years?"
                         rows={3}
                     />
@@ -354,19 +354,19 @@ function PersonalProfileSection() {
                     <TagInput
                         label="Core Values"
                         values={profile.values}
-                        onChange={(v) => updateField('values', v)}
+                        onChange={(v: string) => updateField('values', v)}
                         placeholder="e.g., Innovation, Equity, Collaboration, Impact..."
                     />
                     <TagInput
                         label="Interests"
                         values={profile.interests}
-                        onChange={(v) => updateField('interests', v)}
+                        onChange={(v: string) => updateField('interests', v)}
                         placeholder="e.g., Machine Learning, Philosophy, Music Production..."
                     />
                     <TagInput
                         label="Passions (what drives you?)"
                         values={profile.passions}
-                        onChange={(v) => updateField('passions', v)}
+                        onChange={(v: string) => updateField('passions', v)}
                         placeholder="What are you genuinely passionate about?"
                     />
                 </div>

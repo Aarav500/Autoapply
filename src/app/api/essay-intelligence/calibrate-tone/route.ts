@@ -308,7 +308,10 @@ Return ONLY the JSON object.`;
             const calibration: ToneCalibration = {
                 collegeId: college.id,
                 collegeName: college.name,
-                preferred: baseProfile.preferred,
+                preferred: {
+                    ...baseProfile.preferred,
+                    vocabularyLevel: baseProfile.preferred.vocabularyLevel as "technical" | "balanced" | "accessible"
+                },
                 avoid: baseProfile.avoid,
                 successExamples,
                 failureExamples,

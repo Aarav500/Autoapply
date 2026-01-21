@@ -212,7 +212,7 @@ ${college.fullName} STRENGTHS:
 - Location: ${college.location}
 
 PROFESSORS THEY'LL WORK WITH:
-${professors.map(p => `${p.name} (${p.researchArea})`).join(', ')}
+${professors.map((p: any) => `${p.name} (${p.researchArea})`).join(', ')}
 
 TASK: Rewrite their career goals to show how ${college.name} is the PERFECT place to achieve them.
 
