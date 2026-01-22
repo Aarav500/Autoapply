@@ -98,44 +98,57 @@ export default function CollegeActivitiesPage() {
     const handleAnalyze = async () => {
         if (!college) return;
 
+        // Check if we have activities to analyze
+        if (!activities || activities.length === 0) {
+            alert('No activities found. Please add activities first on the Activities page.');
+            return;
+        }
+
         setAnalyzing(true);
+        console.log(`🎯 Starting analysis for ${college.name} with ${activities.length} activities`);
 
         try {
+            const requestBody = {
+                college: {
+                    id: college.id,
+                    name: college.name,
+                    fullName: college.fullName,
+                    values: college.research.values,
+                    whatTheyLookFor: college.research.whatTheyLookFor,
+                    culture: college.research.culture,
+                    notablePrograms: college.research.notablePrograms,
+                },
+                activities: activities || [],
+                achievements: achievements || [],
+                userProfile: {
+                    major: userProfile?.major,
+                    gpa: parseFloat(userProfile?.gpa) || undefined,
+                    interests: userProfile?.interests,
+                },
+            };
+
+            console.log(`📤 Sending ${requestBody.activities.length} activities to analyzer`);
+
             const response = await fetch('/api/college-activities/analyze', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    college: {
-                        id: college.id,
-                        name: college.name,
-                        fullName: college.fullName,
-                        values: college.research.values,
-                        whatTheyLookFor: college.research.whatTheyLookFor,
-                        culture: college.research.culture,
-                        notablePrograms: college.research.notablePrograms,
-                    },
-                    activities: activities || [],
-                    achievements: achievements || [],
-                    userProfile: {
-                        major: userProfile?.major,
-                        gpa: parseFloat(userProfile?.gpa) || undefined,
-                        interests: userProfile?.interests,
-                    },
-                }),
+                body: JSON.stringify(requestBody),
             });
-
-            if (!response.ok) {
-                throw new Error('Analysis failed');
-            }
 
             const result = await response.json();
 
+            if (!response.ok) {
+                throw new Error(result.message || result.error || 'Analysis failed');
+            }
+
+            console.log(`✅ Analysis complete: ${result.readiness?.overall}% readiness`);
+
             setReadiness(result.readiness);
-            setCustomizedActivities(result.activities.prioritized || []);
+            setCustomizedActivities(result.activities?.prioritized || []);
             setRecommendations(result.recommendations || []);
         } catch (error) {
             console.error('Analysis error:', error);
-            alert('Failed to analyze activities. Please check your API keys.');
+            alert(`Failed to analyze activities: ${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
             setAnalyzing(false);
         }
@@ -205,12 +218,60 @@ export default function CollegeActivitiesPage() {
                 </div>
             </div>
 
+            {/* Show loading state while fetching data or analyzing */}
+            {(activitiesLoading || achievementsLoading) && (
+                <div className="max-w-7xl mx-auto mb-6">
+                    <Card>
+                        <div className="flex items-center gap-4">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            <p className="text-slate-600">Loading your activities and achievements from S3...</p>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
             {analyzing && (
                 <div className="max-w-7xl mx-auto mb-6">
                     <Card>
                         <div className="flex items-center gap-4">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                            <p className="text-slate-600">Analyzing your activities for {college.name}...</p>
+                            <p className="text-slate-600">Analyzing your {activities.length} activities for {college.name}...</p>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
+            {/* Show empty state if no activities loaded */}
+            {!activitiesLoading && !achievementsLoading && activities.length === 0 && !analyzing && (
+                <div className="max-w-7xl mx-auto mb-6">
+                    <Card>
+                        <div className="text-center py-8">
+                            <AlertCircle className="w-12 h-12 text-orange-500 mx-auto mb-4" />
+                            <h3 className="text-xl font-bold text-slate-900 mb-2">No Activities Found</h3>
+                            <p className="text-slate-600 mb-4">
+                                You need to add activities before we can analyze your readiness for {college.name}.
+                            </p>
+                            <Button onClick={() => router.push('/activities')}>
+                                Go to Activities Page
+                            </Button>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
+            {/* Show waiting state before analysis starts */}
+            {!activitiesLoading && !achievementsLoading && activities.length > 0 && !readiness && !analyzing && (
+                <div className="max-w-7xl mx-auto mb-6">
+                    <Card>
+                        <div className="text-center py-8">
+                            <TrendingUp className="w-12 h-12 text-blue-500 mx-auto mb-4" />
+                            <h3 className="text-xl font-bold text-slate-900 mb-2">Ready to Analyze</h3>
+                            <p className="text-slate-600 mb-4">
+                                Click "Refresh Analysis" to analyze your {activities.length} activities for {college.name}.
+                            </p>
+                            <Button onClick={handleAnalyze}>
+                                Start Analysis
+                            </Button>
                         </div>
                     </Card>
                 </div>

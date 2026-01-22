@@ -97,6 +97,18 @@ export async function POST(request: NextRequest) {
         console.log(`   📦 Received ${activities?.length || 0} activities, ${achievements?.length || 0} achievements`);
         console.log(`   👤 User profile: major=${userProfile?.major}, gpa=${userProfile?.gpa}`);
 
+        // Check if we have enough data to analyze
+        if (!activities || activities.length === 0) {
+            console.error('❌ No activities provided - returning error');
+            return NextResponse.json({
+                error: 'No activities provided',
+                message: 'Please add activities to your profile before analyzing.',
+            }, { status: 400 });
+        }
+
+        // Log first activity to verify data structure
+        console.log(`   📋 First activity: ${JSON.stringify(activities[0], null, 2).substring(0, 500)}`);
+
         // ============================================
         // PHASE 1: Prioritize activities for this college
         // ============================================
