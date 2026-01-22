@@ -33,8 +33,11 @@ interface UltimateEssayRequest {
     }[];
 }
 
-async function callAI(apiKey: string, provider: string, systemPrompt: string, userMessage: string): Promise<string> {
+async function callAI(apiKey: string, provider: string, systemPrompt: string, userMessage: string, isReview: boolean = false): Promise<string> {
     if (provider === 'claude') {
+        // Use Sonnet for reviews (faster, cheaper), Sonnet for perfection too (more consistent)
+        const model = 'claude-sonnet-4-20250514';
+
         const response = await fetch(CLAUDE_API_URL, {
             method: 'POST',
             headers: {
@@ -43,8 +46,9 @@ async function callAI(apiKey: string, provider: string, systemPrompt: string, us
                 'anthropic-version': '2023-06-01',
             },
             body: JSON.stringify({
-                model: 'claude-opus-4-20250514',
-                max_tokens: 3000,
+                model,
+                max_tokens: 4000,
+                temperature: isReview ? 0.3 : 0.7, // Low temp for reviews, moderate for writing
                 system: systemPrompt,
                 messages: [{ role: 'user', content: userMessage }],
             }),
@@ -138,47 +142,47 @@ async function reviewEssay(
 
     const systemPrompt = `${persona}
 
-You are reviewing a transfer student essay. Your goal is HELP the student reach PERFECTION.
-You are the TOUGHEST, HARSHEST specialist in the office. You rarely give scores above 95.
+You are reviewing a transfer student essay. Your goal is to HELP the student improve while recognizing what's already working well.
 
-SCORING GUIDE (RUTHLESS STANDARDS):
-- 98-100: TRANSCENDENT - A masterpiece. Flawless. One coherent narrative.
-- 95-97: EXCELLENT - Ready to submit, but could be 1% better.
-- 90-94: VERY GOOD - Still needs polish to be competitive at Ivy League.
-- 85-89: GOOD - Not memorable enough.
-- Below 85: Needs significant work.
+SCORING GUIDE (FAIR BUT HIGH STANDARDS):
+- 95-100: EXCEPTIONAL - Truly outstanding, ready to submit. Minor tweaks only.
+- 90-94: EXCELLENT - Very strong, competitive at top schools. 1-2 small improvements possible.
+- 85-89: VERY GOOD - Solid essay with room for enhancement.
+- 80-84: GOOD - Has potential but needs work in specific areas.
+- Below 80: Needs significant revision.
 
-REVIEW CRITERIA (score each 1-10, then calculate weighted average):
-1. AUTHENTICITY (20%): Is the voice unique? (If it sounds like AI, score < 5)
-2. SPECIFICITY (20%): Vivid examples? (If generic, score < 6)
-3. COLLEGE FIT (25%): Deep research? (If vague, score < 5)
-4. STRUCTURE (15%): ONE coherent narrative? Good transitions? (If disconnected anecdotes, score < 6)
-5. IMPACT (20%): Does it make you FEEL?
-6. COHERENCE (bonus check): Is there ONE main thread, or is it a resume in paragraph form?
+REVIEW CRITERIA (score each 1-10):
+1. AUTHENTICITY (20%): Does it sound like a real person? Contractions, varied sentences, natural flow.
+2. SPECIFICITY (25%): Concrete details? Numbers, names, vivid scenes?
+3. COLLEGE FIT (20%): Shows genuine interest in this specific school?
+4. STRUCTURE (15%): Clear narrative arc? Good flow between ideas?
+5. IMPACT (20%): Emotionally engaging? Memorable?
 
-AUTOMATIC PENALTIES (reduce score):
-- Name-dropping 4+ different organizations/programs: -5 points (looks like a resume)
-- Same example/device repeated 3+ times: -3 points (overworked)
-- Disconnected anecdotes without transitions: -5 points (no narrative thread)
-- Over word limit: -10 points
-- If prompt mentions "community" or "citizen" but essay only shows leadership without citizenship/teamwork: -8 points
+SCORING PRINCIPLES:
+- START by identifying what's WORKING well in the essay
+- An essay can score 95+ without being "perfect" - it just needs to be authentic, specific, and compelling
+- Only deduct points for CLEAR issues, not nitpicks
+- If the essay answers the prompt well and feels genuine, that's a strong foundation
+
+ONLY flag these as issues if they're genuinely problematic:
+- Over word limit: Note it but don't over-penalize if close
+- Missing specific college connection: Suggest adding ONE specific detail
+- Generic phrasing: Point to specific sentences that could be more vivid
 
 IMPORTANT:
-- Be extremely nitpicky. Find the smallest flaws.
-- Improvements must be ACTIONABLE (e.g., "Change the opening to...")
-- **THE SPARK REQUIREMENT**: To score > 93, the essay MUST have a "Spark" - a moment of raw vulnerability, a counter-intuitive insight, or a unique connection that makes it impossible to forget.
-- If "Spark" is missing, max score is 93.
-- **COHERENCE CHECK**: The essay should read as ONE story, not a list of achievements. If it feels like "and then I did X, and then I did Y, and then I did Z", penalize the structure score.
-- Check word count! If over limit, note it.
+- Improvements should be SPECIFIC and ACTIONABLE
+- Maximum 3 improvements - focus on what matters most
+- If the essay is already strong (90+), don't force unnecessary changes
+- Preserve what's working - don't suggest rewriting good parts
 
 Return ONLY valid JSON:
 {
     "score": <number 0-100>,
     "categoryScores": { "authenticity": <number>, "specificity": <number>, "collegeFit": <number>, "structure": <number>, "impact": <number> },
-    "improvements": ["<specific improvement 1>", "<specific improvement 2>"],
-    "oneThingToFix": "<most important fix or null>",
-    "spark": "<description of the spark or null if missing>",
-    "penalties": ["<penalty applied if any>"]
+    "strengths": ["<what's working well>"],
+    "improvements": ["<specific improvement if needed>"],
+    "oneThingToFix": "<single most impactful change or null if essay is strong>",
+    "spark": "<the memorable moment in the essay, or null>"
 }`;
 
     const userMessage = `PROMPT: ${prompt}
@@ -188,7 +192,7 @@ ${essay}
 
 Review and return JSON only:`;
 
-    const response = await callAI(apiKey, provider, systemPrompt, userMessage);
+    const response = await callAI(apiKey, provider, systemPrompt, userMessage, true); // isReview = true
 
     try {
         const jsonMatch = response.match(/\{[\s\S]*\}/);
@@ -202,15 +206,16 @@ Review and return JSON only:`;
             let categoryScores = parsed.categoryScores || {};
             let spark = parsed.spark || null;
 
-            // Ensure improvements exist if score < 95
-            if (score < 95 && improvements.length === 0) {
-                improvements.push("Add more specific details to increase impact");
-                improvements.push("Strengthen the connection to the college's values");
+            // CRITICAL: Only suggest improvements if they're truly needed
+            // Don't force improvements just because score < 95
+            if (improvements.length === 0 && score < 90) {
+                improvements.push("Add more vivid sensory details to make the narrative more immersive");
             }
 
-            // Force spark feedback if high score but no spark (safety net)
-            if (score > 90 && !spark) {
-                improvements.unshift("MISSING SPARK: Add a moment of raw vulnerability or unexpected insight.");
+            // Don't force spark requirement - it can artificially lower good essays
+            // Only mention spark if score is high but essay feels generic
+            if (score >= 90 && score < 95 && !spark && improvements.length === 0) {
+                improvements.push("Consider adding a moment of vulnerability or unexpected insight to make it truly memorable");
             }
 
             if (!oneThingToFix && improvements.length > 0) {
@@ -261,38 +266,37 @@ async function perfectEssay(
         ? `\nCRITICAL INSTRUCTION: STICK TO THE FEEDBACK. Do not be "creative". If the feedback suggests a specific phrase, example, or change, OPTIMIZE FOR THAT EXACTLY. Literal obedience is required.`
         : "";
 
-    const systemPrompt = `You are a legendary essay consultant with 100% admission rate.
-This is iteration ${iteration} of perfection. Your job is to make this essay FLAWLESS.
+    const systemPrompt = `You are a skilled essay editor helping improve a college application essay.
+This is iteration ${iteration}. Your job is to make TARGETED improvements while PRESERVING what's already working.
 
-RUBRIC YOU ARE GRADED ON (Aim for 10/10 in all):
-1. AUTHENTICITY: Unique voice, no AI-sounding phrases.
-2. SPECIFICITY: Vivid concrete details, numbers, names. BUT only 2-3 KEY activities with DEPTH.
-3. COLLEGE FIT: 1-2 specific program mentions (not 4+, that looks desperate).
-4. STRUCTURE: ONE coherent narrative with good TRANSITIONS. Not disconnected anecdotes.
-5. IMPACT: Emotional resonance, memorable story.
+CRITICAL PRINCIPLE: DO NOT REWRITE THE WHOLE ESSAY.
+The student has a voice and story that works. Your job is to ENHANCE, not replace.
 
-RULES:
-1. Word limit: ${wordLimit} words STRICT MAX (Count every word! If limit is 250, stay under 250.)
-2. Address ALL feedback completely - do not ignore anything.
-3. Make it sound authentically human (contractions, varied sentences, natural flow).
-4. Include 1-2 specific details about ${college.name} programs (not 4+).
-5. The goal is 97%+ score.${specificFocus}
+WHAT TO PRESERVE:
+- The overall structure and narrative arc
+- Specific examples and anecdotes that are working
+- The student's authentic voice and tone
+- Opening hooks that are engaging
+- Emotional moments that resonate
 
-CRITICAL ANTI-PATTERNS TO AVOID:
-- Do NOT repeat the same example/device more than 2 times
-- Do NOT name-drop 4+ different organizations (looks like a resume)
-- Do NOT write disconnected anecdotes. ONE main story thread.
-- If the prompt asks about "community", show BOTH leadership AND citizenship (supporting others)
-- Do NOT exceed word limit. Count the words.
+WHAT TO IMPROVE (based on feedback):
+${specificFocus || '- Make small targeted improvements based on the feedback below'}
 
-STRATEGY:
-- If Specificity is low: Add concrete numbers, proper nouns, and sensory details TO 2-3 KEY ACTIVITIES.
-- If Authenticity is low: Rewrite to sound more conversational and less "polished".
-- If College Fit is low: Add 1-2 specific professor/lab/tradition mentions (NOT 4+).
-- If Structure is low: REWRITE with ONE narrative thread and clear transitions.
-- Cut fluff ruthlessly to make space for substance.${obedienceInstruction}
+EDITING RULES:
+1. Word limit: ${wordLimit} words MAX
+2. Only change what's specifically called out in the feedback
+3. Keep the same opening unless feedback says to change it
+4. Maintain the student's voice - don't make it sound "polished" or AI-written
+5. If adding something, remove something else to stay within word limit
 
-Output ONLY the perfected essay, nothing else.`;
+APPROACH:
+- Read the feedback carefully
+- Make the MINIMUM changes needed to address each point
+- If a section is working, leave it alone
+- Prefer tweaking sentences over rewriting paragraphs
+- The goal is improvement, not perfection${obedienceInstruction}
+
+Output ONLY the improved essay, nothing else.`;
 
     const feedbackList = feedbackToAddress.length > 0
         ? `FEEDBACK TO ADDRESS:\n${feedbackToAddress.map((f, i) => `${i + 1}. ${f}`).join('\n')}`
@@ -364,44 +368,72 @@ export async function POST(request: NextRequest) {
         const maxIterations = 3; // Reduced to 3 to save costs & force efficiency
         const logs: string[] = [];
 
-        // ITERATIVE PERFECTION LOOP
+        // First, review the current essay to see where it stands
+        const initialReview = await reviewEssay(apiKey, provider, currentEssay, prompt, college, wordLimit);
+        currentScore = initialReview.score;
+        logs.push(`Initial review score: ${currentScore}%`);
+
+        // If essay is already excellent (93%+), only do minor polish if there's clear feedback
+        if (currentScore >= 93 && initialReview.improvements.length === 0) {
+            logs.push(`✅ Essay is already excellent at ${currentScore}%! No changes needed.`);
+            // Skip perfection loop - return the original essay
+            return NextResponse.json({
+                success: true,
+                ultimateEssay: currentEssay,
+                finalScore: currentScore,
+                iterations: 0,
+                wordCount: currentEssay.split(/\s+/).filter(Boolean).length,
+                remainingImprovements: [],
+                logs,
+                provider,
+                message: "Essay was already strong - preserved original"
+            });
+        }
+
+        // ITERATIVE PERFECTION LOOP - only if improvements are needed
         while (iterations < maxIterations) {
             iterations++;
             logs.push(`\n--- Iteration ${iterations} ---`);
 
-            // Step 1: Perfect the essay
-            const review = await reviewEssay(apiKey, provider, currentEssay, prompt, college, wordLimit);
+            // Get current review (use initial on first iteration)
+            const review = iterations === 1 ? initialReview : await reviewEssay(apiKey, provider, currentEssay, prompt, college, wordLimit);
             currentScore = review.score;
-            logs.push(`Review score: ${currentScore}%`);
-            logs.push(`Improvements: ${review.improvements.length > 0 ? review.improvements.join('; ') : 'None'}`);
 
-            // If we've reached 97%+ with no improvements, we're done! (Higher threshold for safety)
-            if (currentScore >= 97 && review.improvements.length === 0) {
-                logs.push(`✅ TRUE PERFECTION! Score ${currentScore}% with no improvements needed.`);
+            if (iterations > 1) {
+                logs.push(`Review score: ${currentScore}%`);
+            }
+            logs.push(`Improvements suggested: ${review.improvements.length > 0 ? review.improvements.join('; ') : 'None'}`);
+
+            // If we've reached 95%+ OR no improvements left, we're done
+            if (currentScore >= 95) {
+                logs.push(`✅ Excellent! Score ${currentScore}% - ready to submit.`);
                 break;
             }
 
-            // If score is 97%+ but still has minor improvements, we're good
-            if (currentScore >= 97) {
-                logs.push(`✅ Excellent! Score ${currentScore}% - exceeds safety threshold.`);
+            if (review.improvements.length === 0) {
+                logs.push(`✅ No more improvements needed at ${currentScore}%.`);
                 break;
             }
 
-            // Step 2: Collect feedback to address
+            // Collect feedback - limit to top 2 most important
             const feedbackToAddress: string[] = [];
             if (review.oneThingToFix) {
                 feedbackToAddress.push(review.oneThingToFix);
             }
-            feedbackToAddress.push(...review.improvements);
-
-            if (feedbackToAddress.length === 0) {
-                logs.push(`No actionable feedback but score is ${currentScore}%. Doing final polish...`);
-                feedbackToAddress.push('Polish the essay to be more compelling and memorable');
+            // Add max 1 more improvement to avoid over-editing
+            if (review.improvements.length > 0 && feedbackToAddress.length < 2) {
+                const additionalFeedback = review.improvements.filter(i => i !== review.oneThingToFix).slice(0, 1);
+                feedbackToAddress.push(...additionalFeedback);
             }
 
-            // Step 3: Perfect with feedback
-            logs.push(`Applying ${feedbackToAddress.length} improvements...`);
-            currentEssay = await perfectEssay(
+            if (feedbackToAddress.length === 0) {
+                logs.push(`No actionable feedback at ${currentScore}%. Stopping.`);
+                break;
+            }
+
+            // Apply targeted improvements
+            logs.push(`Applying ${feedbackToAddress.length} targeted improvements...`);
+            const improvedEssay = await perfectEssay(
                 apiKey,
                 provider,
                 currentEssay,
@@ -410,14 +442,28 @@ export async function POST(request: NextRequest) {
                 wordLimit,
                 feedbackToAddress,
                 iterations,
-
                 review.categoryScores,
-                !review.spark && currentScore > 90 // Flag missing spark if score is decent but no spark
+                false // Don't force spark - let essay be natural
             );
 
             // Ensure word limit
-            currentEssay = trimToWordLimit(currentEssay, wordLimit);
-            logs.push(`New word count: ${currentEssay.split(/\s+/).filter(Boolean).length}`);
+            const trimmedEssay = trimToWordLimit(improvedEssay, wordLimit);
+            const newWordCount = trimmedEssay.split(/\s+/).filter(Boolean).length;
+            logs.push(`New word count: ${newWordCount}`);
+
+            // CRITICAL: Check if the improvement actually helped
+            const verifyReview = await reviewEssay(apiKey, provider, trimmedEssay, prompt, college, wordLimit);
+
+            if (verifyReview.score >= currentScore) {
+                // Improvement worked or maintained quality - accept it
+                currentEssay = trimmedEssay;
+                logs.push(`✓ Improvement accepted (${currentScore}% → ${verifyReview.score}%)`);
+                currentScore = verifyReview.score;
+            } else {
+                // Improvement made it worse - reject and stop
+                logs.push(`✗ Improvement rejected (would drop from ${currentScore}% to ${verifyReview.score}%). Keeping previous version.`);
+                break;
+            }
         }
 
         // Final review
