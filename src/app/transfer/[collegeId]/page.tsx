@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { targetColleges, getTimeUntilDeadline, formatDeadline, CollegeInfo } from '@/lib/colleges-data';
 import { useS3Storage } from '@/lib/useS3Storage';
+import { STORAGE_KEYS } from '@/lib/s3-storage';
 import { calculateCollegeFitScore, prioritizeActivitiesForCollege } from '@/lib/college-cv-optimizer';
 
 // ============================================
@@ -39,10 +40,10 @@ export default function CollegeApplicationPage() {
     const [generatingEssay, setGeneratingEssay] = useState(false);
     const [scholarships, setScholarships] = useState<ScholarshipMatch[]>([]);
 
-    const { data: activities } = useS3Storage<any[]>('activities', { defaultValue: [] });
-    const { data: achievements } = useS3Storage<any[]>('achievements', { defaultValue: [] });
-    const { data: transcript } = useS3Storage<any>('grades/transcript', { defaultValue: null });
-    const { data: userProfile } = useS3Storage<any>('user-profile', { defaultValue: {} });
+    const { data: activities } = useS3Storage<any[]>(STORAGE_KEYS.ACTIVITIES, { defaultValue: [] });
+    const { data: achievements } = useS3Storage<any[]>(STORAGE_KEYS.ACHIEVEMENTS, { defaultValue: [] });
+    const { data: transcript } = useS3Storage<any>(STORAGE_KEYS.TRANSCRIPT, { defaultValue: null });
+    const { data: userProfile } = useS3Storage<any>(STORAGE_KEYS.USER_PROFILE, { defaultValue: {} });
 
     // Load college-specific essay drafts
     const { data: essayDrafts, setData: setEssayDrafts } = useS3Storage<Record<string, EssayDraft>>(
