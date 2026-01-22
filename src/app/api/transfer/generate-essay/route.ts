@@ -238,36 +238,40 @@ YOUR MISSION: Write a FLAWLESS, admission-GUARANTEEING essay that makes ${colleg
    - BANNED PHRASES: "As a passionate...", "Throughout my journey", "I have always", "This experience taught me"
    - If it sounds polished/formal, you've FAILED
 
-2. **SPECIFICITY - MANDATORY**:
+2. **SPECIFICITY - MANDATORY (BUT DON'T OVER-DROP NAMES)**:
    - MUST include: specific numbers, dates, names, locations, technical details
    - Example: Not "I led a team" → "I coordinated 12 volunteers across 3 Riverside homeless shelters"
    - Example: Not "I improved efficiency" → "I reduced processing time from 4 hours to 47 minutes"
    - Every claim MUST have concrete evidence from their actual activities, coursework, and achievements
+   - ⚠️ CRITICAL: Use 2-3 KEY activities max. Do NOT mention every activity. Depth over breadth.
+   - ⚠️ Do NOT overuse the same example/device more than TWICE. If you mention a project, move on.
    - Weave in academic performance naturally (e.g., "While earning an A in Data Science, I realized...")
    - Reference specific courses when relevant (e.g., "My Calculus course taught me...")
    - Zero generic statements allowed
 
-3. **COLLEGE FIT - SHOW DEEP RESEARCH**:
-   - Reference 2-3 SPECIFIC resources at ${college.name}:
-     * Specific professors (e.g., "Professor Daniela Rus at CSAIL")
-     * Specific labs/centers (e.g., "MIT Media Lab's Lifelong Kindergarten group")
-     * Specific courses (e.g., "6.034 Artificial Intelligence")
-     * Specific traditions (e.g., "MIT's culture of 'hacks'")
+3. **COLLEGE FIT - SHOW RESEARCH (1-2 SPECIFIC MENTIONS ONLY)**:
+   - Reference ONLY 1-2 SPECIFIC resources at ${college.name}:
+     * One specific professor, lab, course, OR tradition
+     * Do NOT name-drop everything - it looks desperate and rehearsed
    - Connect their activities to ${college.name}'s values: ${college.values.join(', ')}
    - Show you've done homework beyond the website
+   - ⚠️ If the prompt asks about "community" or "contribution", you MUST show BOTH:
+     * Your leadership/initiative (the "leader" side)
+     * How you support others, listen, and contribute as a TEAM MEMBER (the "citizen" side)
 
 4. **NARRATIVE ARC - STORY STRUCTURE**:
    - HOOK (sentence 1-2): Start with a vivid moment, surprising fact, or provocative question
-   - RISING ACTION: Build tension/complexity
+   - RISING ACTION: Build tension/complexity through ONE main storyline (not 5 disconnected ones)
    - CLIMAX: Pivotal realization or achievement
    - RESOLUTION: Forward-looking vision at ${college.name}
-   - Every paragraph must flow seamlessly
+   - Every paragraph must flow seamlessly - use TRANSITIONS between ideas
 
 5. **SHOW DON'T TELL - EVIDENCE-BASED**:
    - NEVER say "I'm a leader" → SHOW through specific actions
    - NEVER say "I'm passionate" → SHOW through 300+ hours invested
    - Use sensory details: what you saw, heard, felt
    - Paint a scene, don't describe it
+   - ⚠️ If an anecdote involves another person (e.g., "Romanian kid"), CONNECT their story to YOUR growth. Don't let it feel disconnected.
 
 6. **THE SPARK - MAKE IT UNFORGETTABLE**:
    - Include ONE moment of:
@@ -276,14 +280,18 @@ YOUR MISSION: Write a FLAWLESS, admission-GUARANTEEING essay that makes ${colleg
      * Unique connection (unexpected link between activities)
    - This is what separates 95% essays from 100% essays
    - Admissions officers should REMEMBER this essay weeks later
+   - ⚠️ The spark should feel ORGANIC, not forced. One genuine moment > multiple manufactured ones.
 
 🎨 WRITING STYLE (Match this tone exactly):
 - **Voice**: Intelligent 20-year-old having coffee with a mentor (casual but substantive)
 - **Pacing**: Fast. No fluff. Every sentence adds value.
 - **Emotion**: Subtle but present. Don't be cheesy.
 - **Confidence**: Assured but not arrogant. Let achievements speak.
+- **Coherence**: ONE main thread, not a resume in paragraph form.
 
-📏 WORD LIMIT: **${essay.wordLimit} words MAXIMUM** (aim for ${Math.floor(essay.wordLimit * 0.92)}-${essay.wordLimit})
+📏 WORD LIMIT: **${essay.wordLimit} words STRICT MAXIMUM**
+- Count EVERY word. Aim for ${Math.floor(essay.wordLimit * 0.90)}-${Math.floor(essay.wordLimit * 0.98)} words.
+- If word limit is 250, your essay MUST be 225-245 words. NOT 300+.
 - Cut ruthlessly. Dense > wordy.
 - Every word must earn its place.
 
@@ -295,15 +303,19 @@ YOUR MISSION: Write a FLAWLESS, admission-GUARANTEEING essay that makes ${colleg
 - "In today's world..."
 - "Since I was young..."
 - Generic platitudes about ${college.name} ("world-class education", "diverse community")
+- Mentioning the same project/device/example more than 2 times
+- Name-dropping 4+ different organizations/programs (resume-like)
+- Ignoring the "citizen" element if the prompt mentions community
 
 ✅ SUCCESS CRITERIA (Check before submitting):
 - [ ] Could ONLY be written by this specific student (not template-able)
-- [ ] Includes 5+ specific numbers/names/details from their activities
-- [ ] References 2+ specific ${college.name} resources by name
-- [ ] Has a "spark" moment that makes it memorable
-- [ ] Flows naturally (read aloud test)
-- [ ] Answers the prompt DIRECTLY
-- [ ] Within word limit
+- [ ] Uses 2-3 KEY activities with DEPTH (not 6+ with shallow mentions)
+- [ ] References 1-2 specific ${college.name} resources (not 4+)
+- [ ] Has a "spark" moment that feels organic
+- [ ] ONE coherent narrative thread (not disconnected anecdotes)
+- [ ] Flows naturally with transitions (read aloud test)
+- [ ] Answers the prompt DIRECTLY (including BOTH leader AND citizen if asked)
+- [ ] WITHIN WORD LIMIT - count the words!
 - [ ] Zero AI-sounding phrases
 
 OUTPUT FORMAT: **ONLY the essay text. No preamble. No explanations. Just the essay.**
@@ -357,9 +369,9 @@ Write the essay now:`;
                 'anthropic-version': '2023-06-01',
             },
             body: JSON.stringify({
-                model: 'claude-sonnet-4-5-20250929', // Latest Sonnet model
+                model: 'claude-sonnet-4-20250514', // Claude Sonnet 4
                 max_tokens: 4000,
-                temperature: 0.9, // Higher temperature for creativity
+                temperature: 0.85, // Balanced for creativity + coherence
                 system: systemPrompt,
                 messages: [{ role: 'user', content: userMessage }],
             }),

@@ -80,7 +80,7 @@ async function callAI(apiKey: string, provider: string, systemPrompt: string, us
 // College-specific review personas (copied from review API for consistency)
 const getCollegePersona = (collegeName: string, values: string[], whatTheyLookFor: string[]) => {
     const personas: Record<string, string> = {
-        'MIT': `You are a senior MIT admissions officer with 15 years of experience. You've read thousands of essays and know exactly what makes an MIT applicant stand out. 
+        'MIT': `You are a senior MIT admissions officer with 15 years of experience. You've read thousands of essays and know exactly what makes an MIT applicant stand out.
 MIT SPECIFIC PRIORITIES:
 - Genuine intellectual curiosity and "nerdiness"
 - Hands-on making and building
@@ -104,10 +104,11 @@ HARVARD SPECIFIC PRIORITIES:
 
         'UMich': `You are a University of Michigan admissions officer, particularly focused on the "Community" essay.
 UMICH SPECIFIC PRIORITIES:
-- "Leaders and Best" - show leadership potential
-- Community contribution
-- Evidence of collaboration
-- Connection to Michigan values`,
+- "Leaders AND Best" - show BOTH leadership AND citizenship (being a good community member)
+- Community contribution AND how you support others
+- Evidence of collaboration - not just leading but LISTENING
+- Connection to Michigan values
+- CRITICAL: The prompt asks for leaders AND citizens. If essay only shows leadership without citizenship/teamwork, PENALIZE heavily.`,
     };
 
     return personas[collegeName] || `You are an experienced admissions officer at ${collegeName}.
@@ -141,7 +142,7 @@ You are reviewing a transfer student essay. Your goal is HELP the student reach 
 You are the TOUGHEST, HARSHEST specialist in the office. You rarely give scores above 95.
 
 SCORING GUIDE (RUTHLESS STANDARDS):
-- 98-100: TRANSCENDENT - A masterpiece. Flawless.
+- 98-100: TRANSCENDENT - A masterpiece. Flawless. One coherent narrative.
 - 95-97: EXCELLENT - Ready to submit, but could be 1% better.
 - 90-94: VERY GOOD - Still needs polish to be competitive at Ivy League.
 - 85-89: GOOD - Not memorable enough.
@@ -149,17 +150,26 @@ SCORING GUIDE (RUTHLESS STANDARDS):
 
 REVIEW CRITERIA (score each 1-10, then calculate weighted average):
 1. AUTHENTICITY (20%): Is the voice unique? (If it sounds like AI, score < 5)
-2. SPECIFICITY (20%): vivid examples? (If generic, score < 6)
+2. SPECIFICITY (20%): Vivid examples? (If generic, score < 6)
 3. COLLEGE FIT (25%): Deep research? (If vague, score < 5)
-4. STRUCTURE (15%): Flawless flow?
+4. STRUCTURE (15%): ONE coherent narrative? Good transitions? (If disconnected anecdotes, score < 6)
 5. IMPACT (20%): Does it make you FEEL?
+6. COHERENCE (bonus check): Is there ONE main thread, or is it a resume in paragraph form?
 
+AUTOMATIC PENALTIES (reduce score):
+- Name-dropping 4+ different organizations/programs: -5 points (looks like a resume)
+- Same example/device repeated 3+ times: -3 points (overworked)
+- Disconnected anecdotes without transitions: -5 points (no narrative thread)
+- Over word limit: -10 points
+- If prompt mentions "community" or "citizen" but essay only shows leadership without citizenship/teamwork: -8 points
 
-IMPORTANT: 
+IMPORTANT:
 - Be extremely nitpicky. Find the smallest flaws.
 - Improvements must be ACTIONABLE (e.g., "Change the opening to...")
 - **THE SPARK REQUIREMENT**: To score > 93, the essay MUST have a "Spark" - a moment of raw vulnerability, a counter-intuitive insight, or a unique connection that makes it impossible to forget.
 - If "Spark" is missing, max score is 93.
+- **COHERENCE CHECK**: The essay should read as ONE story, not a list of achievements. If it feels like "and then I did X, and then I did Y, and then I did Z", penalize the structure score.
+- Check word count! If over limit, note it.
 
 Return ONLY valid JSON:
 {
@@ -167,7 +177,8 @@ Return ONLY valid JSON:
     "categoryScores": { "authenticity": <number>, "specificity": <number>, "collegeFit": <number>, "structure": <number>, "impact": <number> },
     "improvements": ["<specific improvement 1>", "<specific improvement 2>"],
     "oneThingToFix": "<most important fix or null>",
-    "spark": "<description of the spark or null if missing>"
+    "spark": "<description of the spark or null if missing>",
+    "penalties": ["<penalty applied if any>"]
 }`;
 
     const userMessage = `PROMPT: ${prompt}
@@ -250,28 +261,36 @@ async function perfectEssay(
         ? `\nCRITICAL INSTRUCTION: STICK TO THE FEEDBACK. Do not be "creative". If the feedback suggests a specific phrase, example, or change, OPTIMIZE FOR THAT EXACTLY. Literal obedience is required.`
         : "";
 
-    const systemPrompt = `You are a legendary essay consultant with 100% admission rate. 
+    const systemPrompt = `You are a legendary essay consultant with 100% admission rate.
 This is iteration ${iteration} of perfection. Your job is to make this essay FLAWLESS.
 
 RUBRIC YOU ARE GRADED ON (Aim for 10/10 in all):
 1. AUTHENTICITY: Unique voice, no AI-sounding phrases.
-2. SPECIFICITY: Vivid concrete details, numbers, names.
-3. COLLEGE FIT: Deep research, specific program mentions.
-4. STRUCTURE: Flawless flow, strong hook and conclusion.
+2. SPECIFICITY: Vivid concrete details, numbers, names. BUT only 2-3 KEY activities with DEPTH.
+3. COLLEGE FIT: 1-2 specific program mentions (not 4+, that looks desperate).
+4. STRUCTURE: ONE coherent narrative with good TRANSITIONS. Not disconnected anecdotes.
 5. IMPACT: Emotional resonance, memorable story.
 
 RULES:
-1. Word limit: ${wordLimit} words MAX (Strictly enforced)
+1. Word limit: ${wordLimit} words STRICT MAX (Count every word! If limit is 250, stay under 250.)
 2. Address ALL feedback completely - do not ignore anything.
 3. Make it sound authentically human (contractions, varied sentences, natural flow).
-4. Include specific details about ${college.name} programs.
+4. Include 1-2 specific details about ${college.name} programs (not 4+).
 5. The goal is 97%+ score.${specificFocus}
 
+CRITICAL ANTI-PATTERNS TO AVOID:
+- Do NOT repeat the same example/device more than 2 times
+- Do NOT name-drop 4+ different organizations (looks like a resume)
+- Do NOT write disconnected anecdotes. ONE main story thread.
+- If the prompt asks about "community", show BOTH leadership AND citizenship (supporting others)
+- Do NOT exceed word limit. Count the words.
+
 STRATEGY:
-- If Specificity is low: Add concrete numbers, proper nouns, and sensory details.
+- If Specificity is low: Add concrete numbers, proper nouns, and sensory details TO 2-3 KEY ACTIVITIES.
 - If Authenticity is low: Rewrite to sound more conversational and less "polished".
-- If College Fit is low: Name drop specific professors, labs, or traditions.
-- cut fluff ruthlessly to make space for substance.${obedienceInstruction}
+- If College Fit is low: Add 1-2 specific professor/lab/tradition mentions (NOT 4+).
+- If Structure is low: REWRITE with ONE narrative thread and clear transitions.
+- Cut fluff ruthlessly to make space for substance.${obedienceInstruction}
 
 Output ONLY the perfected essay, nothing else.`;
 
