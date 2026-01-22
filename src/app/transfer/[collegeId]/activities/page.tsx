@@ -380,7 +380,50 @@ export default function CollegeActivitiesPage() {
                     <Card>
                         <div className="flex items-center gap-4">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                            <p className="text-slate-600">Analyzing your {activities.length} activities for {college.name}...</p>
+                            <p className="text-slate-600">Analyzing your {activities.length} activities and {achievements.length} achievements for {college.name}...</p>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
+            {/* Data Status Card - Shows what was loaded from S3 */}
+            {!activitiesLoading && !achievementsLoading && !analyzing && (
+                <div className="max-w-7xl mx-auto mb-6">
+                    <Card>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-6">
+                                <div className="flex items-center gap-2">
+                                    <Award className="w-5 h-5 text-blue-600" />
+                                    <span className="text-slate-700">
+                                        <strong>{activities.length}</strong> Activities Loaded
+                                    </span>
+                                    {activities.length === 0 && (
+                                        <span className="text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded-full">
+                                            Add activities first
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Star className="w-5 h-5 text-yellow-600" />
+                                    <span className="text-slate-700">
+                                        <strong>{achievements.length}</strong> Achievements Loaded
+                                    </span>
+                                    {achievements.length === 0 && (
+                                        <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full">
+                                            Optional
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            {(activities.length === 0) && (
+                                <Button
+                                    onClick={() => router.push('/activities')}
+                                    variant="outline"
+                                    size="sm"
+                                >
+                                    Go Add Activities
+                                </Button>
+                            )}
                         </div>
                     </Card>
                 </div>

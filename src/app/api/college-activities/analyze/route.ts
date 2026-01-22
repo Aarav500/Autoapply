@@ -339,8 +339,13 @@ export async function POST(request: NextRequest) {
             }, { status: 400 });
         }
 
-        // Log first activity to verify data structure
+        // Log first activity and achievement to verify data structure
         console.log(`   📋 First activity: ${JSON.stringify(activities[0], null, 2).substring(0, 500)}`);
+        if (achievements && achievements.length > 0) {
+            console.log(`   🏆 First achievement: ${JSON.stringify(achievements[0], null, 2).substring(0, 500)}`);
+        } else {
+            console.log(`   ⚠️ No achievements provided - will analyze without them`);
+        }
 
         // ============================================
         // PHASE 1: Prioritize activities for this college
@@ -444,12 +449,18 @@ Return JSON array (sort by relevanceScore, highest first):
 
         // Build activity summaries for better analysis
         const activitySummaries = activities.slice(0, 10).map((a: any) =>
-            `- ${a.name}: ${a.role || 'Member'} at ${a.organization || 'N/A'} (${a.category || 'general'})`
+            `- ${a.name}: ${a.role || 'Member'} at ${a.organization || 'N/A'} (${a.category || 'general'})${a.description ? ` - ${a.description.substring(0, 100)}...` : ''}`
         ).join('\n');
 
-        const achievementSummaries = achievements.slice(0, 10).map((a: any) =>
-            `- ${a.title}: ${a.category || 'award'}`
-        ).join('\n');
+        // Build detailed achievement summaries
+        const achievementSummaries = achievements && achievements.length > 0
+            ? achievements.slice(0, 10).map((a: any) =>
+                `- ${a.title || a.name}: ${a.category || 'award'}${a.description ? ` - ${a.description.substring(0, 80)}` : ''}${a.date ? ` (${a.date})` : ''}`
+            ).join('\n')
+            : '- No achievements listed yet';
+
+        console.log(`   📋 Activities summary: ${activitySummaries.substring(0, 300)}...`);
+        console.log(`   🏆 Achievements summary: ${achievementSummaries.substring(0, 300)}...`);
 
         const readinessPrompt = `You are evaluating a transfer applicant's readiness specifically for ${college.fullName}. Your assessment must be calibrated to what ${college.name} SPECIFICALLY values.
 
@@ -473,13 +484,15 @@ APPLICANT PROFILE
 - Intended Major: ${userProfile?.major || 'Computer Science'}
 - GPA: ${userProfile?.gpa || 'Not provided'}
 - Total Activities: ${activities.length}
-- Total Achievements: ${achievements.length}
+- Total Achievements: ${achievements?.length || 0}
 
-TOP ACTIVITIES:
+TOP ACTIVITIES (${activities.length} total):
 ${activitySummaries || '- Multiple technical and leadership activities'}
 
-KEY ACHIEVEMENTS:
-${achievementSummaries || '- Multiple academic and professional achievements'}
+KEY ACHIEVEMENTS (${achievements?.length || 0} total) - IMPORTANT: Factor these into Academic and overall assessment:
+${achievementSummaries}
+
+NOTE: Achievements should SIGNIFICANTLY boost the Academic score and influence overall readiness. Awards, honors, recognitions, and accomplishments demonstrate academic excellence and dedication.
 
 ═══════════════════════════════════════════════════════════
 ${college.name.toUpperCase()}-CALIBRATED READINESS ASSESSMENT
@@ -534,7 +547,7 @@ Categories based on overallReadiness: "safety" (90+), "strong-match" (75-89), "m
         let readinessAnalysis = parseJSON(readinessResult, {
             readiness: { academic: 75, leadership: 80, researchTechnical: 85, communityImpact: 70, fitPassion: 82 },
             overallReadiness: 78,
-            strengths: [`Strong activity portfolio with ${activities.length} activities`, `Impressive ${achievements.length} achievements`],
+            strengths: [`Strong activity portfolio with ${activities.length} activities`, `${achievements?.length || 0} achievements to highlight`],
             gaps: ['Consider adding more specific details to activity descriptions'],
             category: 'strong-match',
         });
@@ -607,6 +620,16 @@ ${collegeGuidance.keyThemes.map(t => `• ${t}`).join('\n')}
 
 METRICS ${college.name.toUpperCase()} VALUES:
 ${collegeGuidance.emphasizeMetrics.map(m => `✓ ${m}`).join('\n')}
+
+═══════════════════════════════════════════════════════════
+APPLICANT'S CURRENT PROFILE
+═══════════════════════════════════════════════════════════
+
+ACTIVITIES (${activities.length}):
+${activitySummaries}
+
+ACHIEVEMENTS (${achievements?.length || 0}):
+${achievementSummaries}
 
 ═══════════════════════════════════════════════════════════
 CURRENT READINESS SCORES
@@ -715,19 +738,39 @@ Return JSON:
         // PHASE 4: Create customized activity descriptions
         // ============================================
         console.log('✍️  Phase 4: Creating customized descriptions...');
+        console.log(`   📊 Prioritized activities count: ${prioritizedActivities.length}`);
 
-        const customizedActivities = prioritizedActivities.slice(0, 10).map((pa: any, index: number) => {
+        // If AI didn't return proper prioritization, create default prioritization from activities
+        let activitiesToCustomize = prioritizedActivities;
+        if (!prioritizedActivities || prioritizedActivities.length === 0) {
+            console.log('   ⚠️ No prioritized activities from AI - using original activities');
+            activitiesToCustomize = activities.map((a: any, i: number) => ({
+                activityId: a.id || `activity-${i}`,
+                activityName: a.name,
+                relevanceScore: 70,
+                priority: i < 3 ? 1 : i < 6 ? 2 : 3,
+                customization: {
+                    emphasize: 'Your key contributions and leadership',
+                    reframe: `Present this activity in terms of ${college.name}'s values`,
+                    connect: `Connect to ${college.name}'s mission and programs`
+                },
+                reasoning: `Activity relevant for ${college.name} application`
+            }));
+        }
+
+        const customizedActivities = activitiesToCustomize.slice(0, 10).map((pa: any, index: number) => {
             // Try to find the original activity by ID, name, or index
-            let originalActivity = activities.find(a =>
+            let originalActivity = activities.find((a: any) =>
                 a.id === pa.activityId ||
                 a.name === pa.activityName ||
                 a.name?.toLowerCase() === pa.activityName?.toLowerCase()
             );
 
-            // Fallback: if no match found, try to match by index from the activity name pattern
+            // Fallback: if no match found, try to match by partial name
             if (!originalActivity && pa.activityName) {
-                const nameMatch = activities.find(a =>
-                    pa.activityName.includes(a.name) || a.name?.includes(pa.activityName)
+                const nameMatch = activities.find((a: any) =>
+                    pa.activityName?.toLowerCase().includes(a.name?.toLowerCase()) ||
+                    a.name?.toLowerCase().includes(pa.activityName?.toLowerCase())
                 );
                 if (nameMatch) originalActivity = nameMatch;
             }
@@ -737,14 +780,14 @@ Return JSON:
                 originalActivity = activities[index];
             }
 
-            return {
+            const result = {
                 id: originalActivity?.id || pa.activityId || `custom-${index}`,
-                name: pa.activityName || originalActivity?.name || 'Activity',
+                name: pa.activityName || originalActivity?.name || `Activity ${index + 1}`,
                 role: originalActivity?.role || 'Participant',
                 description: originalActivity?.description || pa.activityName || '',
                 category: originalActivity?.category || 'General',
-                relevanceScore: pa.relevanceScore || 70,
-                priority: pa.priority || 3,
+                relevanceScore: typeof pa.relevanceScore === 'number' ? pa.relevanceScore : 70,
+                priority: typeof pa.priority === 'number' ? pa.priority : 3,
                 customization: pa.customization || {
                     emphasize: 'Highlight your contributions and impact',
                     reframe: 'Present in terms of outcomes achieved',
@@ -753,8 +796,11 @@ Return JSON:
                 reasoning: pa.reasoning || 'Relevant activity for your application',
                 customizedDescription: pa.customization?.reframe || originalActivity?.description || '',
             };
-        }).filter((a: any) => a.name && a.name !== 'Activity'); // Filter out empty/invalid activities
 
+            return result;
+        }).filter((a: any) => a.name); // Only filter out truly empty names
+
+        console.log(`   ✅ Created ${customizedActivities.length} customized activities`);
         console.log('✅ Analysis complete!');
 
         return NextResponse.json({
