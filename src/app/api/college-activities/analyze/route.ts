@@ -62,12 +62,28 @@ async function callClaude(prompt: string, maxTokens: number = 2000): Promise<str
 
 function parseJSON(text: string, fallback: any = {}): any {
     try {
+        // Try to extract JSON from markdown code blocks first
         const jsonMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\}|\[[\s\S]*?\])\s*```/);
         if (jsonMatch) {
             return JSON.parse(jsonMatch[1]);
         }
+
+        // Try to find JSON object or array in the text
+        const objectMatch = text.match(/\{[\s\S]*\}/);
+        const arrayMatch = text.match(/\[[\s\S]*\]/);
+
+        if (objectMatch) {
+            return JSON.parse(objectMatch[0]);
+        }
+        if (arrayMatch) {
+            return JSON.parse(arrayMatch[0]);
+        }
+
+        // Last resort: try parsing the whole text
         return JSON.parse(text);
-    } catch {
+    } catch (e) {
+        console.error('JSON parse error:', e);
+        console.error('Text to parse:', text.substring(0, 500));
         return fallback;
     }
 }
@@ -78,6 +94,8 @@ export async function POST(request: NextRequest) {
         const { college, activities, achievements, userProfile } = body;
 
         console.log(`🎯 Analyzing activities for ${college.name}...`);
+        console.log(`   📦 Received ${activities?.length || 0} activities, ${achievements?.length || 0} achievements`);
+        console.log(`   👤 User profile: major=${userProfile?.major}, gpa=${userProfile?.gpa}`);
 
         // ============================================
         // PHASE 1: Prioritize activities for this college
