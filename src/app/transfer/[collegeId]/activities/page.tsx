@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { targetColleges, CollegeInfo } from '@/lib/colleges-data';
 import { useS3Storage } from '@/lib/useS3Storage';
+import { STORAGE_KEYS } from '@/lib/s3-storage';
 import { motion } from 'framer-motion';
 import { Card, Button } from '@/components/ui';
 import {
@@ -74,9 +75,9 @@ export default function CollegeActivitiesPage() {
     const [customizedActivities, setCustomizedActivities] = useState<CustomizedActivity[]>([]);
     const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
 
-    const { data: activities } = useS3Storage<any[]>('activities', { defaultValue: [] });
-    const { data: achievements } = useS3Storage<any[]>('achievements', { defaultValue: [] });
-    const { data: userProfile } = useS3Storage<any>('profile', { defaultValue: {} });
+    const { data: activities, isLoading: activitiesLoading } = useS3Storage<any[]>(STORAGE_KEYS.ACTIVITIES, { defaultValue: [] });
+    const { data: achievements, isLoading: achievementsLoading } = useS3Storage<any[]>(STORAGE_KEYS.ACHIEVEMENTS, { defaultValue: [] });
+    const { data: userProfile } = useS3Storage<any>(STORAGE_KEYS.USER_PROFILE, { defaultValue: {} });
 
     useEffect(() => {
         const foundCollege = targetColleges.find(c => c.id === collegeId);
@@ -87,12 +88,12 @@ export default function CollegeActivitiesPage() {
         setCollege(foundCollege);
     }, [collegeId, router]);
 
-    // Auto-analyze on mount
+    // Auto-analyze on mount when data is loaded
     useEffect(() => {
-        if (college && activities.length > 0 && !readiness) {
+        if (college && !activitiesLoading && !achievementsLoading && activities.length > 0 && !readiness) {
             handleAnalyze();
         }
-    }, [college, activities]);
+    }, [college, activities, activitiesLoading, achievementsLoading]);
 
     const handleAnalyze = async () => {
         if (!college) return;
