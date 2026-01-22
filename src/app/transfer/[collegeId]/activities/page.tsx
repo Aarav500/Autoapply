@@ -418,7 +418,7 @@ export default function CollegeActivitiesPage() {
                             {(activities.length === 0) && (
                                 <Button
                                     onClick={() => router.push('/activities')}
-                                    variant="outline"
+                                    variant="secondary"
                                     size="sm"
                                 >
                                     Go Add Activities
