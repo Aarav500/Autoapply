@@ -209,6 +209,9 @@ export const STORAGE_KEYS = {
     ACTIVITIES: 'activities',
     ACHIEVEMENTS: 'achievements',
 
+    // College-specific activities (added from recommendations)
+    COLLEGE_ACTIVITIES: 'college-activities',
+
     // Analytics
     ANALYTICS_EVENTS: 'analytics-events',
 
