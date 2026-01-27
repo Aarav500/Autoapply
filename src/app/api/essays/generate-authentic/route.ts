@@ -188,6 +188,74 @@ export async function POST(request: NextRequest) {
 
         console.log(`✅ Cleanup complete: ${finalWordCount} words, Score: ${adjustedScore}%`);
 
+        // AUTO-REGENERATION: If cleanup removed > 30% of content, regenerate with stricter temperature
+        const absoluteMin = Math.floor(essay.wordLimit * 0.7);
+        if (finalWordCount < absoluteMin) {
+            console.log(`\n🔄 RETRY TRIGGERED: Essay only ${finalWordCount}/${essay.wordLimit} words (${Math.round(finalWordCount/essay.wordLimit*100)}%)`);
+            console.log(`   Regenerating with temperature 0.2 for stricter adherence to rules...`);
+
+            try {
+                // Retry with much stricter temperature
+                const retryRawStory = await runCombinedDiscoveryExcavation(
+                    activities,
+                    achievements,
+                    transcript,
+                    userProfile,
+                    essay,
+                    apiKey,
+                    0.2  // Much stricter than default 0.3
+                );
+
+                const retryFinalEssay = await runShapingPhase(
+                    retryRawStory,
+                    college,
+                    essay,
+                    apiKey,
+                    0.1  // Extremely strict
+                );
+
+                const retryCleaned = aggressiveCleanup(retryFinalEssay.content, college.name, essay.wordLimit);
+                const retryWordCount = retryCleaned.split(/\s+/).length;
+
+                console.log(`✅ Retry complete: ${retryWordCount} words (${Math.round(retryWordCount/essay.wordLimit*100)}%)`);
+
+                // Use retry if it's better
+                if (retryWordCount >= finalWordCount && retryWordCount >= Math.floor(essay.wordLimit * 0.95)) {
+                    console.log(`   ✓ Using retry result (better word count)`);
+                    return NextResponse.json({
+                        success: true,
+                        essay: retryCleaned,
+                        wordCount: retryWordCount,
+                        scores: {
+                            ...retryFinalEssay.scores,
+                            overall: Math.min(retryFinalEssay.scores.overall, adjustedScore),
+                        },
+                        metadata: {
+                            ...retryFinalEssay.metadata,
+                            phasesDuration: {
+                                excavation: excavationDuration,
+                                shaping: shapingDuration,
+                                total: excavationDuration + shapingDuration,
+                            },
+                            systemVersion: '2.4-auto-retry',
+                            retryCount: 1,
+                            retryReason: 'Word count below 70% threshold after cleanup',
+                            rawStoryLength: retryRawStory.wordCount,
+                            compressionRatio: (retryRawStory.wordCount / retryWordCount).toFixed(2),
+                            cleanupApplied: true,
+                            cleanupWarnings: validateAuthenticity(retryCleaned, college.name),
+                            wordCountAccuracy: `${Math.round(retryWordCount/essay.wordLimit*100)}%`,
+                        },
+                    });
+                } else {
+                    console.log(`   ✗ Retry didn't improve word count, using original`);
+                }
+            } catch (retryError) {
+                console.error(`⚠️ Retry failed:`, retryError);
+                console.log(`   Falling back to original essay`);
+            }
+        }
+
         return NextResponse.json({
             success: true,
             essay: cleanedEssay,
@@ -203,7 +271,7 @@ export async function POST(request: NextRequest) {
                     shaping: shapingDuration,
                     total: excavationDuration + shapingDuration,
                 },
-                systemVersion: '2.3-nuclear-cleanup',
+                systemVersion: '2.4-temp-fix-auto-retry',
                 efficiencyGain: '33% faster (2 API calls vs 3)',
                 rawStoryLength: rawStory.wordCount,
                 compressionRatio: (rawStory.wordCount / finalEssay.wordCount).toFixed(2),
@@ -232,7 +300,8 @@ async function runCombinedDiscoveryExcavation(
     transcript: Transcript,
     userProfile: UserProfile,
     essay: Essay,
-    apiKey: string
+    apiKey: string,
+    temperature: number = 0.3  // Default to 0.3 for strict adherence
 ): Promise<RawStory> {
 
     // Sort activities by total hours to find what student invested in most
@@ -271,6 +340,19 @@ ORIGINAL PROMPT (SANITIZED): "${sanitizedPrompt}"
 
 Think of it this way: They don't want to hear "I want to work with Professor X" or "I'll contribute by doing Y."
 They want a STORY from your past that shows you're the kind of person who would naturally do those things.
+
+⚠️ YOUR OUTPUT WILL BE AUTOMATICALLY SCANNED AND REJECTED IF IT CONTAINS:
+- College name (any variation: Michigan, UMich, University of Michigan, etc.)
+- Professor names (e.g., "Professor Smith", "Dr. Johnson", "Professor Satinder Singh Baveja")
+- Program/lab names (e.g., "Multidisciplinary Design Program", "TechArb", "AI Lab", "research with X")
+- Future vision phrases (e.g., "I want to", "I will", "I'm excited to", "pursuing", "At [College], I")
+- Multiple activities (write about ONE story only, not 3-4 different projects like "retail crash + Olympiad + Daricha")
+- Essay language (e.g., "This experience taught me", "Throughout my journey", "I learned that")
+
+IF YOUR ESSAY IS REJECTED FOR CONTAINING FORBIDDEN CONTENT:
+- It will be automatically regenerated at lower temperature (0.2)
+- This wastes computational resources and time
+- Get it right the first time by following these rules strictly
 
 WORD TARGET: ${essay.wordLimit} words (aim for 100-110% of limit - shaping phase will trim to exact limit)
 
@@ -343,7 +425,7 @@ ${userProfile.background ? `Background: ${userProfile.background}` : ''}
 
 Find the most compelling story in this data and write it authentically.`;
 
-    const narrative = await callClaude(systemPrompt, userPrompt, apiKey, 0.8);
+    const narrative = await callClaude(systemPrompt, userPrompt, apiKey, temperature);  // Use passed temperature parameter
 
     const wordCount = narrative.split(/\s+/).length;
 
@@ -576,7 +658,8 @@ async function runShapingPhase(
     rawStory: RawStory,
     college: College,
     essay: Essay,
-    apiKey: string
+    apiKey: string,
+    temperature: number = 0.2  // Default to 0.2 for even stricter adherence
 ): Promise<FinalEssay> {
 
     const systemPrompt = `You are shaping a raw story into a college essay while preserving authenticity.
@@ -656,7 +739,7 @@ ${rawStory.narrative}
 
 Shape this for the prompt and word limit while preserving authenticity. Return JSON only.`;
 
-    const response = await callClaude(systemPrompt, userPrompt, apiKey, 0.6);
+    const response = await callClaude(systemPrompt, userPrompt, apiKey, temperature);  // Use passed temperature parameter
 
     // Parse JSON response
     try {
@@ -786,7 +869,8 @@ function aggressiveCleanup(essay: string, collegeName: string, wordLimit: number
         );
 
         // Check for professor/lab/program mentions (FORBIDDEN ANYWHERE)
-        const mentionsSpecifics = /Professor \w+|Multidisciplinary|Design Program|MDP's|research (with|in) \w+|Lab\b/i.test(para);
+        // Pattern matches 1-4 words after "Professor" to catch multi-word names like "Professor Satinder Singh Baveja"
+        const mentionsSpecifics = /Professor\s+(?:[\w]+\s+){0,3}[\w]+|Multidisciplinary|Design Program|MDP's|MDP|research (?:with|in|at) [\w\s]+|Lab\b|\w+ Lab\b/i.test(para);
 
         // Check for future-looking phrases (especially in last 50%)
         const inLatterHalf = index >= Math.floor(essayLength * 0.5);
