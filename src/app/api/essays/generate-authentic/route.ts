@@ -243,20 +243,28 @@ CRITICAL DISCOVERY QUESTIONS TO EXPLORE:
 THEN WRITE RAW STORY:
 - Focus on ONE deep story (not surface-level activity listing)
 - NO essay structure (no hook, no arc, no vision)
+- NO markdown headers or section titles (##, ###)
 - Just tell what happened, what you thought, what changed
 - Include mistakes, confusion, dead ends
-- Use numbers ONLY when they matter to the story
-- Write like explaining to a friend, not an admissions officer
+- Use numbers ONLY when they matter to the story (not for resume padding)
+- Write like you're texting a close friend about what happened - raw, unpolished, authentic
 
-FORBIDDEN:
-- Essay language: "This experience taught me...", "Throughout my journey..."
-- Forced transitions or bridge sentences
-- Artificial narrative structure
-- Admissions pandering
+ABSOLUTELY FORBIDDEN:
+- Markdown headers (##, ###) or section titles
+- Essay language: "This experience taught me...", "Throughout my journey...", "Let me be honest"
+- Forced transitions ("Meanwhile", "As a result", "Looking back")
+- Artificial narrative structure with distinct sections
+- Admissions pandering or "here's why I'm great" language
 - Listing multiple activities superficially
-- Ending with future vision paragraph
+- Ending with "This is why I want to attend X" or any future vision
+- Starting sections with philosophical statements or generalizations
 
-OUTPUT: ${Math.floor(essay.wordLimit * 0.85)}-${Math.floor(essay.wordLimit * 0.95)} words of raw, unstructured narrative focused on one compelling story.`;
+VOICE EXAMPLES (what it SHOULD sound like):
+- "I spent three weeks on this algorithm. Thought I had it. Then Professor Koutra said 'your proof is wrong' and I realized I'd been faking understanding."
+- "At 3 AM I got a text. Just three words: 'I trusted you.' My system recommended 50,000 winter coats. In July."
+- "The Romanian kid next to me won gold. He just drew diagrams. No fancy code. I went to his room that night. 'How?'"
+
+OUTPUT: ${Math.floor(essay.wordLimit * 0.85)}-${Math.floor(essay.wordLimit * 0.95)} words of raw narrative. NO sections, NO headers, ONE flowing story.`;
 
     const userPrompt = `STUDENT DATA:
 
@@ -512,39 +520,37 @@ async function runShapingPhase(
 
     const systemPrompt = `You are shaping a raw story into a college essay while preserving authenticity.
 
-YOUR MISSION: Make this fit the prompt and word limit WITHOUT making it sound like an AI essay.
+CRITICAL: This essay must NOT sound AI-generated. Admissions officers can detect formulaic essays immediately.
 
 PRESERVE AT ALL COSTS:
 - The authentic voice (don't make it sound "smarter" or more formal)
-- Specific details that make it real
+- Specific details that make it real (times, quotes, specific numbers that matter)
 - Moments of confusion, failure, uncertainty
 - Natural flow of thought
 - Conversational tone
 
+MANDATORY REMOVALS (these ALWAYS indicate AI writing):
+1. ALL markdown headers (##, ###, etc.) - Remove completely, no section titles
+2. Future vision paragraphs - NEVER end with "This is why I want to attend X" or "X will help me achieve..."
+3. Essay language phrases: "Let me be honest", "Here's what X", "The truth is", "This taught me that"
+4. Formulaic conclusions - NO wrapping up or summarizing at the end
+5. College name-dropping at the end - If college name appears in last 20% of essay, remove it
+6. Section-based structure - Should flow as ONE continuous narrative, not sections
+
 WHAT YOU CAN ADJUST:
-1. Trim to word limit (keep last complete sentence, no mid-sentence cuts)
+1. Trim to EXACTLY word limit (keep last complete sentence, no mid-sentence cuts)
 2. Fix obvious grammar errors (but keep natural sentence structure)
-3. Connect to college values IF it fits naturally (don't force it)
-4. Remove any AI clichés that slipped in ("throughout my journey", "this taught me", etc.)
-5. Light paragraph breaks for readability
+3. Remove paragraph breaks between short sections (max 3-4 paragraph breaks total)
+4. Remove any "transitions" between thoughts (let it jump naturally)
 
-WHAT YOU CANNOT DO:
-- Add fake college research or name-dropping
-- Force a "vision" section about the future
-- Change the voice to sound more "essay-like"
-- Add transitions that don't exist in the raw story
-- Make up details or experiences
-- Add a formulaic conclusion
+WHAT YOU ABSOLUTELY CANNOT DO:
+- Add ANY mention of the college unless it's already in the raw story
+- Add a "vision" section or conclusion paragraph
+- Make it sound more "essay-like" or polished
+- Add transitions that don't exist in raw story
+- Add formulaic endings
 
-COLLEGE FIT:
-College: ${college.name}
-Values: ${college.values.join(', ')}
-Culture: ${college.culture}
-What they look for: ${college.whatTheyLookFor.join(', ')}
-
-Only mention college-specific details if they NATURALLY connect to the story. Don't force it.
-
-WORD LIMIT: ${essay.wordLimit} words (strict - trim to last complete sentence if needed)
+WORD LIMIT: ${essay.wordLimit} words (strict - must hit this exactly by trimming at last complete sentence)
 
 OUTPUT FORMAT:
 {
