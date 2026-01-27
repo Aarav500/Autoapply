@@ -261,15 +261,24 @@ Count your words carefully. Essays over the limit will be REJECTED.
 🎨 NARRATIVE STRUCTURE:
 - Start in medias res (middle of action) - NO exposition
 - First sentence MUST be a specific moment/scene
-- Use the "zoom in" technique: specific moment → broader context → future
-- End with forward-looking connection to ${college.name}
-- NO summary paragraph or "In conclusion"
+- Focus on ONE story/experience - go DEEP not WIDE
+- Write about the PAST, not the future
+- End naturally when story ends - NO future vision paragraphs
+
+🚨 CRITICAL ANTI-SPAM RULES (WILL BE REJECTED IF VIOLATED):
+- DO NOT mention college name (${college.name}) in the essay body
+- DO NOT mention professor names, program names, lab names, course codes
+- DO NOT write "At ${college.name}, I will..." or "I'm excited to..."
+- DO NOT list multiple activities - pick ONE and tell that story deeply
+- ONE college mention is allowed ONLY in the final sentence as natural connection
+- If the prompt asks about future plans, answer by showing PAST experiences that reveal those qualities
 
 TARGET COLLEGE: ${college.name}
 Values: ${college.values.join(', ')}
 What they look for: ${college.whatTheyLookFor.join(', ')}
 Culture: ${college.culture}
-Notable programs: ${college.notablePrograms.join(', ')}
+
+NOTE: Understand these values to write stories that naturally align, but DO NOT explicitly mention them
 
 TONE: ${tone || 'confident, authentic, with moments of vulnerability'}
 
@@ -343,16 +352,22 @@ ${existingEssaysContext}
    - Show vulnerability and uncertainty
    - Have a subtle sense of humor
 
-5. COLLEGE CONNECTION: Mention ${college.name}'s specific programs/values, but naturally
-   - Don't force it or make it sound researched
-   - Connect YOUR experience to THEIR offerings
+5. FOCUS ON THE PAST: Write about experiences that ALREADY happened
+   - ❌ WRONG: "At ${college.name}, I'll work with Professor X on..."
+   - ✅ RIGHT: "At 3 AM I got a text. 'I trusted you.' My system had failed."
+   - Show your character through past actions, not future promises
 
-6. ACTIVITIES: Choose 1-2 activities maximum from the list above
-   - Focus on depth over breadth
-   - Tell ONE story well, don't list multiple activities
-   - Show specific moments, not summaries
+6. ONE STORY ONLY: Pick ONE activity/experience and go deep
+   - ❌ WRONG: "I did robotics, then debate, then volunteering, then..."
+   - ✅ RIGHT: "I spent three months debugging this one algorithm. Here's what happened."
+   - Focus on depth over breadth - one story reveals more than five summaries
 
-7. UNIQUENESS: Make this essay impossible for any other student to write
+7. NO COLLEGE SPAM: Do NOT mention college name, professors, programs, courses
+   - College name allowed ONLY in final sentence as natural connection
+   - Don't write "I want to work with Professor X" or "I'll take EECS 498"
+   - Show qualities that align with college values through past stories
+
+8. UNIQUENESS: Make this essay impossible for any other student to write
    - Include hyper-specific details only YOU would know
    - Tell a story only YOU can tell
 
@@ -433,6 +448,10 @@ You MUST use COMPLETELY DIFFERENT activities, stories, and examples. Be MORE cre
             console.log(`✂️ Trimmed essay to ${words.length} words`);
         }
 
+        // POST-PROCESSING: Remove college spam if AI ignored instructions
+        essay = cleanupCollegeSpam(essay, college.name, wordLimit);
+        words = essay.split(/\s+/).filter(w => w.length > 0);
+
         // POST-PROCESSING: Analyze essay quality
         const diversityAnalysis = calculateDiversityScore(essay);
         const aiDetection = detectAIPatterns(essay);
@@ -464,6 +483,93 @@ You MUST use COMPLETELY DIFFERENT activities, stories, and examples. Be MORE cre
             message: error instanceof Error ? error.message : 'Unknown error',
         }, { status: 500 });
     }
+}
+
+/**
+ * LIGHTWEIGHT CLEANUP: Remove college spam if AI ignored instructions
+ * Less aggressive than generate-authentic's cleanup
+ */
+function cleanupCollegeSpam(essay: string, collegeName: string, wordLimit: number): string {
+    let cleaned = essay;
+
+    // Build college name variations
+    const collegePatterns = [
+        collegeName,
+        collegeName.replace(/^U/, 'University of '),
+        collegeName.replace(/^U/, ''),
+    ];
+    if (collegeName === 'UMich') collegePatterns.push('Michigan', 'University of Michigan', 'U-M', 'UM');
+    if (collegeName === 'MIT') collegePatterns.push('Massachusetts Institute of Technology');
+    if (collegeName === 'CMU') collegePatterns.push('Carnegie Mellon', 'Carnegie Mellon University');
+    if (collegeName === 'Stanford') collegePatterns.push('Stanford University');
+
+    console.log(`🔍 Checking for college spam: ${collegePatterns.join(', ')}`);
+
+    // Split into paragraphs
+    const paragraphs = cleaned.split('\n\n').filter(p => p.trim().length > 0);
+    const lastParagraphIndex = paragraphs.length - 1;
+
+    // RULE 1: Remove paragraphs with college spam (EXCEPT last paragraph which can have one mention)
+    const filteredParagraphs = paragraphs.filter((para, index) => {
+        const isLastParagraph = index === lastParagraphIndex;
+
+        // Check for college name mentions
+        const collegeCount = collegePatterns.reduce((count, pattern) => {
+            const regex = new RegExp(pattern, 'gi');
+            return count + (para.match(regex) || []).length;
+        }, 0);
+
+        // Check for professor/program mentions
+        const hasProfessor = /Professor\s+[A-Z][a-z]+|Dr\.\s+[A-Z][a-z]+/i.test(para);
+        const hasProgram = /Lab\b|EECS\s+\d+|TechArb|Multidisciplinary Design/i.test(para);
+
+        // Check for pure future vision
+        const futureVisionCount = (para.match(/At\s+\w+,?\s+I(?:'ll|will)|I(?:'ll|will)\s+(?:work|study|contribute|pursue|learn)|Through\s+courses|partnerships\s+with/gi) || []).length;
+        const isPureFutureVision = futureVisionCount >= 2;
+
+        // Keep last paragraph even if it has ONE college mention (natural ending)
+        if (isLastParagraph && collegeCount <= 1 && !hasProfessor && !hasProgram && futureVisionCount <= 1) {
+            return true;
+        }
+
+        // Remove if has spam
+        if (collegeCount > 0 || hasProfessor || hasProgram || isPureFutureVision) {
+            console.log(`🗑️  Removed paragraph ${index + 1} (${collegeCount > 0 ? 'COLLEGE' : hasProfessor ? 'PROFESSOR' : hasProgram ? 'PROGRAM' : 'FUTURE VISION'})`);
+            console.log(`   Preview: "${para.substring(0, 100)}..."`);
+            return false;
+        }
+
+        return true;
+    });
+
+    cleaned = filteredParagraphs.join('\n\n');
+
+    // RULE 2: Remove sentences with obvious essay language
+    const essayLanguage = [
+        /This experience (completely )?changed[^.]*\./gi,
+        /I learned that[^.]*\./gi,
+        /Looking back[^.]*\./gi,
+        /Throughout my journey[^.]*\./gi,
+    ];
+
+    essayLanguage.forEach(pattern => {
+        cleaned = cleaned.replace(pattern, '');
+    });
+
+    // RULE 3: Check word count
+    const currentWords = cleaned.split(/\s+/).filter(w => w.length > 0).length;
+    const targetMin = Math.floor(wordLimit * 0.75);
+
+    if (currentWords < targetMin) {
+        console.log(`⚠️  Cleanup removed too much (${currentWords}/${wordLimit} words). Consider regenerating.`);
+    }
+
+    // Clean up whitespace
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
+
+    console.log(`✅ Cleanup complete: ${cleaned.split(/\s+/).filter(w => w.length > 0).length} words`);
+
+    return cleaned;
 }
 
 // GET endpoint to check which providers are available
