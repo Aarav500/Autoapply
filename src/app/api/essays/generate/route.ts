@@ -441,16 +441,35 @@ COUNT YOUR WORDS BEFORE RESPONDING. If over ${wordLimit}, CUT content IMMEDIATEL
 Begin writing the essay NOW. First sentence:`;
         }
 
-        // Call the AI with retry logic for duplication
+        // Call the AI with retry logic for duplication AND meta-commentary detection
         let essay: string;
         let attempt = 0;
         const maxAttempts = 3;
         let isDuplicate = false;
+        let isMetaCommentary = false;
+
+        // Define meta-commentary patterns to detect and reject
+        const metaCommentaryPatterns = [
+            /^I cannot provide/i,
+            /^I notice that/i,
+            /^To help you/i,
+            /^Could you please/i,
+            /^Please provide/i,
+            /^I would need/i,
+            /^Once you provide/i,
+            /^Please submit/i,
+            /^I can help you/i,
+            /^Here's the essay/i,
+            /^Let me write/i,
+            /no actual essay content was submitted/i,
+            /please provide your actual essay/i,
+            /submit your actual essay/i,
+        ];
 
         do {
             attempt++;
             if (attempt > 1) {
-                console.log(`⚠️ Attempt ${attempt}/${maxAttempts} - previous essay was too similar`);
+                console.log(`⚠️ Attempt ${attempt}/${maxAttempts} - ${isMetaCommentary ? 'previous response was meta-commentary' : 'previous essay was too similar'}`);
             }
 
             if (provider === 'claude') {
@@ -461,8 +480,36 @@ Begin writing the essay NOW. First sentence:`;
                 essay = await callOpenAI(apiKey, systemPrompt, userMessage, 0.7);
             }
 
-            // Check for duplication with existing essays
-            if (existingEssays && existingEssays.length > 0) {
+            // CRITICAL CHECK: Detect meta-commentary
+            isMetaCommentary = metaCommentaryPatterns.some(pattern => pattern.test(essay));
+
+            if (isMetaCommentary && attempt < maxAttempts) {
+                console.log(`🚨 CRITICAL: AI generated meta-commentary instead of essay. Regenerating with stronger instructions...`);
+                console.log(`   Preview: "${essay.substring(0, 150)}..."`);
+
+                // Add NUCLEAR-level instruction for next attempt
+                userMessage = userMessage.split('\n\n⚠️⚠️⚠️ CRITICAL')[0]; // Remove previous warnings
+                userMessage += `\n\n🚨🚨🚨 CRITICAL - PREVIOUS ATTEMPT FAILED:
+You generated meta-commentary like "I cannot provide..." or "Please submit..." instead of writing the actual essay.
+
+THIS IS ABSOLUTELY UNACCEPTABLE. Your response must be THE ESSAY ITSELF.
+
+DO NOT WRITE:
+- "I cannot provide..."
+- "Please submit your essay..."
+- "To help you write..."
+- ANY meta-text or commentary
+
+YOUR ENTIRE RESPONSE = THE ESSAY. Nothing else. Start with the first sentence of the story.`;
+
+                continue; // Skip duplication check, just retry
+            } else if (isMetaCommentary) {
+                console.log(`❌ CRITICAL ERROR: AI still generating meta-commentary after ${maxAttempts} attempts.`);
+                // Don't break - let it through and hope frontend handles it
+            }
+
+            // Check for duplication with existing essays (only if not meta-commentary)
+            if (!isMetaCommentary && existingEssays && existingEssays.length > 0) {
                 const dupCheck = checkForDuplication(essay, existingEssays, 40);
                 isDuplicate = dupCheck.isDuplicate;
 
@@ -479,7 +526,7 @@ You MUST use COMPLETELY DIFFERENT activities, stories, and examples. Be MORE cre
             } else {
                 isDuplicate = false; // No existing essays to compare
             }
-        } while (isDuplicate && attempt < maxAttempts);
+        } while ((isDuplicate || isMetaCommentary) && attempt < maxAttempts);
 
         // POST-PROCESSING: Trim essay if it exceeds word limit
         let words = essay.split(/\s+/).filter(w => w.length > 0);
