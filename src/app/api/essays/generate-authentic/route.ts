@@ -255,6 +255,11 @@ async function runCombinedDiscoveryExcavation(
     const systemPrompt = `You are writing an authentic college essay by excavating a student's real story.
 
 ESSAY PROMPT: "${essay.prompt}"
+
+⚠️ CRITICAL: Even if the prompt asks "how you will contribute" or "your future plans", IGNORE THAT PART.
+Write ONLY about the past. Tell a story that happened. NO future vision. NO college mentions.
+The admissions office wants to see WHO YOU ARE through a past story, not hear what you'll do for them.
+
 WORD TARGET: ${essay.wordLimit} words (aim for 100-110% of limit - shaping phase will trim to exact limit)
 
 YOUR MISSION - DO BOTH:
@@ -742,25 +747,46 @@ async function callClaude(
 function aggressiveCleanup(essay: string, collegeName: string, wordLimit: number): string {
     let cleaned = essay;
 
+    // Build comprehensive college name patterns (e.g., "UMich" -> also match "Michigan", "University of Michigan")
+    const collegePatterns = [
+        collegeName,
+        collegeName.replace(/^U/, 'University of '), // UMich -> University of Mich
+        collegeName.replace(/^U/, ''), // UMich -> Mich
+    ];
+    if (collegeName === 'UMich') collegePatterns.push('Michigan', 'University of Michigan');
+    if (collegeName === 'MIT') collegePatterns.push('Massachusetts Institute of Technology');
+    if (collegeName === 'CMU') collegePatterns.push('Carnegie Mellon');
+    // Add more as needed
+
+    console.log(`🔍 Checking for college names: ${collegePatterns.join(', ')}`);
+
     // Split into paragraphs
     const paragraphs = cleaned.split('\n\n').filter(p => p.trim().length > 0);
     const essayLength = paragraphs.length;
     const last30PercentStart = Math.floor(essayLength * 0.7); // Last 30%
 
-    // RULE 1: Remove last 30% if it mentions college name
-    let removedFutureVision = false;
+    console.log(`📊 Essay has ${essayLength} paragraphs, last 30% starts at paragraph ${last30PercentStart + 1}`);
+
+    // RULE 1: Remove last 30% if it mentions college name OR future vision
     const filteredParagraphs = paragraphs.filter((para, index) => {
         if (index >= last30PercentStart) {
-            // Check if paragraph mentions college or future-looking phrases
-            const hasFutureVision =
-                para.includes(collegeName) ||
-                /want to contribute|will help me|I want to|pursuing|at \w+,?\s+I/i.test(para) ||
-                /enrich the future|developing solutions|future plans/i.test(para) ||
-                /through \w+ mission|this approach.*how I want/i.test(para);
+            // Check if paragraph mentions ANY college name variation
+            const mentionsCollege = collegePatterns.some(pattern =>
+                para.includes(pattern) || para.toLowerCase().includes(pattern.toLowerCase())
+            );
 
-            if (hasFutureVision) {
-                console.log(`🗑️ Removed paragraph ${index + 1}/${essayLength} (future vision detected)`);
-                removedFutureVision = true;
+            // Check for future-looking phrases
+            const hasFutureVision =
+                mentionsCollege ||
+                /want to contribute|will help me|I want to|I'm excited to|looking forward to/i.test(para) ||
+                /pursuing|enrich the future|developing solutions|future plans/i.test(para) ||
+                /through \w+ mission|this approach.*how I want|can contribute to/i.test(para) ||
+                /Professor \w+|Multidisciplinary|Design Program|research (with|in)/i.test(para) || // Specific lab/program mentions
+                /At \w+,?\s+I/i.test(para); // "At Michigan, I..." pattern
+
+            if (hasFutureVision || mentionsCollege) {
+                console.log(`🗑️ REMOVED paragraph ${index + 1}/${essayLength} (${mentionsCollege ? 'college mention' : 'future vision'})`);
+                console.log(`   Preview: "${para.substring(0, 100)}..."`);
                 return false;
             }
         }
@@ -769,26 +795,38 @@ function aggressiveCleanup(essay: string, collegeName: string, wordLimit: number
 
     cleaned = filteredParagraphs.join('\n\n');
 
-    // RULE 2: Remove essay language phrases
+    console.log(`📝 After paragraph filtering: ${cleaned.split('\n\n').length} paragraphs remain`);
+
+    // RULE 2: Remove entire sentences with essay language (not just phrases)
     const essayPhrases = [
-        /This experience (completely )?changed (how|the way) I think/gi,
-        /I learned that/gi,
-        /Now when I approach/gi,
-        /This is what .+ means to me/gi,
-        /Throughout my journey/gi,
-        /Let me be honest/gi,
-        /The truth is/gi,
-        /Here's what/gi,
-        /Looking back/gi,
+        /This experience (completely )?changed (how|the way) I think[^.]*\./gi,
+        /This shift influenced everything[^.]*\./gi,
+        /I learned that[^.]*\./gi,
+        /Now when I approach[^.]*\./gi,
+        /This is what .+ means to me[^.]*\./gi,
+        /Throughout my journey[^.]*\./gi,
+        /Let me be honest[^.]*\./gi,
+        /The truth is[^.]*\./gi,
+        /Here's what[^.]*\./gi,
+        /Looking back[^.]*\./gi,
+        /After .+, I realized that[^.]*\./gi,
+        /true (technical )?leadership means[^.]*\./gi,
+        /true citizenship means[^.]*\./gi,
     ];
 
+    let removalCount = 0;
     essayPhrases.forEach(pattern => {
-        if (pattern.test(cleaned)) {
-            console.log(`🗑️ Removed essay language: ${pattern.source}`);
+        const matches = cleaned.match(pattern);
+        if (matches) {
+            console.log(`🗑️ Removing ${matches.length} sentence(s) with essay language: "${matches[0].substring(0, 80)}..."`);
+            removalCount += matches.length;
         }
-        // Replace with empty string, but keep sentence structure
         cleaned = cleaned.replace(pattern, '');
     });
+
+    if (removalCount > 0) {
+        console.log(`✂️ Removed ${removalCount} essay language sentences`);
+    }
 
     // RULE 3: Remove markdown headers
     cleaned = cleaned.replace(/^#+\s+.+$/gm, '');
@@ -808,20 +846,34 @@ function aggressiveCleanup(essay: string, collegeName: string, wordLimit: number
         cleaned = kept.join('\n\n');
     }
 
-    // RULE 5: Trim to word limit if over
-    const words = cleaned.split(/\s+/);
-    if (words.length > wordLimit) {
-        console.log(`✂️ Trimming from ${words.length} to ${wordLimit} words`);
-        cleaned = words.slice(0, wordLimit).join(' ');
+    // RULE 5: If essay is still too short after cleanup, pad warning
+    const currentWords = cleaned.split(/\s+/).length;
+    const targetMin = Math.floor(wordLimit * 0.95);
+    const targetMax = Math.floor(wordLimit * 1.05);
+
+    if (currentWords < targetMin) {
+        console.log(`⚠️ WARNING: Essay only ${currentWords} words (target: ${targetMin}-${targetMax})`);
+    } else if (currentWords > targetMax) {
+        console.log(`✂️ Trimming from ${currentWords} to ${targetMax} words`);
+        const words = cleaned.split(/\s+/);
+        cleaned = words.slice(0, targetMax).join(' ');
         // End at last complete sentence
         const lastPeriod = cleaned.lastIndexOf('.');
-        if (lastPeriod > wordLimit * 0.9) {
+        if (lastPeriod > targetMax * 0.9) {
             cleaned = cleaned.substring(0, lastPeriod + 1);
         }
     }
 
     // Clean up extra whitespace
     cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
+
+    // Final check: Count how many times "system", "program", "project", "platform" appear
+    const activityMentions = (cleaned.match(/\b(platform|system|program|project|research)\b/gi) || []).length;
+    if (activityMentions >= 5) {
+        console.log(`⚠️ WARNING: Essay still mentions ${activityMentions} different projects (too scattered)`);
+    }
+
+    console.log(`✅ Cleanup complete: ${cleaned.split(/\s+/).length} words, ${cleaned.split('\n\n').length} paragraphs`);
 
     return cleaned;
 }
