@@ -128,7 +128,18 @@ export async function POST(request: NextRequest) {
         const { prompt, essayTitle, college, activities, achievements, wordLimit, tone, major, goals, previousFeedback, previousDraft, existingEssays } = body;
 
         // Detect if this is an improvement iteration
-        const isImprovement = previousFeedback && previousDraft;
+        // CRITICAL: Validate that previousDraft is a real essay (not placeholder/empty)
+        const hasMeaningfulDraft = previousDraft && previousDraft.trim().length > 50 &&
+            !previousDraft.toLowerCase().includes('submit your') &&
+            !previousDraft.toLowerCase().includes('please provide') &&
+            previousDraft.split(/\s+/).filter(w => w.length > 0).length >= 50;
+
+        const isImprovement = previousFeedback && hasMeaningfulDraft;
+
+        if (previousFeedback && !hasMeaningfulDraft) {
+            console.log('⚠️  WARNING: previousFeedback exists but draft is empty/placeholder. Generating NEW essay instead.');
+        }
+
         if (isImprovement) {
             console.log('📝 This is an IMPROVEMENT iteration with previous feedback');
         }
