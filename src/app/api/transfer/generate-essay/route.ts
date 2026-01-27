@@ -165,12 +165,13 @@ ${coursesStr}
 
 export async function POST(request: NextRequest) {
     try {
-        const body: GenerateEssayRequest & { useAuthentic?: boolean } = await request.json();
-        const { college, essay, activities, achievements, transcript, userProfile, useAuthentic } = body;
+        const body: GenerateEssayRequest & { useLegacy?: boolean } = await request.json();
+        const { college, essay, activities, achievements, transcript, userProfile, useLegacy } = body;
 
-        // 🎯 NEW: Use authentic essay generation system if requested
-        if (useAuthentic) {
-            console.log('🎯 Using NEW Authentic Essay Generation System');
+        // 🎯 DEFAULT: Use authentic essay generation system (v2.0-optimized)
+        // Only use legacy system if explicitly requested with useLegacy=true
+        if (!useLegacy) {
+            console.log('🎯 Using Authentic Essay Generation System (v2.0-optimized) - DEFAULT');
             const authenticResponse = await fetch(new URL('/api/essays/generate-authentic', request.url), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -191,7 +192,7 @@ export async function POST(request: NextRequest) {
 
             const result = await authenticResponse.json();
 
-            // Format response to match old API format for compatibility
+            // Format response to match expected API format
             return NextResponse.json({
                 success: true,
                 essay: result.essay,
@@ -200,12 +201,13 @@ export async function POST(request: NextRequest) {
                 metadata: {
                     ...result.metadata,
                     scores: result.scores,
-                    generationMethod: 'authentic',
+                    generationMethod: 'authentic-v2-default',
                 },
             });
         }
 
-        // LEGACY: Original essay generation system
+        // LEGACY: Original essay generation system (DEPRECATED - only if useLegacy=true)
+        console.log('⚠️ Using LEGACY Essay Generation System (deprecated)');
         const claudeKey = getClaudeKey();
 
         if (!claudeKey) {
