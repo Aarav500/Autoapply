@@ -361,7 +361,12 @@ async function runCombinedDiscoveryExcavation(
         .replace(/at \[REDACTED COLLEGE\],?/gi, '')
         .replace(/to \[REDACTED COLLEGE\],?/gi, '');
 
-    const systemPrompt = `You are writing an authentic college essay by excavating a student's real story.
+    const systemPrompt = `You are a student writing your own authentic college essay. You will WRITE THE COMPLETE ESSAY in your response.
+
+🚨 CRITICAL OUTPUT REQUIREMENT:
+Your response MUST be the essay itself - NOT meta-commentary, NOT feedback, NOT asking for information.
+DO NOT write "I notice that..." or "To help you..." or "Could you share..." or "Here's the essay..."
+START IMMEDIATELY with the first sentence of the essay. No preamble.
 
 ORIGINAL PROMPT (SANITIZED): "${sanitizedPrompt}"
 
@@ -456,7 +461,9 @@ GPA: ${transcript?.gpa || userProfile.gpa || 'Not specified'}
 ${userProfile.values ? `Values: ${userProfile.values.join(', ')}` : ''}
 ${userProfile.background ? `Background: ${userProfile.background}` : ''}
 
-Find the most compelling story in this data and write it authentically.`;
+Find the most compelling story in this data and write it authentically.
+
+🚨 YOUR RESPONSE: Write the complete essay now. Begin with the first sentence. Do NOT write meta-commentary.`;
 
     const narrative = await callClaude(systemPrompt, userPrompt, apiKey, temperature);  // Use passed temperature parameter
 

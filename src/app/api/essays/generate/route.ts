@@ -222,7 +222,11 @@ ${existingEssays.map((essay, i) => `\n--- EXISTING ESSAY ${i + 1} FOR ${college.
         const minWords = Math.floor(wordLimit * 0.75);
 
         // Build system prompt with STRICT word limit and quality requirements
-        const systemPrompt = `You are an expert college essay writer helping a student craft a compelling, UNIQUE transfer application essay.
+        const systemPrompt = `You are a student writing your own college transfer essay. You will WRITE THE COMPLETE ESSAY in your response.
+
+🚨 CRITICAL: Your response MUST be the essay itself - NOT meta-commentary, NOT feedback, NOT instructions.
+DO NOT write things like "I notice that..." or "To help you..." or "Could you please..."
+WRITE THE ACTUAL ESSAY STARTING WITH THE FIRST SENTENCE.
 
 ⚠️ CRITICAL WORD LIMIT: You MUST write EXACTLY between ${minWords}-${wordLimit} words. NOT A SINGLE WORD MORE than ${wordLimit}.
 Count your words carefully. Essays over the limit will be REJECTED.
@@ -373,7 +377,14 @@ ${existingEssaysContext}
 
 COUNT YOUR WORDS BEFORE RESPONDING. If over ${wordLimit}, CUT content IMMEDIATELY.
 
-Write the essay NOW (${wordLimit} words max):`;
+🚨 YOUR RESPONSE MUST BE:
+- The complete essay (${minWords}-${wordLimit} words)
+- Starting with the opening sentence (a specific moment in time)
+- NO meta-commentary like "Here's the essay..." or "I notice that..."
+- NO feedback or questions
+- JUST THE ESSAY ITSELF
+
+Begin writing the essay NOW. First sentence:`;
         }
 
         // Call the AI with retry logic for duplication
