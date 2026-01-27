@@ -227,7 +227,7 @@ async function runCombinedDiscoveryExcavation(
     const systemPrompt = `You are writing an authentic college essay by excavating a student's real story.
 
 ESSAY PROMPT: "${essay.prompt}"
-WORD TARGET: ${essay.wordLimit} words (aim for 80-90% of limit in raw form)
+WORD TARGET: ${essay.wordLimit} words (aim for 100-110% of limit - shaping phase will trim to exact limit)
 
 YOUR MISSION - DO BOTH:
 1. DISCOVER what's genuinely interesting about this student (pivots, contradictions, surprises, omissions)
@@ -264,7 +264,7 @@ VOICE EXAMPLES (what it SHOULD sound like):
 - "At 3 AM I got a text. Just three words: 'I trusted you.' My system recommended 50,000 winter coats. In July."
 - "The Romanian kid next to me won gold. He just drew diagrams. No fancy code. I went to his room that night. 'How?'"
 
-OUTPUT: ${Math.floor(essay.wordLimit * 0.85)}-${Math.floor(essay.wordLimit * 0.95)} words of raw narrative. NO sections, NO headers, ONE flowing story.`;
+OUTPUT: ${Math.floor(essay.wordLimit * 1.0)}-${Math.floor(essay.wordLimit * 1.1)} words of raw narrative. NO sections, NO headers, ONE flowing story.`;
 
     const userPrompt = `STUDENT DATA:
 
@@ -531,11 +531,18 @@ PRESERVE AT ALL COSTS:
 
 MANDATORY REMOVALS (these ALWAYS indicate AI writing):
 1. ALL markdown headers (##, ###, etc.) - Remove completely, no section titles
-2. Future vision paragraphs - NEVER end with "This is why I want to attend X" or "X will help me achieve..."
-3. Essay language phrases: "Let me be honest", "Here's what X", "The truth is", "This taught me that"
-4. Formulaic conclusions - NO wrapping up or summarizing at the end
-5. College name-dropping at the end - If college name appears in last 20% of essay, remove it
+2. Future vision paragraphs - CRITICAL: Remove ANY paragraph mentioning:
+   - "This is why I want to attend X"
+   - "X will help me achieve..."
+   - "I want to contribute..."
+   - "developing solutions", "enrich the future", "pursue X at [college]"
+   - ANY forward-looking statement about college or career goals
+   - Rule: If last 30% of essay mentions college name OR future goals, DELETE that entire section
+3. Essay language phrases: "Let me be honest", "Here's what X", "The truth is", "This taught me that", "Throughout my journey"
+4. Formulaic conclusions - NO wrapping up or summarizing at the end. Essay should END mid-story or mid-thought
+5. College name-dropping - If college name appears ANYWHERE in last 30% of essay, remove entire paragraph containing it
 6. Section-based structure - Should flow as ONE continuous narrative, not sections
+7. Multiple activity listing - If essay mentions 3+ different activities, it's too broad. Focus on ONE story only.
 
 WHAT YOU CAN ADJUST:
 1. Trim to EXACTLY word limit (keep last complete sentence, no mid-sentence cuts)
