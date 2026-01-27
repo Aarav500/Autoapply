@@ -166,11 +166,36 @@ export async function POST(request: NextRequest) {
         console.log(`✅ Shaping complete (${shapingDuration}ms): ${finalEssay.wordCount} words`);
         console.log(`🎯 Overall Score: ${finalEssay.scores.overall}%`);
 
+        // PHASE 4: AGGRESSIVE AI TELL CLEANUP (PROGRAMMATIC)
+        console.log('\n📍 Phase 4: AI Tell Cleanup & Validation...');
+        const cleanedEssay = aggressiveCleanup(finalEssay.content, college.name, essay.wordLimit);
+        const cleanupWarnings = validateAuthenticity(cleanedEssay, college.name);
+
+        if (cleanupWarnings.length > 0) {
+            console.log('⚠️ Cleanup warnings:', cleanupWarnings);
+        }
+
+        // Recalculate scores after cleanup
+        const finalWordCount = cleanedEssay.split(/\s+/).length;
+        const wordCountAccuracy = Math.round((finalWordCount / essay.wordLimit) * 100);
+
+        // Penalize score if word count is off
+        let adjustedScore = finalEssay.scores.overall;
+        if (wordCountAccuracy < 95 || wordCountAccuracy > 105) {
+            adjustedScore = Math.round(adjustedScore * 0.95);
+            console.log(`⚠️ Word count penalty: ${wordCountAccuracy}% of target (${finalWordCount}/${essay.wordLimit})`);
+        }
+
+        console.log(`✅ Cleanup complete: ${finalWordCount} words, Score: ${adjustedScore}%`);
+
         return NextResponse.json({
             success: true,
-            essay: finalEssay.content,
-            wordCount: finalEssay.wordCount,
-            scores: finalEssay.scores,
+            essay: cleanedEssay,
+            wordCount: finalWordCount,
+            scores: {
+                ...finalEssay.scores,
+                overall: adjustedScore,
+            },
             metadata: {
                 ...finalEssay.metadata,
                 phasesDuration: {
@@ -178,10 +203,13 @@ export async function POST(request: NextRequest) {
                     shaping: shapingDuration,
                     total: excavationDuration + shapingDuration,
                 },
-                systemVersion: '2.0-optimized',
+                systemVersion: '2.1-aggressive-cleanup',
                 efficiencyGain: '33% faster (2 API calls vs 3)',
                 rawStoryLength: rawStory.wordCount,
                 compressionRatio: (rawStory.wordCount / finalEssay.wordCount).toFixed(2),
+                cleanupApplied: true,
+                cleanupWarnings,
+                wordCountAccuracy: `${wordCountAccuracy}%`,
             },
         });
 
@@ -240,24 +268,40 @@ CRITICAL DISCOVERY QUESTIONS TO EXPLORE:
 - What's missing? (What they DIDN'T do that you'd expect)
 - What reveals values? (Chose X over Y - why?)
 
-THEN WRITE RAW STORY:
-- Focus on ONE deep story (not surface-level activity listing)
-- NO essay structure (no hook, no arc, no vision)
-- NO markdown headers or section titles (##, ###)
-- Just tell what happened, what you thought, what changed
-- Include mistakes, confusion, dead ends
-- Use numbers ONLY when they matter to the story (not for resume padding)
-- Write like you're texting a close friend about what happened - raw, unpolished, authentic
+THEN WRITE RAW STORY - CRITICAL CONSTRAINTS:
 
-ABSOLUTELY FORBIDDEN:
+1. **ONE STORY ONLY**: Pick ONE activity, ONE moment, ONE experience. Go DEEP not WIDE.
+   - BAD: "I did quantum computing, then F1 platform, then community work..."
+   - GOOD: "I spent three months on this one algorithm. Here's what happened."
+
+2. **NO COLLEGE MENTION**: Do NOT mention the college name anywhere in the story. Not even once.
+   - This is a story about YOUR past, not your future at their school
+
+3. **NO ESSAY STRUCTURE**:
+   - NO hook-crisis-resolution arc
+   - NO markdown headers (##, ###)
+   - NO distinct sections with transitions
+   - Just tell what happened, linearly, like texting a friend
+
+4. **NO FUTURE VISION**:
+   - Story ends when it ends, not with "and this is why I want to..."
+   - NO "I want to contribute/pursue/develop/enrich" language
+   - End mid-thought or mid-story if that's authentic
+
+5. **VOICE**: Raw, conversational, unpolished
+   - Use numbers ONLY when they matter to the story
+   - Include mistakes, confusion, dead ends
+   - "I thought X but actually Y"
+
+ABSOLUTELY FORBIDDEN (WILL FAIL IF PRESENT):
 - Markdown headers (##, ###) or section titles
-- Essay language: "This experience taught me...", "Throughout my journey...", "Let me be honest"
-- Forced transitions ("Meanwhile", "As a result", "Looking back")
-- Artificial narrative structure with distinct sections
-- Admissions pandering or "here's why I'm great" language
-- Listing multiple activities superficially
-- Ending with "This is why I want to attend X" or any future vision
-- Starting sections with philosophical statements or generalizations
+- Essay language: "This experience taught me", "Throughout my journey", "I learned that"
+- College name or any mention of applying to college
+- Forced transitions ("Meanwhile", "As a result", "Looking back", "Now when I")
+- Multiple activities listed (pick ONE story only)
+- Ending with future plans/vision ("I want to", "I will", "pursuing")
+- Starting with philosophical statements
+- More than 4 paragraph breaks (should flow as 3-5 paragraphs maximum)
 
 VOICE EXAMPLES (what it SHOULD sound like):
 - "I spent three weeks on this algorithm. Thought I had it. Then Professor Koutra said 'your proof is wrong' and I realized I'd been faking understanding."
@@ -557,7 +601,21 @@ WHAT YOU ABSOLUTELY CANNOT DO:
 - Add transitions that don't exist in raw story
 - Add formulaic endings
 
-WORD LIMIT: ${essay.wordLimit} words (strict - must hit this exactly by trimming at last complete sentence)
+WORD LIMIT: ${essay.wordLimit} words (strict - must hit 95-100% of limit)
+
+EXAMPLES OF BAD VS GOOD ENDINGS:
+
+❌ BAD (sounds AI-generated):
+"This experience taught me that effective leadership means combining technical innovation with human understanding. At Michigan, I want to contribute to developing solutions that enrich the future through the Multidisciplinary Design Program and Professor X's lab, where I can apply these lessons to real-world challenges."
+
+✅ GOOD (authentic):
+"The inventory manager still uses my system. Last week she texted me: 'Your algorithm said 200 units. I ordered 150 anyway. The supplier was late again.' She was right. I texted back: 'Next version, you train the algorithm on supplier reliability.' She replied with a thumbs up emoji."
+
+❌ BAD (multiple activities):
+"My quantum optimization work taught me about real-world constraints. The F1 platform showed me prediction challenges. The community program demonstrated AI's social impact. Now I understand how to build technology that serves people."
+
+✅ GOOD (one deep story):
+"I spent three months debugging that Black Friday crash. Turns out the problem wasn't the quantum computing or the fancy algorithms. It was that I never asked the inventory manager what she actually needed. I just assumed I knew better."
 
 OUTPUT FORMAT:
 {
@@ -675,6 +733,143 @@ async function callClaude(
 
     const data = await response.json();
     return data.content[0].text;
+}
+
+/**
+ * AGGRESSIVE CLEANUP: Programmatically remove AI tells
+ * This runs AFTER Claude shaping to forcibly remove patterns Claude keeps including
+ */
+function aggressiveCleanup(essay: string, collegeName: string, wordLimit: number): string {
+    let cleaned = essay;
+
+    // Split into paragraphs
+    const paragraphs = cleaned.split('\n\n').filter(p => p.trim().length > 0);
+    const essayLength = paragraphs.length;
+    const last30PercentStart = Math.floor(essayLength * 0.7); // Last 30%
+
+    // RULE 1: Remove last 30% if it mentions college name
+    let removedFutureVision = false;
+    const filteredParagraphs = paragraphs.filter((para, index) => {
+        if (index >= last30PercentStart) {
+            // Check if paragraph mentions college or future-looking phrases
+            const hasFutureVision =
+                para.includes(collegeName) ||
+                /want to contribute|will help me|I want to|pursuing|at \w+,?\s+I/i.test(para) ||
+                /enrich the future|developing solutions|future plans/i.test(para) ||
+                /through \w+ mission|this approach.*how I want/i.test(para);
+
+            if (hasFutureVision) {
+                console.log(`🗑️ Removed paragraph ${index + 1}/${essayLength} (future vision detected)`);
+                removedFutureVision = true;
+                return false;
+            }
+        }
+        return true;
+    });
+
+    cleaned = filteredParagraphs.join('\n\n');
+
+    // RULE 2: Remove essay language phrases
+    const essayPhrases = [
+        /This experience (completely )?changed (how|the way) I think/gi,
+        /I learned that/gi,
+        /Now when I approach/gi,
+        /This is what .+ means to me/gi,
+        /Throughout my journey/gi,
+        /Let me be honest/gi,
+        /The truth is/gi,
+        /Here's what/gi,
+        /Looking back/gi,
+    ];
+
+    essayPhrases.forEach(pattern => {
+        if (pattern.test(cleaned)) {
+            console.log(`🗑️ Removed essay language: ${pattern.source}`);
+        }
+        // Replace with empty string, but keep sentence structure
+        cleaned = cleaned.replace(pattern, '');
+    });
+
+    // RULE 3: Remove markdown headers
+    cleaned = cleaned.replace(/^#+\s+.+$/gm, '');
+
+    // RULE 4: Clean up excessive paragraph breaks (max 4 breaks = 5 paragraphs)
+    const finalParagraphs = cleaned.split('\n\n').filter(p => p.trim().length > 0);
+    if (finalParagraphs.length > 5) {
+        console.log(`📝 Reducing paragraph breaks from ${finalParagraphs.length} to 5`);
+        // Keep first 2, last 1, distribute rest evenly
+        const kept = [
+            finalParagraphs[0],
+            finalParagraphs[1],
+            finalParagraphs[Math.floor(finalParagraphs.length / 2)],
+            finalParagraphs[Math.floor(finalParagraphs.length * 0.75)],
+            finalParagraphs[finalParagraphs.length - 1],
+        ];
+        cleaned = kept.join('\n\n');
+    }
+
+    // RULE 5: Trim to word limit if over
+    const words = cleaned.split(/\s+/);
+    if (words.length > wordLimit) {
+        console.log(`✂️ Trimming from ${words.length} to ${wordLimit} words`);
+        cleaned = words.slice(0, wordLimit).join(' ');
+        // End at last complete sentence
+        const lastPeriod = cleaned.lastIndexOf('.');
+        if (lastPeriod > wordLimit * 0.9) {
+            cleaned = cleaned.substring(0, lastPeriod + 1);
+        }
+    }
+
+    // Clean up extra whitespace
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
+
+    return cleaned;
+}
+
+/**
+ * VALIDATE AUTHENTICITY: Check for remaining AI tells
+ */
+function validateAuthenticity(essay: string, collegeName: string): string[] {
+    const warnings: string[] = [];
+
+    // Check 1: College name in essay
+    if (essay.includes(collegeName)) {
+        const position = essay.indexOf(collegeName);
+        const percentThrough = (position / essay.length) * 100;
+        warnings.push(`College name appears at ${Math.round(percentThrough)}% through essay`);
+    }
+
+    // Check 2: Multiple activities mentioned
+    const activityCount = (essay.match(/\b(platform|system|program|project|research)\b/gi) || []).length;
+    if (activityCount >= 4) {
+        warnings.push(`Essay mentions ${activityCount} different projects (may be too scattered)`);
+    }
+
+    // Check 3: Word count vs target
+    const wordCount = essay.split(/\s+/).length;
+
+    // Check 4: Essay language remaining
+    const essayLanguagePatterns = [
+        'I learned',
+        'taught me',
+        'this experience',
+        'looking back',
+        'throughout',
+    ];
+    const foundPatterns = essayLanguagePatterns.filter(pattern =>
+        essay.toLowerCase().includes(pattern.toLowerCase())
+    );
+    if (foundPatterns.length > 0) {
+        warnings.push(`Essay language found: ${foundPatterns.join(', ')}`);
+    }
+
+    // Check 5: Paragraph structure
+    const paragraphCount = essay.split('\n\n').filter(p => p.trim().length > 0).length;
+    if (paragraphCount > 5) {
+        warnings.push(`${paragraphCount} paragraphs (should be ≤5 for natural flow)`);
+    }
+
+    return warnings;
 }
 
 /**
