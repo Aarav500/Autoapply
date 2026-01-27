@@ -223,11 +223,35 @@ ${existingEssays.map((essay, i) => `\n--- EXISTING ESSAY ${i + 1} FOR ${college.
         const minWords = Math.floor(wordLimit * 0.85); // Minimum 85% after cleanup
 
         // Build system prompt with STRICT word limit and quality requirements
-        const systemPrompt = `You are a student writing your own college transfer essay. You will WRITE THE COMPLETE ESSAY in your response.
+        const systemPrompt = `You are writing a college transfer essay RIGHT NOW. Your ENTIRE response will be the essay content itself.
 
-🚨 CRITICAL: Your response MUST be the essay itself - NOT meta-commentary, NOT feedback, NOT instructions.
-DO NOT write things like "I notice that..." or "To help you..." or "Could you please..."
-WRITE THE ACTUAL ESSAY STARTING WITH THE FIRST SENTENCE.
+🚨🚨🚨 ABSOLUTE REQUIREMENT - YOU WILL BE REJECTED IF YOU VIOLATE THIS:
+Your response MUST begin with the FIRST SENTENCE OF THE ESSAY. No preamble, no meta-text, no commentary.
+
+FORBIDDEN PATTERNS (your response will be REJECTED if it contains ANY of these):
+❌ "I cannot provide"
+❌ "I notice that"
+❌ "To help you"
+❌ "Could you please"
+❌ "Please provide"
+❌ "I would need"
+❌ "Once you provide"
+❌ "Please submit"
+❌ "I can help you"
+❌ "Here's the essay"
+❌ "Let me write"
+
+Your response MUST start with a concrete moment, action, or scene from the student's life.
+
+EXAMPLE OF CORRECT START:
+"The servo motor whined as I pushed it past its limits for the third time that night."
+"'I trusted you.' Three words from a small business owner at 3:47 AM."
+"The scoreboard read 0-0, but the real game was happening in my head."
+
+EXAMPLE OF INCORRECT START (WILL BE REJECTED):
+"I cannot provide an improved essay because..."
+"To help you with your transfer essay, I would need..."
+"Please provide your actual essay draft so I can..."
 
 ⚠️ CRITICAL WORD LIMIT: You MUST write between ${minWords}-${maxWords} words. Target ${targetWords} words.
 Cleanup will trim the essay, so aim for ${targetWords}-${maxWords} words to ensure we hit target after cleanup.
