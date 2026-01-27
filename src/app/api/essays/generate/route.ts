@@ -217,9 +217,10 @@ ${existingEssays.map((essay, i) => `\n--- EXISTING ESSAY ${i + 1} FOR ${college.
 `;
         }
 
-        // Calculate target word count (aim for 90% of limit to leave buffer)
-        const targetWords = Math.floor(wordLimit * 0.9);
-        const minWords = Math.floor(wordLimit * 0.75);
+        // Calculate target word count (aim for 100-105% so cleanup brings us to 90%+)
+        const targetWords = Math.floor(wordLimit * 1.0); // Target 100% of limit
+        const maxWords = Math.floor(wordLimit * 1.05); // Allow up to 105%
+        const minWords = Math.floor(wordLimit * 0.85); // Minimum 85% after cleanup
 
         // Build system prompt with STRICT word limit and quality requirements
         const systemPrompt = `You are a student writing your own college transfer essay. You will WRITE THE COMPLETE ESSAY in your response.
@@ -228,8 +229,9 @@ ${existingEssays.map((essay, i) => `\n--- EXISTING ESSAY ${i + 1} FOR ${college.
 DO NOT write things like "I notice that..." or "To help you..." or "Could you please..."
 WRITE THE ACTUAL ESSAY STARTING WITH THE FIRST SENTENCE.
 
-⚠️ CRITICAL WORD LIMIT: You MUST write EXACTLY between ${minWords}-${wordLimit} words. NOT A SINGLE WORD MORE than ${wordLimit}.
-Count your words carefully. Essays over the limit will be REJECTED.
+⚠️ CRITICAL WORD LIMIT: You MUST write between ${minWords}-${maxWords} words. Target ${targetWords} words.
+Cleanup will trim the essay, so aim for ${targetWords}-${maxWords} words to ensure we hit target after cleanup.
+Count your words carefully.
 
 🎯 AUTHENTICITY REQUIREMENTS (This MUST sound like a real 17-18 year old wrote it):
 - Write in first person with natural, conversational voice
@@ -275,7 +277,15 @@ Count your words carefully. Essays over the limit will be REJECTED.
 - DO NOT write "At ${college.name}, I will..." or "I'm excited to..."
 - DO NOT list multiple activities - pick ONE and tell that story deeply
 - ONE college mention is allowed ONLY in the final sentence as natural connection
-- If the prompt asks about future plans, answer by showing PAST experiences that reveal those qualities
+
+⚠️ IF PROMPT ASKS ABOUT "OBJECTIVES" OR "FUTURE PLANS":
+Answer by showing PAST experiences that reveal what you value, not by listing future plans.
+- ❌ WRONG: "My objective is to work with Professor X on Y research"
+- ❌ WRONG: "I hope to take EECS 498 and join the Z lab"
+- ✅ RIGHT: Tell a story from your past that shows you care about that thing
+- ✅ RIGHT: Let the story speak for itself - don't explain "this is why I want X"
+
+Example: Instead of "I want to study AI ethics" → Tell story about the retail crash where your AI failed and you learned ethics matters
 
 TARGET COLLEGE: ${college.name}
 Values: ${college.values.join(', ')}
@@ -338,7 +348,7 @@ ${existingEssaysContext}
 
 ⚠️ CRITICAL INSTRUCTIONS:
 
-1. WORD LIMIT: MAXIMUM ${wordLimit} words. Aim for ${targetWords} words. COUNT CAREFULLY.
+1. WORD LIMIT: Aim for ${targetWords}-${maxWords} words (cleanup will trim to final limit). COUNT CAREFULLY.
 
 2. OPENING: Start with a specific moment in time. NO background/exposition.
    ✅ Good: "The servo motor whined as I pushed it past its limits for the third time that night."
@@ -375,14 +385,23 @@ ${existingEssaysContext}
    - Include hyper-specific details only YOU would know
    - Tell a story only YOU can tell
 
+9. IF PROMPT MENTIONS "OBJECTIVES" OR "HOPES TO ACHIEVE":
+   This is a TRAP. DO NOT write about future plans. Instead:
+   - Write about PAST experiences that show what you value
+   - Example: Prompt asks "objectives" → Write about past failure that taught you what matters
+   - Example: Prompt asks "what you hope to achieve" → Write about past achievement and what it revealed
+   - Let your past actions speak louder than future promises
+   - The admissions officer will infer your objectives from your story
+
 COUNT YOUR WORDS BEFORE RESPONDING. If over ${wordLimit}, CUT content IMMEDIATELY.
 
 🚨 YOUR RESPONSE MUST BE:
-- The complete essay (${minWords}-${wordLimit} words)
+- The complete essay (${targetWords}-${maxWords} words - will be trimmed by cleanup)
 - Starting with the opening sentence (a specific moment in time)
 - NO meta-commentary like "Here's the essay..." or "I notice that..."
 - NO feedback or questions
 - JUST THE ESSAY ITSELF
+- Focus on ONE deep story from your PAST (not future plans)
 
 Begin writing the essay NOW. First sentence:`;
         }
@@ -569,10 +588,13 @@ function cleanupCollegeSpam(essay: string, collegeName: string, wordLimit: numbe
 
     // RULE 3: Check word count
     const currentWords = cleaned.split(/\s+/).filter(w => w.length > 0).length;
-    const targetMin = Math.floor(wordLimit * 0.75);
+    const targetMin = Math.floor(wordLimit * 0.85); // Updated to 85%
+    const targetRange = Math.floor(wordLimit * 0.95); // Good range is 95-105%
 
     if (currentWords < targetMin) {
-        console.log(`⚠️  Cleanup removed too much (${currentWords}/${wordLimit} words). Consider regenerating.`);
+        console.log(`⚠️  Cleanup removed too much (${currentWords}/${wordLimit} words = ${Math.round(currentWords/wordLimit*100)}%). Consider regenerating.`);
+    } else if (currentWords >= targetMin && currentWords < targetRange) {
+        console.log(`⚡ Word count acceptable but on lower end (${currentWords}/${wordLimit} words = ${Math.round(currentWords/wordLimit*100)}%)`);
     }
 
     // Clean up whitespace
