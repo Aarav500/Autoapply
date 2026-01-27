@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { calculateDiversityScore, detectAIPatterns } from '@/lib/essay-quality';
 
 /**
  * AUTHENTIC ESSAY GENERATION SYSTEM
@@ -166,13 +167,24 @@ export async function POST(request: NextRequest) {
         console.log(`✅ Shaping complete (${shapingDuration}ms): ${finalEssay.wordCount} words`);
         console.log(`🎯 Overall Score: ${finalEssay.scores.overall}%`);
 
-        // PHASE 4: AGGRESSIVE AI TELL CLEANUP (PROGRAMMATIC)
-        console.log('\n📍 Phase 4: AI Tell Cleanup & Validation...');
+        // PHASE 4: BALANCED CLEANUP & QUALITY ANALYSIS
+        console.log('\n📍 Phase 4: Balanced Cleanup & Quality Analysis...');
         const cleanedEssay = aggressiveCleanup(finalEssay.content, college.name, essay.wordLimit);
         const cleanupWarnings = validateAuthenticity(cleanedEssay, college.name);
 
+        // Analyze essay quality with our new utilities
+        const diversityAnalysis = calculateDiversityScore(cleanedEssay);
+        const aiDetectionAnalysis = detectAIPatterns(cleanedEssay);
+
+        console.log(`📊 Diversity Score: ${diversityAnalysis.score}/100`);
+        console.log(`🤖 AI Detection Confidence: ${aiDetectionAnalysis.confidence}%`);
+
         if (cleanupWarnings.length > 0) {
             console.log('⚠️ Cleanup warnings:', cleanupWarnings);
+        }
+
+        if (aiDetectionAnalysis.confidence > 50) {
+            console.log('⚠️ AI detection confidence high - essay may sound too AI-generated');
         }
 
         // Recalculate scores after cleanup
@@ -222,6 +234,11 @@ export async function POST(request: NextRequest) {
                 // Use retry if it's better
                 if (retryWordCount >= finalWordCount && retryWordCount >= Math.floor(essay.wordLimit * 0.95)) {
                     console.log(`   ✓ Using retry result (better word count)`);
+
+                    // Analyze retry quality
+                    const retryDiversity = calculateDiversityScore(retryCleaned);
+                    const retryAIDetection = detectAIPatterns(retryCleaned);
+
                     return NextResponse.json({
                         success: true,
                         essay: retryCleaned,
@@ -230,6 +247,14 @@ export async function POST(request: NextRequest) {
                             ...retryFinalEssay.scores,
                             overall: Math.min(retryFinalEssay.scores.overall, adjustedScore),
                         },
+                        qualityMetrics: {
+                            diversityScore: retryDiversity.score,
+                            diversityBreakdown: retryDiversity.breakdown,
+                            diversityFeedback: retryDiversity.feedback,
+                            aiDetectionConfidence: retryAIDetection.confidence,
+                            aiPatterns: retryAIDetection.patterns,
+                            aiSuggestions: retryAIDetection.suggestions,
+                        },
                         metadata: {
                             ...retryFinalEssay.metadata,
                             phasesDuration: {
@@ -237,7 +262,7 @@ export async function POST(request: NextRequest) {
                                 shaping: shapingDuration,
                                 total: excavationDuration + shapingDuration,
                             },
-                            systemVersion: '2.4-auto-retry',
+                            systemVersion: '2.5-balanced-cleanup-retry',
                             retryCount: 1,
                             retryReason: 'Word count below 70% threshold after cleanup',
                             rawStoryLength: retryRawStory.wordCount,
@@ -264,6 +289,14 @@ export async function POST(request: NextRequest) {
                 ...finalEssay.scores,
                 overall: adjustedScore,
             },
+            qualityMetrics: {
+                diversityScore: diversityAnalysis.score,
+                diversityBreakdown: diversityAnalysis.breakdown,
+                diversityFeedback: diversityAnalysis.feedback,
+                aiDetectionConfidence: aiDetectionAnalysis.confidence,
+                aiPatterns: aiDetectionAnalysis.patterns,
+                aiSuggestions: aiDetectionAnalysis.suggestions,
+            },
             metadata: {
                 ...finalEssay.metadata,
                 phasesDuration: {
@@ -271,7 +304,7 @@ export async function POST(request: NextRequest) {
                     shaping: shapingDuration,
                     total: excavationDuration + shapingDuration,
                 },
-                systemVersion: '2.4-temp-fix-auto-retry',
+                systemVersion: '2.5-balanced-cleanup',
                 efficiencyGain: '33% faster (2 API calls vs 3)',
                 rawStoryLength: rawStory.wordCount,
                 compressionRatio: (rawStory.wordCount / finalEssay.wordCount).toFixed(2),
@@ -860,30 +893,41 @@ function aggressiveCleanup(essay: string, collegeName: string, wordLimit: number
 
     console.log(`📊 Essay has ${essayLength} paragraphs, last 30% starts at paragraph ${last30PercentStart + 1}`);
 
-    // RULE 1: NUCLEAR - Remove ANY paragraph that mentions college OR professor OR program names
-    // Not just last 30% - ANYWHERE in the essay
+    // RULE 1: SELECTIVE REMOVAL - Only remove paragraphs with obvious AI tells
+    // CHANGED: Only remove college mentions in last 40%, not everywhere
+    // CHANGED: Check if paragraph is pure fluff before removing
     const filteredParagraphs = paragraphs.filter((para, index) => {
-        // Check if paragraph mentions ANY college name variation
-        const mentionsCollege = collegePatterns.some(pattern =>
+        const isInLast40Percent = index >= Math.floor(essayLength * 0.6);
+
+        // Check if paragraph mentions college name (only remove in last 40%)
+        const mentionsCollege = isInLast40Percent && collegePatterns.some(pattern =>
             para.includes(pattern) || para.toLowerCase().includes(pattern.toLowerCase())
         );
 
         // Check for professor/lab/program mentions (FORBIDDEN ANYWHERE)
-        // Pattern matches 1-4 words after "Professor" to catch multi-word names like "Professor Satinder Singh Baveja"
-        const mentionsSpecifics = /Professor\s+(?:[\w]+\s+){0,3}[\w]+|Multidisciplinary|Design Program|MDP's|MDP|research (?:with|in|at) [\w\s]+|Lab\b|\w+ Lab\b/i.test(para);
+        // But only if it's the main focus of the paragraph (not just a passing mention)
+        const paraWords = para.split(/\s+/).length;
+        const professorMentions = (para.match(/Professor\s+(?:[\w]+\s+){0,3}[\w]+/gi) || []).length;
+        const labMentions = (para.match(/\w+ Lab\b/gi) || []).length;
+        const isProfessorFocused = professorMentions > 0 && paraWords < 80; // Only short paragraphs focused on professors
 
-        // Check for future-looking phrases (especially in last 50%)
+        // Check for pure future vision paragraphs (no substance, just "I want to")
         const inLatterHalf = index >= Math.floor(essayLength * 0.5);
-        const hasFutureVision = inLatterHalf && (
-            /want to contribute|will help me|I want to|I'm excited to|looking forward to/i.test(para) ||
-            /pursuing|enrich the future|developing solutions|future plans/i.test(para) ||
-            /through \w+ mission|this approach.*how I want|can contribute to/i.test(para) ||
-            /At \w+,?\s+I/i.test(para) || // "At Michigan, I..." pattern
-            /This.*approach.*why I.*[college|university]/i.test(para)
-        );
+        const futureVisionWords = (para.match(/want to contribute|will help me|I'm excited to|looking forward to|pursuing|future plans|can contribute to/gi) || []).length;
+        const isPureFutureVision = inLatterHalf && futureVisionWords >= 2 && paraWords < 60; // Short paragraphs with 2+ future phrases
 
-        if (mentionsCollege || mentionsSpecifics || hasFutureVision) {
-            console.log(`🗑️ REMOVED paragraph ${index + 1}/${essayLength} (${mentionsCollege ? 'COLLEGE MENTION' : mentionsSpecifics ? 'PROFESSOR/PROGRAM' : 'FUTURE VISION'})`);
+        // Check if paragraph is pure essay language (no real content)
+        const essayLanguageCount = (para.match(/This experience|I learned that|I realized that|Looking back|The truth is|Let me be honest/gi) || []).length;
+        const isPureEssayLanguage = essayLanguageCount >= 2 && paraWords < 50;
+
+        const shouldRemove = mentionsCollege || isProfessorFocused || isPureFutureVision || isPureEssayLanguage;
+
+        if (shouldRemove) {
+            const reason = mentionsCollege ? 'COLLEGE MENTION IN LAST 40%' :
+                          isProfessorFocused ? 'PROFESSOR-FOCUSED' :
+                          isPureFutureVision ? 'PURE FUTURE VISION' :
+                          'PURE ESSAY LANGUAGE';
+            console.log(`🗑️ REMOVED paragraph ${index + 1}/${essayLength} (${reason})`);
             console.log(`   Preview: "${para.substring(0, 120)}..."`);
             return false;
         }
@@ -895,24 +939,16 @@ function aggressiveCleanup(essay: string, collegeName: string, wordLimit: number
 
     console.log(`📝 After paragraph filtering: ${cleaned.split('\n\n').length} paragraphs remain`);
 
-    // RULE 2: Remove entire sentences with essay language (not just phrases)
+    // RULE 2: SELECTIVE sentence removal - only remove the most egregious essay language
+    // CHANGED: Reduced list to truly generic phrases, not all reflective language
     const essayPhrases = [
         /This experience (completely )?changed (how|the way) I think[^.]*\./gi,
-        /This shift influenced everything[^.]*\./gi,
         /I learned that[^.]*\./gi,
-        /Now when I approach[^.]*\./gi,
         /This is what .+ means to me[^.]*\./gi,
         /Throughout my journey[^.]*\./gi,
-        /Let me be honest[^.]*\./gi,
-        /The truth is[^.]*\./gi,
-        /Here's what[^.]*\./gi,
         /Looking back[^.]*\./gi,
-        /After .+, I realized that[^.]*\./gi,
         /true (technical )?leadership means[^.]*\./gi,
         /true citizenship means[^.]*\./gi,
-        /This mirrors[^.]*\./gi,
-        /This.*approach.*why I[^.]*\./gi,
-        /This.*exactly why[^.]*\./gi,
         /[Tt]his.*mission of[^.]*\./gi,
     ];
 
@@ -920,14 +956,22 @@ function aggressiveCleanup(essay: string, collegeName: string, wordLimit: number
     essayPhrases.forEach(pattern => {
         const matches = cleaned.match(pattern);
         if (matches) {
-            console.log(`🗑️ Removing ${matches.length} sentence(s) with essay language: "${matches[0].substring(0, 80)}..."`);
-            removalCount += matches.length;
+            // Only remove if the sentence is generic (doesn't contain specific details)
+            matches.forEach(match => {
+                const hasSpecificDetails = /\b\d+\b|[A-Z][a-z]+\s[A-Z][a-z]+/.test(match); // Numbers or proper nouns
+                if (!hasSpecificDetails) {
+                    console.log(`🗑️ Removing generic essay sentence: "${match.substring(0, 80)}..."`);
+                    cleaned = cleaned.replace(match, '');
+                    removalCount++;
+                } else {
+                    console.log(`✓ Keeping sentence (has specific details): "${match.substring(0, 60)}..."`);
+                }
+            });
         }
-        cleaned = cleaned.replace(pattern, '');
     });
 
     if (removalCount > 0) {
-        console.log(`✂️ Removed ${removalCount} essay language sentences`);
+        console.log(`✂️ Removed ${removalCount} generic essay language sentences`);
     }
 
     // RULE 3: Remove markdown headers

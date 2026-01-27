@@ -1,6 +1,7 @@
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { checkForDuplication, calculateDiversityScore, detectAIPatterns, calculateSimilarity } from '@/lib/essay-quality';
 
 // ============================================
 // ESSAY INTELLIGENCE SYSTEM - GENERATION API
@@ -127,6 +128,32 @@ export async function POST(request: NextRequest) {
         const variants = await Promise.all(variantPromises);
 
         // ============================================
+        // PHASE 2.5: CHECK VARIANT UNIQUENESS
+        // Ensure variants are actually different from each other
+        // ============================================
+
+        console.log(`🔍 Checking variant uniqueness...`);
+
+        const variantSimilarities: number[] = [];
+        for (let i = 0; i < variants.length; i++) {
+            for (let j = i + 1; j < variants.length; j++) {
+                const similarity = calculateSimilarity(variants[i].content, variants[j].content);
+                variantSimilarities.push(similarity);
+                console.log(`   Variant ${i + 1} vs ${j + 1}: ${similarity}% similar`);
+
+                if (similarity > 60) {
+                    console.log(`⚠️ WARNING: Variants ${i + 1} and ${j + 1} are too similar (${similarity}%)`);
+                }
+            }
+        }
+
+        const avgVariantSimilarity = variantSimilarities.length > 0
+            ? variantSimilarities.reduce((a, b) => a + b, 0) / variantSimilarities.length
+            : 0;
+
+        console.log(`📊 Average variant similarity: ${avgVariantSimilarity.toFixed(1)}%`);
+
+        // ============================================
         // PHASE 3: EVALUATE VARIANTS
         // ============================================
 
@@ -243,6 +270,16 @@ export async function POST(request: NextRequest) {
             personalProfile,
         });
 
+        // ============================================
+        // PHASE 7: COMPREHENSIVE QUALITY ANALYSIS
+        // ============================================
+
+        const finalDiversityScore = calculateDiversityScore(currentEssay);
+        const finalAIDetection = detectAIPatterns(currentEssay);
+
+        console.log(`📊 Final Diversity Score: ${finalDiversityScore.score}/100`);
+        console.log(`🤖 AI Detection: ${finalAIDetection.confidence}% confidence`);
+
         return NextResponse.json({
             success: true,
             essay: currentEssay,
@@ -255,6 +292,17 @@ export async function POST(request: NextRequest) {
             iterations,
             validation: finalValidation,
             admissionsOfficerFeedback: aoFeedback,
+            qualityAnalysis: {
+                diversityScore: finalDiversityScore.score,
+                diversityBreakdown: finalDiversityScore.breakdown,
+                aiDetectionConfidence: finalAIDetection.confidence,
+                aiPatterns: finalAIDetection.patterns,
+                suggestions: finalAIDetection.suggestions,
+                variantUniqueness: {
+                    avgSimilarity: avgVariantSimilarity,
+                    pairwiseSimilarities: variantSimilarities,
+                },
+            },
             metadata: {
                 numVariantsGenerated: numVariants,
                 bestApproach: bestVariant.approach,
@@ -382,7 +430,7 @@ OUTPUT: Only the essay text, no preamble.`;
         body: JSON.stringify({
             model: 'claude-sonnet-4-5-20250929',
             max_tokens: 4000,
-            temperature: 0.9,
+            temperature: 0.75, // Reduced from 0.9 - still creative but more controlled
             system: systemPrompt,
             messages: [{ role: 'user', content: userMessage }],
         }),
@@ -437,7 +485,7 @@ Return ONLY JSON:
         body: JSON.stringify({
             model: 'claude-sonnet-4-5-20250929',
             max_tokens: 500,
-            temperature: 0,
+            temperature: 0.1, // Very low for consistent evaluation
             messages: [{ role: 'user', content: evaluationPrompt }],
         }),
     });
@@ -542,7 +590,7 @@ OUTPUT: Only the improved essay, no explanation.`;
         body: JSON.stringify({
             model: 'claude-sonnet-4-5-20250929',
             max_tokens: 4000,
-            temperature: 0.8,
+            temperature: 0.6, // Reduced from 0.8 for more controlled improvements
             messages: [{ role: 'user', content: improvementPrompt }],
         }),
     });

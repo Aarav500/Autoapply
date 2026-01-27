@@ -1,6 +1,7 @@
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { checkForDuplication, calculateDiversityScore, detectAIPatterns } from '@/lib/essay-quality';
 
 // ============================================
 // SERVER-SIDE ESSAY GENERATION API
@@ -42,8 +43,8 @@ interface EssayRequest {
     existingEssays?: string[]; // New: List of other essays for the same college
 }
 
-// Call Claude API
-async function callClaude(apiKey: string, systemPrompt: string, userMessage: string): Promise<string> {
+// Call Claude API with optimal temperature for essay generation
+async function callClaude(apiKey: string, systemPrompt: string, userMessage: string, temperature: number = 0.7): Promise<string> {
     const response = await fetch(CLAUDE_API_URL, {
         method: 'POST',
         headers: {
@@ -53,7 +54,8 @@ async function callClaude(apiKey: string, systemPrompt: string, userMessage: str
         },
         body: JSON.stringify({
             model: 'claude-opus-4-20250514',
-            max_tokens: 2000,
+            max_tokens: 4000,
+            temperature: temperature, // 0.7 = creative but controlled
             system: systemPrompt,
             messages: [{ role: 'user', content: userMessage }],
         }),
@@ -68,14 +70,18 @@ async function callClaude(apiKey: string, systemPrompt: string, userMessage: str
     return data.content[0].text;
 }
 
-// Call Gemini API
-async function callGemini(apiKey: string, systemPrompt: string, userMessage: string): Promise<string> {
+// Call Gemini API with standardized temperature
+async function callGemini(apiKey: string, systemPrompt: string, userMessage: string, temperature: number = 0.7): Promise<string> {
     const response = await fetch(`${GEMINI_API_URL}/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             systemInstruction: { parts: [{ text: systemPrompt }] },
             contents: [{ parts: [{ text: userMessage }] }],
+            generationConfig: {
+                temperature: temperature,
+                maxOutputTokens: 4000,
+            },
         }),
     });
 
@@ -88,8 +94,8 @@ async function callGemini(apiKey: string, systemPrompt: string, userMessage: str
     return data.candidates[0].content.parts[0].text;
 }
 
-// Call OpenAI API
-async function callOpenAI(apiKey: string, systemPrompt: string, userMessage: string): Promise<string> {
+// Call OpenAI API with standardized temperature
+async function callOpenAI(apiKey: string, systemPrompt: string, userMessage: string, temperature: number = 0.7): Promise<string> {
     const response = await fetch(OPENAI_API_URL, {
         method: 'POST',
         headers: {
@@ -102,7 +108,8 @@ async function callOpenAI(apiKey: string, systemPrompt: string, userMessage: str
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userMessage },
             ],
-            max_tokens: 2000,
+            max_tokens: 4000,
+            temperature: temperature, // 0.7 = creative but controlled
         }),
     });
 
@@ -154,21 +161,59 @@ export async function POST(request: NextRequest) {
 
         console.log(`📝 ${isImprovement ? 'Improving' : 'Generating'} essay using ${provider} for ${college.name}`);
 
-        // Build activities context
-        const activitiesContext = activities.map((a, i) =>
+        // Build activities context - sort by total hours (most significant first)
+        const sortedActivities = [...activities].sort((a, b) => {
+            const getTotalHours = (act: any) => (act.hoursPerWeek || 0) * (act.weeksPerYear || 40);
+            return getTotalHours(b) - getTotalHours(a);
+        });
+
+        const activitiesContext = sortedActivities.map((a, i) =>
             `Activity ${i + 1}: ${a.name}\n- Description: ${a.description}\n- Impact: ${a.impact}`
         ).join('\n\n');
 
-        // Build existing essays context (ANTI-DUPLICATION)
+        // Build existing essays context with FULL CONTENT for proper deduplication
         let existingEssaysContext = '';
+        let existingEssaysAnalysis = '';
+
         if (existingEssays && existingEssays.length > 0) {
+            // Extract key topics from each existing essay
+            const extractedTopics = existingEssays.map((essay, i) => {
+                // Extract main verbs and nouns to understand what the essay is about
+                const words = essay.toLowerCase().split(/\s+/);
+                const activities = sortedActivities.map(a => a.name.toLowerCase());
+                const usedActivities = activities.filter(act =>
+                    essay.toLowerCase().includes(act.toLowerCase())
+                );
+
+                return {
+                    index: i + 1,
+                    usedActivities,
+                    excerpt: essay.slice(0, 150) + '...',
+                    fullText: essay, // Include full text for semantic comparison
+                };
+            });
+
+            existingEssaysAnalysis = extractedTopics.map(topic =>
+                `Essay ${topic.index}: Uses activities [${topic.usedActivities.join(', ') || 'general experience'}]`
+            ).join('\n');
+
             existingEssaysContext = `
-⚠️ DO NOT REPEAT CONTENT FROM THESE EXISTING ESSAYS FOR ${college.name}:
-The student has ALREADY written about the following topics. You MUST choose DIFFERENT stories/angles/activities to show breadth.
+⚠️ CRITICAL ANTI-DUPLICATION REQUIREMENTS:
 
-${existingEssays.map((essay, i) => `--- EXISTING ESSAY ${i + 1} ---\n${essay.slice(0, 300)}... (excerpt)\n---`).join('\n')}
+You have ALREADY written ${existingEssays.length} essay(s) for ${college.name}:
+${existingEssaysAnalysis}
 
-DO NOT REPEAT the same specific anecdotes used above.
+STRICT RULES TO AVOID REPETITION:
+1. DO NOT use the same activities mentioned in existing essays
+2. DO NOT tell similar stories or use similar anecdotes
+3. DO NOT use similar opening hooks or narrative structures
+4. CHOOSE COMPLETELY DIFFERENT aspects of your experience
+5. Show a DIFFERENT side of yourself
+
+EXISTING ESSAYS (FULL TEXT - DO NOT REPEAT THESE):
+${existingEssays.map((essay, i) => `\n--- EXISTING ESSAY ${i + 1} FOR ${college.name} ---\n${essay}\n---\n`).join('\n')}
+
+⚠️ Your new essay MUST be meaningfully different. Focus on activities/experiences NOT covered above.
 `;
         }
 
@@ -176,30 +221,49 @@ DO NOT REPEAT the same specific anecdotes used above.
         const targetWords = Math.floor(wordLimit * 0.9);
         const minWords = Math.floor(wordLimit * 0.75);
 
-        // Build system prompt with STRICT word limit
-        const systemPrompt = `You are an expert college essay writer helping a student craft a compelling transfer application essay.
+        // Build system prompt with STRICT word limit and quality requirements
+        const systemPrompt = `You are an expert college essay writer helping a student craft a compelling, UNIQUE transfer application essay.
 
-⚠️ CRITICAL WORD LIMIT: You MUST write EXACTLY between ${minWords}-${wordLimit} words. NOT A SINGLE WORD MORE than ${wordLimit}. 
+⚠️ CRITICAL WORD LIMIT: You MUST write EXACTLY between ${minWords}-${wordLimit} words. NOT A SINGLE WORD MORE than ${wordLimit}.
 Count your words carefully. Essays over the limit will be REJECTED.
 
-WRITING STYLE:
-- Write in first person with a genuine, authentic voice
-- Use specific, concrete examples - not generic statements
-- Show personal growth and self-reflection
-- Avoid clichés and AI-sounding phrases
-- Be confident but not arrogant
-- Be CONCISE - every word must earn its place
-- USE THE STUDENT'S ACTUAL ACTIVITIES - do NOT ask for more information
+🎯 AUTHENTICITY REQUIREMENTS (This MUST sound like a real 17-18 year old wrote it):
+- Write in first person with natural, conversational voice
+- Use contractions (I'm, don't, can't, won't) - real students use these
+- Include imperfect thoughts and real hesitations
+- Use specific sensory details (what you saw, heard, felt, smelled)
+- Sometimes use sentence fragments. For emphasis.
+- Show vulnerability - admit failures and uncertainties
+- Include timestamps ("3am on a Tuesday", not "one night")
+- Use dialogue when it adds personality
+- Have a sense of humor about yourself
 
-BANNED PHRASES (never use these):
-- "Ever since I was young"
-- "My passion for..."
-- "I've always wanted to..."
-- "This experience taught me..."
+📊 SPECIFICITY REQUIREMENTS (Include 8-12 specific details):
+- Exact numbers, dates, times
+- Real names (people, places, organizations - but NOT professor/college names)
+- Specific tools, technologies, concepts
+- Concrete sensory details
+- Measurable outcomes
+
+🚫 ABSOLUTELY BANNED PHRASES (AI tells):
+- "Ever since I was young" / "From a young age"
+- "I have always been passionate" / "My passion for"
+- "sparked my interest" / "ignited my passion"
+- "This experience taught me" / "I learned that"
 - "pushed me out of my comfort zone"
 - "diverse perspectives"
-- "making a difference"
-- "giving back to the community"
+- "making a difference" / "giving back to the community"
+- "transformative experience"
+- "journey of self-discovery"
+- "shaped me into the person I am"
+- Opening with a famous quote or dictionary definition
+
+🎨 NARRATIVE STRUCTURE:
+- Start in medias res (middle of action) - NO exposition
+- First sentence MUST be a specific moment/scene
+- Use the "zoom in" technique: specific moment → broader context → future
+- End with forward-looking connection to ${college.name}
+- NO summary paragraph or "In conclusion"
 
 TARGET COLLEGE: ${college.name}
 Values: ${college.values.join(', ')}
@@ -207,9 +271,16 @@ What they look for: ${college.whatTheyLookFor.join(', ')}
 Culture: ${college.culture}
 Notable programs: ${college.notablePrograms.join(', ')}
 
-TONE: ${tone || 'confident and reflective'}
+TONE: ${tone || 'confident, authentic, with moments of vulnerability'}
 
-STRICT WORD LIMIT: ${wordLimit} words maximum. Target: ${targetWords} words.`;
+STRICT WORD LIMIT: ${wordLimit} words maximum. Target: ${targetWords} words.
+
+🎯 QUALITY BENCHMARK: Your essay will be scored on:
+- Authenticity (sounds human, not AI)
+- Specificity (concrete details, not generic)
+- Uniqueness (different from other essays)
+- Emotional impact (memorable to admissions officers)
+- College fit (connects to ${college.name} specifically)`;
 
         // Build user message - different for first draft vs improvement
         let userMessage: string;
@@ -241,43 +312,94 @@ ${previousFeedback}
 Write the IMPROVED essay now (${wordLimit} words max):`;
         } else {
             userMessage = `ESSAY PROMPT${essayTitle ? ` (${essayTitle})` : ''}:
-${prompt}
+"${prompt}"
 
-${achievements ? `STUDENT ACHIEVEMENTS:\n${achievements}\n` : ''}
-
+${achievements ? `STUDENT ACHIEVEMENTS:\n${achievements}\n\n` : ''}
 ${major ? `STUDENT'S FIELD/MAJOR: ${major}\n` : ''}
-${goals ? `STUDENT'S GOALS: ${goals}\n` : ''}
+${goals ? `STUDENT'S GOALS: ${goals}\n\n` : ''}
 
-STUDENT'S ACTIVITIES AND EXPERIENCES (use these - do NOT ask for more):
+STUDENT'S ACTIVITIES AND EXPERIENCES (choose 1-2 most relevant - do NOT use all):
 ${activitiesContext}
 
 ${existingEssaysContext}
 
-⚠️ WORD LIMIT: MAXIMUM ${wordLimit} words. Aim for ${targetWords} words.
+⚠️ CRITICAL INSTRUCTIONS:
 
-Write a CONCISE essay that:
-1. Opens with a compelling hook (specific moment/scene) - 2-3 sentences MAX
-2. Weaves in 1-2 of the student's most relevant activities
-3. Briefly connects to ${college.name}'s specific values
-4. STAYS STRICTLY UNDER ${wordLimit} words - this is NON-NEGOTIABLE
-5. Ends with ONE sentence connecting to future at ${college.name}
+1. WORD LIMIT: MAXIMUM ${wordLimit} words. Aim for ${targetWords} words. COUNT CAREFULLY.
 
-IMPORTANT: Use the activities provided above. Do NOT ask for more information.
+2. OPENING: Start with a specific moment in time. NO background/exposition.
+   ✅ Good: "The servo motor whined as I pushed it past its limits for the third time that night."
+   ❌ Bad: "I have always been interested in robotics since I was young."
 
-COUNT YOUR WORDS BEFORE RESPONDING. If over ${wordLimit}, CUT content immediately.
+3. SPECIFICITY: Include 8-12 concrete details:
+   - Exact numbers ("47 lines of code", "3am on a Tuesday")
+   - Real names of places/tools/concepts
+   - Sensory details (sounds, sights, textures)
+   - Measurable outcomes
 
-Write the essay now (${wordLimit} words max):`;
+4. VOICE: Write like a smart 17-18 year old:
+   - Use contractions naturally (I'm, don't, can't)
+   - Include sentence fragments for emphasis
+   - Show vulnerability and uncertainty
+   - Have a subtle sense of humor
+
+5. COLLEGE CONNECTION: Mention ${college.name}'s specific programs/values, but naturally
+   - Don't force it or make it sound researched
+   - Connect YOUR experience to THEIR offerings
+
+6. ACTIVITIES: Choose 1-2 activities maximum from the list above
+   - Focus on depth over breadth
+   - Tell ONE story well, don't list multiple activities
+   - Show specific moments, not summaries
+
+7. UNIQUENESS: Make this essay impossible for any other student to write
+   - Include hyper-specific details only YOU would know
+   - Tell a story only YOU can tell
+
+COUNT YOUR WORDS BEFORE RESPONDING. If over ${wordLimit}, CUT content IMMEDIATELY.
+
+Write the essay NOW (${wordLimit} words max):`;
         }
 
-        // Call the AI
+        // Call the AI with retry logic for duplication
         let essay: string;
-        if (provider === 'claude') {
-            essay = await callClaude(apiKey, systemPrompt, userMessage);
-        } else if (provider === 'gemini') {
-            essay = await callGemini(apiKey, systemPrompt, userMessage);
-        } else {
-            essay = await callOpenAI(apiKey, systemPrompt, userMessage);
-        }
+        let attempt = 0;
+        const maxAttempts = 3;
+        let isDuplicate = false;
+
+        do {
+            attempt++;
+            if (attempt > 1) {
+                console.log(`⚠️ Attempt ${attempt}/${maxAttempts} - previous essay was too similar`);
+            }
+
+            if (provider === 'claude') {
+                essay = await callClaude(apiKey, systemPrompt, userMessage, 0.7);
+            } else if (provider === 'gemini') {
+                essay = await callGemini(apiKey, systemPrompt, userMessage, 0.7);
+            } else {
+                essay = await callOpenAI(apiKey, systemPrompt, userMessage, 0.7);
+            }
+
+            // Check for duplication with existing essays
+            if (existingEssays && existingEssays.length > 0) {
+                const dupCheck = checkForDuplication(essay, existingEssays, 40);
+                isDuplicate = dupCheck.isDuplicate;
+
+                if (isDuplicate && attempt < maxAttempts) {
+                    console.log(`❌ Essay is ${dupCheck.mostSimilar}% similar to existing essay. Regenerating...`);
+                    // Add stronger anti-duplication instruction for next attempt
+                    userMessage += `\n\n⚠️⚠️⚠️ PREVIOUS ATTEMPT WAS TOO SIMILAR TO EXISTING ESSAYS (${dupCheck.mostSimilar}% similarity).
+You MUST use COMPLETELY DIFFERENT activities, stories, and examples. Be MORE creative and show a DIFFERENT side of yourself.`;
+                } else if (!isDuplicate) {
+                    console.log(`✅ Essay uniqueness check passed (max similarity: ${dupCheck.mostSimilar}%)`);
+                } else {
+                    console.log(`⚠️ Essay still ${dupCheck.mostSimilar}% similar after ${maxAttempts} attempts. Proceeding anyway.`);
+                }
+            } else {
+                isDuplicate = false; // No existing essays to compare
+            }
+        } while (isDuplicate && attempt < maxAttempts);
 
         // POST-PROCESSING: Trim essay if it exceeds word limit
         let words = essay.split(/\s+/).filter(w => w.length > 0);
@@ -311,12 +433,28 @@ Write the essay now (${wordLimit} words max):`;
             console.log(`✂️ Trimmed essay to ${words.length} words`);
         }
 
-        console.log(`✅ Generated essay(${words.length} words) using ${provider}`);
+        // POST-PROCESSING: Analyze essay quality
+        const diversityAnalysis = calculateDiversityScore(essay);
+        const aiDetection = detectAIPatterns(essay);
+
+        console.log(`✅ Generated essay (${words.length} words) using ${provider}`);
+        console.log(`📊 Diversity Score: ${diversityAnalysis.score}/100`);
+        console.log(`🤖 AI Detection Confidence: ${aiDetection.confidence}%`);
 
         return NextResponse.json({
             essay,
             provider,
             wordCount: words.length,
+            // Quality metadata
+            qualityMetrics: {
+                diversityScore: diversityAnalysis.score,
+                diversityBreakdown: diversityAnalysis.breakdown,
+                diversityFeedback: diversityAnalysis.feedback,
+                aiDetectionConfidence: aiDetection.confidence,
+                aiPatterns: aiDetection.patterns,
+                aiSuggestions: aiDetection.suggestions,
+            },
+            attempts: attempt, // How many tries it took to avoid duplication
         });
 
     } catch (error) {
