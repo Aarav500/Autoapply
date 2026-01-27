@@ -203,7 +203,7 @@ export async function POST(request: NextRequest) {
                     shaping: shapingDuration,
                     total: excavationDuration + shapingDuration,
                 },
-                systemVersion: '2.1-aggressive-cleanup',
+                systemVersion: '2.3-nuclear-cleanup',
                 efficiencyGain: '33% faster (2 API calls vs 3)',
                 rawStoryLength: rawStory.wordCount,
                 compressionRatio: (rawStory.wordCount / finalEssay.wordCount).toFixed(2),
@@ -252,13 +252,25 @@ async function runCombinedDiscoveryExcavation(
         `- ${a.title} (${a.date}): ${a.description || ''}`
     ).join('\n');
 
+    // CRITICAL: Remove college name from prompt to prevent Claude from echoing it
+    const sanitizedPrompt = essay.prompt
+        .replace(/University of Michigan|Michigan/gi, '[REDACTED COLLEGE]')
+        .replace(/UMich/gi, '[REDACTED COLLEGE]')
+        .replace(/at \[REDACTED COLLEGE\],?/gi, '')
+        .replace(/to \[REDACTED COLLEGE\],?/gi, '');
+
     const systemPrompt = `You are writing an authentic college essay by excavating a student's real story.
 
-ESSAY PROMPT: "${essay.prompt}"
+ORIGINAL PROMPT (SANITIZED): "${sanitizedPrompt}"
 
-⚠️ CRITICAL: Even if the prompt asks "how you will contribute" or "your future plans", IGNORE THAT PART.
-Write ONLY about the past. Tell a story that happened. NO future vision. NO college mentions.
-The admissions office wants to see WHO YOU ARE through a past story, not hear what you'll do for them.
+🚨 ABSOLUTE RULE - WILL BE REJECTED IF VIOLATED:
+1. Do NOT write about the college. Do NOT mention the college name. Do NOT say where you want to go.
+2. Do NOT write about "how you will contribute" or "your future plans".
+3. Write ONLY about a past experience. Something that ALREADY happened.
+4. The prompt asks about future contribution - IGNORE THAT. Write about the PAST that reveals your character.
+
+Think of it this way: They don't want to hear "I want to work with Professor X" or "I'll contribute by doing Y."
+They want a STORY from your past that shows you're the kind of person who would naturally do those things.
 
 WORD TARGET: ${essay.wordLimit} words (aim for 100-110% of limit - shaping phase will trim to exact limit)
 
@@ -578,20 +590,18 @@ PRESERVE AT ALL COSTS:
 - Natural flow of thought
 - Conversational tone
 
-MANDATORY REMOVALS (these ALWAYS indicate AI writing):
+🚨 ABSOLUTE PROHIBITIONS (WILL CAUSE REJECTION):
+1. College name mentioned ANYWHERE - The essay must NOT contain the college name. Period. If you include it, the essay will be rejected.
+2. Professor/lab/program names - NO "Professor X", NO "Multidisciplinary Program", NO specific program names
+3. Future vision - NO "I want to", "I'm excited to", "I will", "pursuing"
+4. "How I will contribute" - The prompt asks this. IGNORE IT. Write about the PAST only.
+
+MANDATORY REMOVALS (these indicate AI writing):
 1. ALL markdown headers (##, ###, etc.) - Remove completely, no section titles
-2. Future vision paragraphs - CRITICAL: Remove ANY paragraph mentioning:
-   - "This is why I want to attend X"
-   - "X will help me achieve..."
-   - "I want to contribute..."
-   - "developing solutions", "enrich the future", "pursue X at [college]"
-   - ANY forward-looking statement about college or career goals
-   - Rule: If last 30% of essay mentions college name OR future goals, DELETE that entire section
-3. Essay language phrases: "Let me be honest", "Here's what X", "The truth is", "This taught me that", "Throughout my journey"
-4. Formulaic conclusions - NO wrapping up or summarizing at the end. Essay should END mid-story or mid-thought
-5. College name-dropping - If college name appears ANYWHERE in last 30% of essay, remove entire paragraph containing it
-6. Section-based structure - Should flow as ONE continuous narrative, not sections
-7. Multiple activity listing - If essay mentions 3+ different activities, it's too broad. Focus on ONE story only.
+2. Essay language phrases: "Let me be honest", "Here's what X", "The truth is", "This taught me that", "Throughout my journey", "This experience changed how I think"
+3. Formulaic conclusions - NO wrapping up or summarizing at the end. Essay should END mid-story or mid-thought
+4. Section-based structure - Should flow as ONE continuous narrative, not sections
+5. Multiple activity listing - If essay mentions 3+ different activities, it's too broad. Focus on ONE story only.
 
 WHAT YOU CAN ADJUST:
 1. Trim to EXACTLY word limit (keep last complete sentence, no mid-sentence cuts)
@@ -767,29 +777,33 @@ function aggressiveCleanup(essay: string, collegeName: string, wordLimit: number
 
     console.log(`📊 Essay has ${essayLength} paragraphs, last 30% starts at paragraph ${last30PercentStart + 1}`);
 
-    // RULE 1: Remove last 30% if it mentions college name OR future vision
+    // RULE 1: NUCLEAR - Remove ANY paragraph that mentions college OR professor OR program names
+    // Not just last 30% - ANYWHERE in the essay
     const filteredParagraphs = paragraphs.filter((para, index) => {
-        if (index >= last30PercentStart) {
-            // Check if paragraph mentions ANY college name variation
-            const mentionsCollege = collegePatterns.some(pattern =>
-                para.includes(pattern) || para.toLowerCase().includes(pattern.toLowerCase())
-            );
+        // Check if paragraph mentions ANY college name variation
+        const mentionsCollege = collegePatterns.some(pattern =>
+            para.includes(pattern) || para.toLowerCase().includes(pattern.toLowerCase())
+        );
 
-            // Check for future-looking phrases
-            const hasFutureVision =
-                mentionsCollege ||
-                /want to contribute|will help me|I want to|I'm excited to|looking forward to/i.test(para) ||
-                /pursuing|enrich the future|developing solutions|future plans/i.test(para) ||
-                /through \w+ mission|this approach.*how I want|can contribute to/i.test(para) ||
-                /Professor \w+|Multidisciplinary|Design Program|research (with|in)/i.test(para) || // Specific lab/program mentions
-                /At \w+,?\s+I/i.test(para); // "At Michigan, I..." pattern
+        // Check for professor/lab/program mentions (FORBIDDEN ANYWHERE)
+        const mentionsSpecifics = /Professor \w+|Multidisciplinary|Design Program|MDP's|research (with|in) \w+|Lab\b/i.test(para);
 
-            if (hasFutureVision || mentionsCollege) {
-                console.log(`🗑️ REMOVED paragraph ${index + 1}/${essayLength} (${mentionsCollege ? 'college mention' : 'future vision'})`);
-                console.log(`   Preview: "${para.substring(0, 100)}..."`);
-                return false;
-            }
+        // Check for future-looking phrases (especially in last 50%)
+        const inLatterHalf = index >= Math.floor(essayLength * 0.5);
+        const hasFutureVision = inLatterHalf && (
+            /want to contribute|will help me|I want to|I'm excited to|looking forward to/i.test(para) ||
+            /pursuing|enrich the future|developing solutions|future plans/i.test(para) ||
+            /through \w+ mission|this approach.*how I want|can contribute to/i.test(para) ||
+            /At \w+,?\s+I/i.test(para) || // "At Michigan, I..." pattern
+            /This.*approach.*why I.*[college|university]/i.test(para)
+        );
+
+        if (mentionsCollege || mentionsSpecifics || hasFutureVision) {
+            console.log(`🗑️ REMOVED paragraph ${index + 1}/${essayLength} (${mentionsCollege ? 'COLLEGE MENTION' : mentionsSpecifics ? 'PROFESSOR/PROGRAM' : 'FUTURE VISION'})`);
+            console.log(`   Preview: "${para.substring(0, 120)}..."`);
+            return false;
         }
+
         return true;
     });
 
@@ -812,6 +826,10 @@ function aggressiveCleanup(essay: string, collegeName: string, wordLimit: number
         /After .+, I realized that[^.]*\./gi,
         /true (technical )?leadership means[^.]*\./gi,
         /true citizenship means[^.]*\./gi,
+        /This mirrors[^.]*\./gi,
+        /This.*approach.*why I[^.]*\./gi,
+        /This.*exactly why[^.]*\./gi,
+        /[Tt]his.*mission of[^.]*\./gi,
     ];
 
     let removalCount = 0;
@@ -846,12 +864,17 @@ function aggressiveCleanup(essay: string, collegeName: string, wordLimit: number
         cleaned = kept.join('\n\n');
     }
 
-    // RULE 5: If essay is still too short after cleanup, pad warning
+    // RULE 5: Check word count and warn/trim
     const currentWords = cleaned.split(/\s+/).length;
     const targetMin = Math.floor(wordLimit * 0.95);
     const targetMax = Math.floor(wordLimit * 1.05);
+    const absoluteMin = Math.floor(wordLimit * 0.7); // If below 70%, essay is ruined
 
-    if (currentWords < targetMin) {
+    if (currentWords < absoluteMin) {
+        console.log(`🚨 CRITICAL: Essay only ${currentWords} words after cleanup (${Math.round(currentWords/wordLimit*100)}% of target)`);
+        console.log(`   This means Claude generated too much forbidden content. Essay quality severely degraded.`);
+        // Note: We could auto-regenerate here, but for now just warn
+    } else if (currentWords < targetMin) {
         console.log(`⚠️ WARNING: Essay only ${currentWords} words (target: ${targetMin}-${targetMax})`);
     } else if (currentWords > targetMax) {
         console.log(`✂️ Trimming from ${currentWords} to ${targetMax} words`);
