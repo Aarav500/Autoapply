@@ -587,6 +587,47 @@ export const seedActivities: Activity[] = [
         ]
     },
 
+    // ========== ATHLETIC & SPORTS ==========
+    {
+        id: 'act_sports_chess_national',
+        name: 'Competitive Chess - National Level Player',
+        role: 'Chess Player & Club Founder',
+        organization: 'All India Chess Federation',
+        category: 'athletic',
+        description: 'National-level chess player with over a decade of competitive experience. Qualified for nationals by ranking among top 200 players in India (Under-19 category). Represented state twice at national championships. Won 2 district championships and competed against India\'s best young players. Founded and currently lead a chess club where I mentor younger players, organize tournaments, and build a community of chess enthusiasts. Chess has sharpened my strategic thinking, pattern recognition, and ability to perform under pressure - skills directly applicable to algorithmic problem-solving.',
+        startDate: '2014-01-01',
+        isOngoing: true,
+        hoursPerWeek: 10,
+        weeksPerYear: 48,
+        achievements: [
+            'Ranked top 200 in India (Under-19 category)',
+            'Qualified for nationals - competed against 500+ players',
+            '2-time State-level representative at nationals',
+            '2-time District Champion',
+            'Founded and lead chess club with 30+ active members',
+            '12+ years of competitive chess experience'
+        ]
+    },
+    {
+        id: 'act_sports_tabletennis_state',
+        name: 'Table Tennis - State Level Competitor',
+        role: 'Competitive Table Tennis Player',
+        organization: 'State Table Tennis Association',
+        category: 'athletic',
+        description: 'State-level table tennis player with proven success at district, divisional, and state competitions. Won divisional championship by defeating strong opponents through exceptional focus, strategy, and perseverance. Dominated district championship against top local players. Qualified for and competed at state level - a highly competitive tier requiring surpassing numerous skilled players at lower levels. The intense mental focus and split-second decision-making required in competitive table tennis translates directly to my work in real-time systems and rapid algorithmic optimization.',
+        startDate: '2018-01-01',
+        isOngoing: true,
+        hoursPerWeek: 8,
+        weeksPerYear: 45,
+        achievements: [
+            'State-level qualifier and competitor',
+            'Divisional Champion',
+            'District Champion',
+            'Competed in 20+ tournaments across 4 years',
+            'Developed mental resilience and strategic thinking under pressure'
+        ]
+    },
+
     // ========== ADDITIONAL ACADEMIC ==========
     {
         id: 'act_academic_ucr_coursework',
@@ -621,6 +662,46 @@ export const seedAchievements: Achievement[] = [
         date: '2025-03-01',
         description: 'Awarded Silver Medal at international STEM Olympiad in Frankfurt, Germany. Competed against 500+ students from 40+ countries in algorithmic problem-solving. Demonstrated expertise in data structures, dynamic programming, and graph algorithms under competitive conditions. Ranked in top 5% globally.',
         issuer: 'International STEM Olympiad Federation, Frankfurt, Germany'
+    },
+    {
+        id: 'ach_chess_national_qualifier',
+        title: 'National Chess Championship Qualifier - Top 200 India Ranking',
+        category: 'award',
+        date: '2023-12-01',
+        description: 'Qualified for National Chess Championship by ranking among top 200 players in India (Under-19 category). Competed against India\'s best young chess minds. Represented state twice at national level. Demonstrates strategic thinking, pattern recognition, and performance under pressure - skills that directly enhance algorithmic problem-solving capabilities.',
+        issuer: 'All India Chess Federation'
+    },
+    {
+        id: 'ach_chess_district_champion',
+        title: '2-Time District Chess Champion',
+        category: 'award',
+        date: '2022-08-01',
+        description: 'Won district championship twice, defeating top local players. These victories were crucial stepping stones toward state and national level competition. Shows consistency and competitive excellence over multiple years.',
+        issuer: 'District Chess Association'
+    },
+    {
+        id: 'ach_tabletennis_state',
+        title: 'State-Level Table Tennis Competitor',
+        category: 'award',
+        date: '2023-06-01',
+        description: 'Qualified for state-level table tennis championship - a highly competitive tier requiring surpassing numerous skilled players at district and divisional levels. Competed against the best players in the state, demonstrating mental focus and split-second decision-making.',
+        issuer: 'State Table Tennis Association'
+    },
+    {
+        id: 'ach_tabletennis_divisional',
+        title: 'Divisional Table Tennis Champion',
+        category: 'award',
+        date: '2023-04-01',
+        description: 'Won divisional-level table tennis tournament, defeating strong opponents through exceptional focus, strategy, and perseverance. This victory secured qualification for state-level competition.',
+        issuer: 'Divisional Sports Authority'
+    },
+    {
+        id: 'ach_tabletennis_district',
+        title: 'District Table Tennis Champion',
+        category: 'award',
+        date: '2022-11-01',
+        description: 'Dominated district table tennis championship, earning the title by consistently outperforming top local players. This win was crucial in progression toward divisional and state-level competitions.',
+        issuer: 'District Sports Association'
     },
     {
         id: 'ach_hackathon_first',
