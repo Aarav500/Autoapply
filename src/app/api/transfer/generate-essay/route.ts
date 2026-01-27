@@ -165,9 +165,47 @@ ${coursesStr}
 
 export async function POST(request: NextRequest) {
     try {
-        const body: GenerateEssayRequest = await request.json();
-        const { college, essay, activities, achievements, transcript, userProfile } = body;
+        const body: GenerateEssayRequest & { useAuthentic?: boolean } = await request.json();
+        const { college, essay, activities, achievements, transcript, userProfile, useAuthentic } = body;
 
+        // 🎯 NEW: Use authentic essay generation system if requested
+        if (useAuthentic) {
+            console.log('🎯 Using NEW Authentic Essay Generation System');
+            const authenticResponse = await fetch(new URL('/api/essays/generate-authentic', request.url), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    college,
+                    essay,
+                    activities,
+                    achievements,
+                    transcript,
+                    userProfile,
+                }),
+            });
+
+            if (!authenticResponse.ok) {
+                const error = await authenticResponse.json();
+                return NextResponse.json(error, { status: authenticResponse.status });
+            }
+
+            const result = await authenticResponse.json();
+
+            // Format response to match old API format for compatibility
+            return NextResponse.json({
+                success: true,
+                essay: result.essay,
+                wordCount: result.wordCount,
+                score: result.scores.overall, // Overall score as main score
+                metadata: {
+                    ...result.metadata,
+                    scores: result.scores,
+                    generationMethod: 'authentic',
+                },
+            });
+        }
+
+        // LEGACY: Original essay generation system
         const claudeKey = getClaudeKey();
 
         if (!claudeKey) {
@@ -182,7 +220,7 @@ export async function POST(request: NextRequest) {
             }, { status: 400 });
         }
 
-        console.log(`🎓 Generating essay for ${college.name}: "${essay.title}"`);
+        console.log(`🎓 Generating essay for ${college.name}: "${essay.title}" (LEGACY MODE)`);
         console.log(`📊 Using ${activities.length} activities as context`);
 
         // Sort activities by total hours (shows dedication)
