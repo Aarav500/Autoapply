@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import type { ApiResponse } from '@/types';
-import type { Education } from '@prisma/client';
 
 // ============================================
 // Validation Schemas
@@ -244,7 +243,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     }
 
     // Process data
-    const processedData: Partial<Education> = {};
+    const processedData: Record<string, unknown> = {};
 
     if (updateData.institution !== undefined) processedData.institution = updateData.institution;
     if (updateData.logo !== undefined) processedData.logo = updateData.logo;

@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import type { ApiResponse } from '@/types';
-import type { Experience } from '@prisma/client';
 
 // ============================================
 // Validation Schemas

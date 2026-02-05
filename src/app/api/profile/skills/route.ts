@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth';
 import type { ApiResponse } from '@/types';
-import type { Skill } from '@prisma/client';
 
 // ============================================
 // Validation Schemas
@@ -334,7 +333,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     }
 
     // Process update data
-    const processedData: Partial<Skill> = {};
+    const processedData: Record<string, unknown> = {};
 
     if (updateData.name !== undefined) processedData.name = updateData.name;
     if (updateData.category !== undefined) processedData.category = updateData.category;
