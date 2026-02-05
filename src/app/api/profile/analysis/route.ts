@@ -376,13 +376,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       location: profile.location,
       remotePreference: profile.remotePreference,
       yearsOfExperience: profile.yearsOfExperience,
-      skills: profile.skills.map(s => ({
+      skills: profile.skills.map((s: { name: string; category: string | null; proficiency: number | null; yearsOfExp: number | null }) => ({
         name: s.name,
         category: s.category,
         proficiency: s.proficiency,
         yearsOfExp: s.yearsOfExp,
       })),
-      experiences: profile.experiences.map(e => ({
+      experiences: profile.experiences.map((e: { company: string; title: string; description: string | null; achievements: string[]; skills: string[]; isCurrent: boolean }) => ({
         company: e.company,
         title: e.title,
         description: e.description,
@@ -390,7 +390,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         skills: e.skills,
         isCurrent: e.isCurrent,
       })),
-      education: profile.education.map(e => ({
+      education: profile.education.map((e: { institution: string; degree: string; field: string | null }) => ({
         institution: e.institution,
         degree: e.degree,
         field: e.field,
@@ -512,13 +512,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       location: profile.location,
       remotePreference: profile.remotePreference,
       yearsOfExperience: profile.yearsOfExperience,
-      skills: profile.skills.map(s => ({
+      skills: profile.skills.map((s: { name: string; category: string | null; proficiency: number | null; yearsOfExp: number | null }) => ({
         name: s.name,
         category: s.category,
         proficiency: s.proficiency,
         yearsOfExp: s.yearsOfExp,
       })),
-      experiences: profile.experiences.map(e => ({
+      experiences: profile.experiences.map((e: { company: string; title: string; description: string | null; achievements: string[]; skills: string[]; isCurrent: boolean }) => ({
         company: e.company,
         title: e.title,
         description: e.description,
@@ -526,7 +526,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         skills: e.skills,
         isCurrent: e.isCurrent,
       })),
-      education: profile.education.map(e => ({
+      education: profile.education.map((e: { institution: string; degree: string; field: string | null }) => ({
         institution: e.institution,
         degree: e.degree,
         field: e.field,

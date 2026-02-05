@@ -86,8 +86,8 @@ export function calculateJobMatch(job: Job, profile: UserProfile): MatchResult {
     const reasons: string[] = [];
 
     // Skill matching (40% of score)
-    const jobSkills = job.skills.map(s => s.toLowerCase());
-    const userSkills = profile.skills.map(s => s.toLowerCase());
+    const jobSkills = job.skills.map((s: string) => s.toLowerCase());
+    const userSkills = profile.skills.map((s: string) => s.toLowerCase());
 
     const matchedSkills = profile.skills.filter(skill =>
         jobSkills.includes(skill.toLowerCase())
@@ -109,7 +109,7 @@ export function calculateJobMatch(job: Job, profile: UserProfile): MatchResult {
 
     // Location matching (15% of score)
     const locationLower = job.location.toLowerCase();
-    const preferredLocations = profile.preferences.locations.map(l => l.toLowerCase());
+    const preferredLocations = profile.preferences.locations.map((l: string) => l.toLowerCase());
 
     if (profile.preferences.remote && job.locationType === 'remote') {
         score += 15;
