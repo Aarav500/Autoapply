@@ -61,6 +61,18 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
+        const experienceLines: string[] = [];
+        for (const exp of profile.experiences) {
+          experienceLines.push(`${exp.title} at ${exp.company}: ${exp.achievements.join(', ')}`);
+        }
+        const skillNames: string[] = [];
+        for (const skill of profile.skills) {
+          skillNames.push(skill.name);
+        }
+        const allAchievements: string[] = [];
+        for (const exp of profile.experiences) {
+          allAchievements.push(...exp.achievements);
+        }
         content = await generateCoverLetter(
           {
             title: job.title,
@@ -70,11 +82,9 @@ export async function POST(request: NextRequest) {
           {
             name: profile.user.name,
             headline: profile.headline || '',
-            experience: profile.experiences
-              .map((e) => `${e.title} at ${e.company}: ${e.achievements.join(', ')}`)
-              .join('\n'),
-            skills: profile.skills.map((s) => s.name),
-            achievements: profile.experiences.flatMap((e) => e.achievements).slice(0, 5),
+            experience: experienceLines.join('\n'),
+            skills: skillNames,
+            achievements: allAchievements.slice(0, 5),
           }
         );
         filename = `Cover_Letter_${job.company.replace(/\s+/g, '_')}_${Date.now()}.txt`;
@@ -180,24 +190,24 @@ SUMMARY:
 ${profile.summary || 'Experienced professional seeking new opportunities.'}
 
 SKILLS:
-${profile.skills.map((s) => s.name).join(', ')}
+${profile.skills.map((s: { name: string }) => s.name).join(', ')}
 
 EXPERIENCE:
 ${profile.experiences
   .map(
-    (e) => `
+    (e: { title: string; company: string; location?: string | null; startDate: Date; endDate?: Date | null; isCurrent: boolean; description?: string | null; achievements: string[] }) => `
 ${e.title} at ${e.company}
 ${e.location || ''} | ${e.startDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} - ${e.isCurrent ? 'Present' : e.endDate?.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
 ${e.description || ''}
 Achievements:
-${e.achievements.map((a) => `• ${a}`).join('\n')}`
+${e.achievements.map((a: string) => `• ${a}`).join('\n')}`
   )
   .join('\n\n')}
 
 EDUCATION:
 ${profile.education
   .map(
-    (e) => `
+    (e: { degree: string; field?: string | null; institution: string; startDate: Date; endDate?: Date | null; gpa?: number | null }) => `
 ${e.degree} in ${e.field || 'General Studies'}
 ${e.institution}
 ${e.startDate.getFullYear()} - ${e.endDate?.getFullYear() || 'Present'}${e.gpa ? ` | GPA: ${e.gpa}` : ''}`

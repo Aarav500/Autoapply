@@ -57,12 +57,12 @@ export async function GET(request: NextRequest) {
       _count: { classification: true },
     });
 
-    const counts = classificationCounts.reduce((acc, item) => {
+    const counts: Record<string, number> = {};
+    for (const item of classificationCounts) {
       if (item.classification) {
-        acc[item.classification] = item._count.classification;
+        counts[item.classification] = item._count.classification;
       }
-      return acc;
-    }, {} as Record<string, number>);
+    }
 
     // Get unread count
     const unreadCount = await db.email.count({

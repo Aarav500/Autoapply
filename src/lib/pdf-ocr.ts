@@ -67,7 +67,11 @@ export function isTextMeaningful(text: string): boolean {
     }
 
     // Check for reasonable word lengths (average should be 3-10 chars)
-    const avgWordLength = words.reduce((sum, w) => sum + w.length, 0) / words.length;
+    let totalLength = 0;
+    for (const w of words) {
+      totalLength += w.length;
+    }
+    const avgWordLength = totalLength / words.length;
     if (avgWordLength < 2 || avgWordLength > 15) {
         return false;
     }

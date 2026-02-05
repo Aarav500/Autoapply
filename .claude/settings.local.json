@@ -16,7 +16,9 @@
       "Bash(grep:*)",
       "Bash(git checkout:*)",
       "Bash(npm install:*)",
-      "Bash(npx prisma generate:*)"
+      "Bash(npx prisma generate:*)",
+      "Bash(gh run list:*)",
+      "Bash(python:*)"
     ]
   }
 }
