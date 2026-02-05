@@ -66,13 +66,10 @@ export async function GET(request: NextRequest) {
       _count: { status: true },
     });
 
-    const statusCounts = stats.reduce(
-      (acc: Record<string, number>, item) => {
-        acc[item.status] = item._count.status;
-        return acc;
-      },
-      {} as Record<string, number>
-    );
+    const statusCounts: Record<string, number> = {};
+    for (const item of stats) {
+      statusCounts[item.status] = item._count.status;
+    }
 
     return NextResponse.json({
       items: applications,
