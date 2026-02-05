@@ -1,88 +1,86 @@
-import { ProfileGraph, ValidatedEducation, ActivitySchema } from '../profile-schema';
+// Profile content generator for LinkedIn optimization
 
-type Activity = ProfileGraph['workExperience'][0];
+import { ProfileGraph, Experience } from '../profile-graph';
 
 export class ProfileGenerator {
+  /**
+   * Generate an optimized LinkedIn headline
+   */
+  static generateHeadline(graph: ProfileGraph): string {
+    const skills = graph.skills.slice(0, 3);
+    const currentRole = graph.workExperience[0]?.role;
 
-    /**
-     * Generates a strong LinkedIn headline:
-     * "{Role} | {Key Skills} | {Mission/Value Prop}"
-     */
-    static generateHeadline(graph: ProfileGraph, targetRole: string = 'Software Engineer'): string {
-        const topSkills = graph.skills
-            .filter(s => s.proficiency === 'advanced' || s.proficiency === 'expert')
-            .map(s => s.skillName)
-            .slice(0, 3)
-            .join(' • ');
-
-        const school = graph.education[0]?.school ? `Student at ${graph.education[0].school}` : '';
-
-        return `${targetRole} | ${topSkills} | ${school}`;
+    if (currentRole) {
+      if (skills.length > 0) {
+        return `${currentRole} | ${skills.join(' • ')}`;
+      }
+      return currentRole;
     }
 
-    /**
-     * Generates an About section using the "Hook -> Story -> Skills -> Call to Action" formula
-     */
-    static generateAbout(graph: ProfileGraph): string {
-        const skillsBlock = graph.skills
-            .map(s => s.skillName)
-            .join(', ');
-
-        return `
-I am a ${graph.education[0]?.major || 'student'} passionate about building software that solves real problems.
-
-CURRENTLY:
-Student at ${graph.education[0]?.school}, focusing on ${graph.skills.slice(0, 2).map(s => s.skillName).join(' and ')}.
-
-SKILLS:
-${skillsBlock}
-
-Open to new opportunities in software engineering. Connect with me!
-        `.trim();
+    if (skills.length > 0) {
+      return skills.join(' | ');
     }
 
-    /**
-     * Generates a bulleted experience block for an activity.
-     * Uses strict "Action Verb + Task + Result" formatting if data allows.
-     */
-    static generateExperienceBlock(activity: Activity): string {
-        const startDate = activity.startDate instanceof Date ? activity.startDate.toISOString() : activity.startDate;
-        const endDate = activity.endDate instanceof Date ? activity.endDate.toISOString() : activity.endDate;
-        const dateRange = `${startDate.split('T')[0]} - ${endDate ? endDate.split('T')[0] : 'Present'}`;
+    return 'Professional';
+  }
 
-        // Simple template for now - can be enhanced with LLM later
-        let content = `${activity.role} | ${activity.organization}\n${dateRange}\n\n`;
+  /**
+   * Generate an optimized LinkedIn about section
+   */
+  static generateAbout(graph: ProfileGraph): string {
+    const parts: string[] = [];
 
-        if (activity.description) {
-            content += activity.description;
-        } else {
-            content += `• Contributed to ${activity.name} as a ${activity.role}.\n`;
-            if (activity.skills && activity.skills.length > 0) {
-                content += `• Utilized: ${activity.skills.join(', ')}`;
-            }
-        }
-
-        return content;
+    // Opening hook
+    if (graph.workExperience.length > 0) {
+      const currentRole = graph.workExperience[0];
+      parts.push(
+        `${currentRole.role} at ${currentRole.organization} with expertise in building impactful solutions.`
+      );
     }
 
-    /**
-     * Analyzes keyword coverage against a target job description or role.
-     * Returns a score (0-100) and missing keywords.
-     */
-    static analyzeKeywordCoverage(text: string, targetKeywords: string[]): { score: number, missing: string[] } {
-        const lowerText = text.toLowerCase();
-        const missing: string[] = [];
-        let found = 0;
-
-        for (const keyword of targetKeywords) {
-            if (lowerText.includes(keyword.toLowerCase())) {
-                found++;
-            } else {
-                missing.push(keyword);
-            }
-        }
-
-        const score = Math.floor((found / targetKeywords.length) * 100);
-        return { score, missing };
+    // Skills highlight
+    if (graph.skills.length > 0) {
+      const topSkills = graph.skills.slice(0, 5);
+      parts.push(`\n\nCore competencies: ${topSkills.join(', ')}.`);
     }
+
+    // Experience summary
+    if (graph.workExperience.length > 1) {
+      parts.push(
+        `\n\nPreviously worked at ${graph.workExperience
+          .slice(1, 3)
+          .map((e) => e.organization)
+          .join(', ')}.`
+      );
+    }
+
+    // Call to action
+    parts.push(`\n\nOpen to connecting and discussing opportunities.`);
+
+    return parts.join('') || graph.about || '';
+  }
+
+  /**
+   * Generate optimized bullet points for an experience
+   */
+  static generateExperienceBlock(experience: Experience): string {
+    const bullets: string[] = [];
+
+    // Role summary
+    if (experience.description) {
+      bullets.push(experience.description);
+    }
+
+    // Achievements
+    if (experience.achievements && experience.achievements.length > 0) {
+      bullets.push(...experience.achievements.slice(0, 4));
+    }
+
+    // Skills used
+    if (experience.skills && experience.skills.length > 0) {
+      bullets.push(`Technologies: ${experience.skills.slice(0, 5).join(', ')}`);
+    }
+
+    return bullets.map((b) => `• ${b}`).join('\n');
+  }
 }

@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EssayPro | AI-Powered College & Job Applications",
-  description: "Your AI-powered platform for crafting perfect college transfer essays and finding the right job opportunities. Designed for international students at UCR.",
-  keywords: ["college essays", "transfer applications", "job search", "UCR", "international students", "AI writing"],
+  title: "AutoApply | AI-Powered Job Hunting",
+  description: "Your autonomous AI-powered job hunting platform. Automatically find, match, and apply to jobs while you sleep.",
+  keywords: ["job search", "auto apply", "AI job hunting", "resume", "cover letter", "interview prep"],
 };
 
 export default function RootLayout({

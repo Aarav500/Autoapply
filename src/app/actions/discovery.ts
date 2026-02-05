@@ -15,7 +15,7 @@ type ScanErrorResult = {
 
 type ScanResponse = ScanSuccessResult | ScanErrorResult;
 
-export async function runDiscoveryScan(type: 'jobs' | 'scholarships' | 'all'): Promise<ScanResponse> {
+export async function runDiscoveryScan(type: 'jobs'): Promise<ScanResponse> {
     try {
         console.log(`Starting discovery scan for: ${type}`);
 
@@ -24,13 +24,7 @@ export async function runDiscoveryScan(type: 'jobs' | 'scholarships' | 'all'): P
         const jobScrapers = ['indeed', 'handshake', 'companies', 'glassdoor', 'ziprecruiter', 'chegg'];
         // 'linkedin' - disabled temporarily until we fix its reliability issues
 
-        const scholarshipScrapers = ['bold-org', 'fastweb', 'scholarships-com'];
-
-        const platforms = type === 'all'
-            ? [...jobScrapers, ...scholarshipScrapers]
-            : type === 'jobs'
-                ? jobScrapers
-                : scholarshipScrapers;
+        const platforms = jobScrapers;
 
         // We can't return the full complex object easily, so we return a summary
         // The service updates the OpportunityStore which the UI should poll or read
@@ -39,7 +33,6 @@ export async function runDiscoveryScan(type: 'jobs' | 'scholarships' | 'all'): P
         // Revalidate all relevant pages to pick up new data
         revalidatePath('/jobs');
         revalidatePath('/job-hub');
-        revalidatePath('/scholarships');
 
         return { success: true, results } as ScanSuccessResult;
     } catch (error) {
@@ -47,4 +40,3 @@ export async function runDiscoveryScan(type: 'jobs' | 'scholarships' | 'all'): P
         return { success: false, error: String(error) } as ScanErrorResult;
     }
 }
-

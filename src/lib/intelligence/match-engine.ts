@@ -23,14 +23,14 @@ export class MatchEngine {
             strengths: []
         };
 
-        const oppText = (opportunity.title + ' ' + opportunity.description + ' ' + opportunity.requirements.join(' ')).toLowerCase();
+        const oppText = (opportunity.title + ' ' + opportunity.description + ' ' + (opportunity.requirements?.join(' ') || '')).toLowerCase();
 
         // 1. STRICT ELIGIBILITY CHECKS
         // ----------------------------------------------------
 
         // GPA Check
         const gpaMatch = oppText.match(/gpa[:\s]*(\d\.\d)/);
-        if (gpaMatch) {
+        if (gpaMatch && profile.gpa !== undefined) {
             const minGPA = parseFloat(gpaMatch[1]);
             if (profile.gpa < minGPA) {
                 analysis.score = 0;
@@ -110,7 +110,7 @@ export class MatchEngine {
         }
 
         // DEGREE LEVEL CHECK (Undergrad vs Graduate/Law/Medical)
-        const degreeLevel = profile.degree.toLowerCase();
+        const degreeLevel = (profile.degree || '').toLowerCase();
         const isUndergrad = degreeLevel.includes('bachelor') || degreeLevel.includes('undergraduate');
         if (isUndergrad) {
             const gradPatterns = ['law school', 'law student', 'graduate student', 'phd student',
@@ -124,7 +124,7 @@ export class MatchEngine {
         }
 
         // FIELD RESTRICTION CHECK (Art, Nursing, Law, Medical majors)
-        const userMajor = profile.major.toLowerCase();
+        const userMajor = (profile.major || '').toLowerCase();
         const fieldRestrictions = [
             { field: 'art', keywords: ['art student', 'art major', 'fine arts', 'art scholarship'] },
             { field: 'nursing', keywords: ['nursing student', 'nursing major', 'nursing scholarship'] },
@@ -149,7 +149,7 @@ export class MatchEngine {
         }
 
         // YEAR IN SCHOOL CHECK
-        const gradYear = profile.graduationYear;
+        const gradYear = profile.graduationYear || (new Date().getFullYear() + 1);
         const currentYear = new Date().getFullYear();
         const yearsUntilGrad = gradYear - currentYear;
 
@@ -184,8 +184,9 @@ export class MatchEngine {
         }
 
         // Major Matching
-        if (oppText.includes(profile.major.toLowerCase()) ||
-            (profile.major.toLowerCase().includes('computer science') && (oppText.includes('software') || oppText.includes('developer')))) {
+        const profileMajor = (profile.major || '').toLowerCase();
+        if (profileMajor && (oppText.includes(profileMajor) ||
+            (profileMajor.includes('computer science') && (oppText.includes('software') || oppText.includes('developer'))))) {
             score += 15;
             analysis.strengths.push('Major aligns with role');
         }
@@ -194,7 +195,7 @@ export class MatchEngine {
         // Simple keyword expansion from common leadership terms
         const leadershipKeywords = ['lead', 'president', 'founder', 'chair', 'captain'];
         const hasLeadership = leadershipKeywords.some(kw =>
-            profile.workExperience.some(exp => exp.role.toLowerCase().includes(kw)) ||
+            profile.experience.some(exp => exp.title.toLowerCase().includes(kw)) ||
             (oppText.includes('leadership') || oppText.includes('initiative'))
         );
 
@@ -244,7 +245,7 @@ export class MatchEngine {
 
         // Additional Logic: If it's a top tier company, it's always a Reach or Target, never Safety
         const topTier = ['google', 'meta', 'apple', 'microsoft', 'amazon', 'netflix', 'openai', 'anthropic'];
-        if (topTier.some(c => opportunity.organization.toLowerCase().includes(c))) {
+        if (topTier.some(c => opportunity.company.toLowerCase().includes(c))) {
             if (analysis.category === 'Safety') analysis.category = 'Target';
             if (analysis.category === 'Target') analysis.category = 'Reach';
             analysis.reasons.push('High competition expected (Top Tier Company)');

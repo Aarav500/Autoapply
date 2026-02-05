@@ -1,7 +1,7 @@
 # GitHub Actions Workflow for Docker Deployment to AWS EC2
 # Builds Docker image, uploads to S3, deploys to EC2 via SSM
 
-name: Deploy to AWS (Docker)
+name: Deploy AutoApply
 
 on:
   push:
@@ -10,12 +10,12 @@ on:
 
 env:
   APP_NAME: autoapply
-  DOCKER_IMAGE: college-essay-app
+  DOCKER_IMAGE: autoapply
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -56,11 +56,20 @@ jobs:
           CLAUDE_KEY: ${{ secrets.CLAUDE_API_KEY }}
           AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          DATABASE_URL_VAL: ${{ secrets.DATABASE_URL }}
+          NEXTAUTH_SECRET_VAL: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL_VAL: ${{ secrets.NEXTAUTH_URL }}
+          TWILIO_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_MSG_SID: ${{ secrets.TWILIO_MESSAGING_SERVICE_SID }}
+          TWILIO_PHONE: ${{ secrets.TWILIO_PHONE_NUMBER }}
+          SENDGRID_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          SENDGRID_EMAIL: ${{ secrets.SENDGRID_FROM_EMAIL }}
         run: |
           cat > deploy-script.sh << 'SCRIPT_EOF'
           #!/bin/bash
           set -e
-          echo "=== Starting Docker Deployment ==="
+          echo "=== Starting AutoApply Docker Deployment ==="
 
           # Install Docker if not present
           if ! command -v docker &> /dev/null; then
@@ -135,20 +144,29 @@ jobs:
           echo "Loading Docker image..."
           gunzip -c /home/ubuntu/docker-image.tar.gz | sudo docker load
 
-          # Run new container
+          # Run new container with all environment variables
           echo "Starting new container..."
-          sudo docker run -d \
-            --name autoapply \
-            --restart unless-stopped \
-            -p 3000:3000 \
-            -e NODE_ENV=production \
-            -e CLAUDE_API_KEY="${CLAUDE_KEY}" \
-            -e NEXT_PUBLIC_CLAUDE_API_KEY="${CLAUDE_KEY}" \
-            -e AWS_REGION="${AWS_REGION_VAL}" \
-            -e S3_BUCKET_NAME="${S3_BUCKET}" \
-            -e AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY}" \
-            -e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_KEY}" \
-            college-essay-app:latest
+          sudo docker run -d \\
+            --name autoapply \\
+            --restart unless-stopped \\
+            -p 3000:3000 \\
+            -e NODE_ENV=production \\
+            -e CLAUDE_API_KEY="${CLAUDE_KEY}" \\
+            -e ANTHROPIC_API_KEY="${CLAUDE_KEY}" \\
+            -e AWS_REGION="${AWS_REGION_VAL}" \\
+            -e S3_BUCKET_NAME="${S3_BUCKET}" \\
+            -e AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY}" \\
+            -e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_KEY}" \\
+            -e DATABASE_URL="${DATABASE_URL_VAL}" \\
+            -e NEXTAUTH_SECRET="${NEXTAUTH_SECRET_VAL}" \\
+            -e NEXTAUTH_URL="${NEXTAUTH_URL_VAL}" \\
+            -e TWILIO_ACCOUNT_SID="${TWILIO_SID}" \\
+            -e TWILIO_AUTH_TOKEN="${TWILIO_TOKEN}" \\
+            -e TWILIO_MESSAGING_SERVICE_SID="${TWILIO_MSG_SID}" \\
+            -e TWILIO_PHONE_NUMBER="${TWILIO_PHONE}" \\
+            -e SENDGRID_API_KEY="${SENDGRID_KEY}" \\
+            -e SENDGRID_FROM_EMAIL="${SENDGRID_EMAIL}" \\
+            autoapply:latest
 
           # Cleanup
           rm -f /home/ubuntu/docker-image.tar.gz
@@ -171,13 +189,13 @@ jobs:
       - name: Deploy to EC2 via SSM
         run: |
           echo "🚀 Deploying to EC2..."
-          
+
           INSTANCE_ID="${{ secrets.EC2_INSTANCE_ID }}"
           S3_BUCKET="${{ secrets.S3_BUCKET_NAME }}"
           REGION="${{ secrets.AWS_REGION }}"
-          
+
           echo "📍 Instance: $INSTANCE_ID"
-          
+
           # Send SSM command to download and run script
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
@@ -187,10 +205,10 @@ jobs:
             --timeout-seconds 900 \
             --query "Command.CommandId" \
             --output text)
-          
+
           echo "📋 Command ID: $COMMAND_ID"
           echo "⏳ Waiting for deployment to complete..."
-          
+
           # Wait for command to complete
           for i in {1..30}; do
             STATUS=$(aws ssm get-command-invocation \
@@ -198,9 +216,9 @@ jobs:
               --instance-id "$INSTANCE_ID" \
               --query "Status" \
               --output text 2>/dev/null || echo "Pending")
-            
+
             echo "Status: $STATUS"
-            
+
             if [ "$STATUS" = "Success" ]; then
               echo "✅ Deployment succeeded!"
               aws ssm get-command-invocation \
@@ -218,22 +236,22 @@ jobs:
                 --output text
               exit 1
             fi
-            
+
             sleep 10
           done
 
       - name: Get Application URL
         run: |
           INSTANCE_ID="${{ secrets.EC2_INSTANCE_ID }}"
-          
+
           PUBLIC_IP=$(aws ec2 describe-instances \
             --instance-ids "$INSTANCE_ID" \
             --query "Reservations[0].Instances[0].PublicIpAddress" \
             --output text)
-          
+
           echo ""
           echo "========================================"
-          echo "🎉 DEPLOYMENT COMPLETE!"
+          echo "🎉 AUTOAPPLY DEPLOYMENT COMPLETE!"
           echo "========================================"
           echo "🐳 Docker Container: autoapply"
           echo "🌐 URL: http://$PUBLIC_IP:3000"
@@ -247,18 +265,18 @@ jobs:
             --instance-ids "$INSTANCE_ID" \
             --query "Reservations[0].Instances[0].PublicIpAddress" \
             --output text)
-          
+
           echo "Testing http://$PUBLIC_IP:3000..."
           sleep 15
-          
+
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://$PUBLIC_IP:3000" --connect-timeout 30 || echo "000")
-          
+
           if [ "$HTTP_CODE" == "200" ] || [ "$HTTP_CODE" == "304" ]; then
-            echo "✅ App is live and responding!"
+            echo "✅ AutoApply is live and responding!"
           else
             echo "⚠️ HTTP $HTTP_CODE - app may still be starting"
             echo "Check container logs: ssh to EC2 and run 'docker logs autoapply'"
           fi
-          
+
           echo ""
           echo "🌐 http://$PUBLIC_IP:3000"

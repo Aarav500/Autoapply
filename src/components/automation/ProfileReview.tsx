@@ -30,7 +30,7 @@ export const ProfileReview: React.FC<ProfileReviewProps> = ({ data, onRefresh })
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <StatCard
                     label="Snapshot Updated"
-                    value={new Date(snapshot.lastUpdated).toLocaleDateString()}
+                    value={snapshot.lastUpdated ? new Date(snapshot.lastUpdated).toLocaleDateString() : 'Never'}
                     icon={<CheckCircle2 className="w-4 h-4 text-green-400" />}
                 />
                 <StatCard

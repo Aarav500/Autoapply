@@ -1,310 +1,783 @@
-// Prisma Schema for College Essay & Job Application Platform
+// AutoApply - Autonomous Job Hunting AI System
+// Prisma Schema v1.0
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-// User Model
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String
-  school       String   @default("UCR")
-  expectedGrad String?
-  isInternational Boolean @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String   @id @default(cuid())
+  email           String   @unique
+  emailVerified   DateTime?
+  name            String
+  image           String?
+  phone           String?
+  whatsappNumber  String?
+  timezone        String   @default("UTC")
 
   // Relations
-  documents    Document[]
-  essays       Essay[]
-  jobs         JobApplication[]
-  activities   Activity[]
-  achievements Achievement[]
-  emails       EmailDraft[]
-  education    Education[]
-  skills       UserSkill[]
-  leads        Lead[]
+  profile         Profile?
+  accounts        Account[]
+  sessions        Session[]
+  jobs            Job[]
+  applications    Application[]
+  documents       Document[]
+  emails          Email[]
+  interviews      Interview[]
+  notifications   Notification[]
+  savedSearches   SavedSearch[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
-// Document Storage
-model Document {
-  id        String   @id @default(cuid())
-  userId    String
-  name      String
-  type      String   // resume, paper, transcript, certificate, other
-  mimeType  String
-  size      Int
-  s3Key     String
-  s3Url     String
-  status    String   @default("pending") // pending, processing, analyzed
-  analysis  Json?    // Parsed content, skills, education, etc.
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
 
-  user      User     @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([provider, providerAccountId])
   @@index([userId])
 }
 
-// College Essay
-model Essay {
+model Session {
   id           String   @id @default(cuid())
+  sessionToken String   @unique
   userId       String
-  collegeId    String
-  collegeName  String
-  prompt       String   @db.Text
-  wordLimit    Int
-  currentDraft String   @db.Text
-  status       String   @default("not-started") // not-started, draft, review, complete
-  confidence   Float    @default(0)
-  deadline     DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  expires      DateTime
 
-  user         User           @relation(fields: [userId], references: [id])
-  versions     EssayVersion[]
-  feedback     EssayFeedback[]
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([collegeId])
 }
 
-// Essay Version History
-model EssayVersion {
-  id        String   @id @default(cuid())
-  essayId   String
-  content   String   @db.Text
-  confidence Float
-  version   Int
-  createdAt DateTime @default(now())
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
 
-  essay     Essay    @relation(fields: [essayId], references: [id])
-
-  @@index([essayId])
+  @@unique([identifier, token])
 }
 
-// AI Feedback on Essays
-model EssayFeedback {
-  id        String   @id @default(cuid())
-  essayId   String
-  type      String   // strength, improvement, suggestion
-  content   String   @db.Text
-  applied   Boolean  @default(false)
-  createdAt DateTime @default(now())
+// ============================================
+// USER PROFILE
+// ============================================
 
-  essay     Essay    @relation(fields: [essayId], references: [id])
+model Profile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([essayId])
+  // Basic info
+  headline         String?
+  summary          String?  @db.Text
+  location         String?
+
+  // Work preferences
+  remotePreference String?  // remote, hybrid, onsite, any
+  willingToRelocate Boolean @default(false)
+  availableFrom    DateTime?
+  noticePeriod     Int?     // days
+
+  // Salary expectations
+  salaryMin        Int?
+  salaryMax        Int?
+  salaryCurrency   String   @default("USD")
+
+  // Experience
+  yearsOfExperience Float?
+
+  // External profiles
+  githubUrl        String?
+  githubUsername   String?
+  githubData       Json?    // Cached analysis
+  linkedinUrl      String?
+  linkedinData     Json?    // Cached analysis
+  portfolioUrl     String?
+  personalWebsite  String?
+  twitterUrl       String?
+
+  // Primary resume
+  resumeS3Key      String?
+  resumeUpdatedAt  DateTime?
+
+  // Relations
+  skills           Skill[]
+  experiences      Experience[]
+  education        Education[]
+
+  // Completion tracking
+  completionScore  Int      @default(0)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
-// Job Application
-model JobApplication {
+model Skill {
   id          String   @id @default(cuid())
-  userId      String
-  title       String
-  company     String
-  location    String
-  type        String   // on-campus, internship, full-time
-  description String?  @db.Text
-  url         String?
-  source      String   @default("manual") // handshake, linkedin, manual
-  match       Float    @default(0)
-  status      String   @default("saved") // saved, applied, interview, offer, rejected
-  appliedAt   DateTime?
-  deadline    DateTime?
-  notes       String?  @db.Text
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  name        String
+  category    String?  // technical, soft, language, tool, framework
+  proficiency Int?     // 1-5 (1=beginner, 5=expert)
+  yearsOfExp  Float?
+  isHighlight Boolean  @default(false)
+  endorsements Int     @default(0)
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  user        User     @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-  @@index([status])
+  @@unique([profileId, name])
+  @@index([profileId])
+  @@index([category])
 }
 
-// Extracurricular Activity
-model Activity {
-  id           String   @id @default(cuid())
-  userId       String
-  name         String
-  role         String
-  organization String
+model Experience {
+  id           String    @id @default(cuid())
+  profileId    String
+  profile      Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  company      String
+  companyLogo  String?
+  title        String
+  location     String?
+  locationType String?   // remote, hybrid, onsite
+
   startDate    DateTime
   endDate      DateTime?
-  isCurrent    Boolean  @default(false)
-  description  String   @db.Text
-  hoursPerWeek Int
-  weeksPerYear Int
-  order        Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  isCurrent    Boolean   @default(false)
 
-  user         User     @relation(fields: [userId], references: [id])
-  skills       ActivitySkill[]
-  variants     PostVariant[]
-
-  @@index([userId])
-}
-
-// Achievement/Award
-model Achievement {
-  id           String   @id @default(cuid())
-  userId       String
-  title        String
-  organization String
-  date         DateTime
-  description  String?  @db.Text
-  createdAt    DateTime @default(now())
-
-  user         User     @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-}
-
-// Email Draft
-model EmailDraft {
-  id          String   @id @default(cuid())
-  userId      String
-  to          String
-  subject     String
-  body        String   @db.Text
-  status      String   @default("draft") // draft, scheduled, sent
-  category    String   @default("other") // job, college, other
-  scheduledAt DateTime?
-  sentAt      DateTime?
-  starred     Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  user        User     @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-  @@index([status])
-}
-
-// Target College
-model TargetCollege {
-  id           String   @id @default(cuid())
-  name         String
-  fullName     String
-  deadline     DateTime?
-  essayCount   Int      @default(0)
-  prompts      Json?    // Array of prompt objects
-  requirements Json?    // Application requirements
-  lastScraped  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@unique([name])
-}
-
-// Interview Question
-model InterviewQuestion {
-  id         String   @id @default(cuid())
-  question   String   @db.Text
-  category   String   // general, behavioral, college, job
-  difficulty String   // easy, medium, hard
-  sampleAnswer String? @db.Text
-  createdAt  DateTime @default(now())
-}
-
-// Expanded Education History
-model Education {
-  id           String   @id @default(cuid())
-  userId       String
-  school       String
-  degree       String
-  major        String
-  gpa          Float?
-  startDate    DateTime
-  endDate      DateTime? // null if current
   description  String?   @db.Text
+  achievements String[]  // Bullet points with quantified results
+  skills       String[]  // Skills used in this role
 
-  user         User      @relation(fields: [userId], references: [id])
+  // For AI matching
+  embedding    Json?     // Vector embedding of description
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([profileId])
+}
+
+model Education {
+  id          String    @id @default(cuid())
+  profileId   String
+  profile     Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  institution String
+  logo        String?
+  degree      String    // Bachelor's, Master's, PhD, etc.
+  field       String?   // Major/Field of study
+
+  startDate   DateTime
+  endDate     DateTime?
+  isCurrent   Boolean   @default(false)
+
+  gpa         Float?
+  gpaScale    Float?    @default(4.0)
+  honors      String[]  // Dean's list, Summa Cum Laude, etc.
+  activities  String[]  // Clubs, organizations
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([profileId])
+}
+
+// ============================================
+// JOBS & MATCHING
+// ============================================
+
+model Job {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Job details
+  title           String
+  company         String
+  companyLogo     String?
+  companyWebsite  String?
+  location        String?
+  locationType    String?  // remote, hybrid, onsite
+
+  // Compensation
+  salaryMin       Int?
+  salaryMax       Int?
+  salaryCurrency  String?
+  salaryPeriod    String?  // yearly, monthly, hourly
+
+  // Description
+  description     String   @db.Text
+  requirements    String?  @db.Text
+  responsibilities String? @db.Text
+  benefits        String?  @db.Text
+
+  // Skills
+  requiredSkills  String[]
+  preferredSkills String[]
+
+  // Source tracking
+  sourceUrl       String
+  sourcePlatform  String   // linkedin, indeed, glassdoor, etc.
+  externalId      String?
+  applyUrl        String?
+
+  // AI analysis
+  matchScore      Float?   // 0-100
+  matchReasons    String[] // Why it matches
+  missingSkills   String[] // Skills gap
+  embedding       Json?    // Vector embedding
+
+  // User actions
+  isBookmarked    Boolean  @default(false)
+  isHidden        Boolean  @default(false)
+  viewedAt        DateTime?
+
+  // Application
+  application     Application?
+
+  // Timestamps
+  postedAt        DateTime?
+  expiresAt       DateTime?
+  scrapedAt       DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([sourcePlatform, externalId])
+  @@index([userId, matchScore])
+  @@index([userId, isBookmarked])
+  @@index([sourcePlatform])
+  @@index([company])
+}
+
+model SavedSearch {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name           String
+  query          String?
+
+  // Filters
+  titles         String[]
+  companies      String[]
+  locations      String[]
+  remoteOnly     Boolean  @default(false)
+  salaryMin      Int?
+  salaryMax      Int?
+  experienceMin  Int?
+  experienceMax  Int?
+
+  isActive       Boolean  @default(true)
+  alertFrequency String   @default("daily") // instant, daily, weekly
+
+  lastRunAt      DateTime?
+  lastMatchCount Int      @default(0)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@index([userId])
 }
 
-// Master Skill Taxonomy
-model Skill {
-  id          String    @id @default(cuid())
-  name        String    @unique // Canonical name (e.g., "Python")
-  category    String?   // e.g., "Programming", "Soft Skill"
+// ============================================
+// APPLICATIONS
+// ============================================
+
+model Application {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId           String   @unique
+  job             Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  status          String   @default("applied")
+  // applied, screening, phone_screen, interview, technical,
+  // onsite, offer, negotiation, accepted, rejected, withdrawn
+
+  appliedAt       DateTime @default(now())
+  appliedVia      String?  // manual, auto, easy_apply, direct
+
+  // Documents used
+  resumeDocId     String?
+  coverLetterDocId String?
+
+  // Tracking
+  lastActivity    DateTime @default(now())
+  nextFollowUp    DateTime?
+  followUpCount   Int      @default(0)
+
+  // Response tracking
+  responseReceived Boolean @default(false)
+  responseDate     DateTime?
+
+  notes           String?  @db.Text
 
   // Relations
-  users       UserSkill[]
-  activities  ActivitySkill[]
+  emails          Email[]
+  interviews      Interview[]
+  logs            ApplicationLog[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, appliedAt])
 }
 
-// User-Skill Proficiency
-model UserSkill {
+model ApplicationLog {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  action        String      // status_change, note_added, email_sent, follow_up
+  oldValue      String?
+  newValue      String?
+  description   String?
+
+  createdAt     DateTime    @default(now())
+
+  @@index([applicationId])
+}
+
+// ============================================
+// DOCUMENTS
+// ============================================
+
+model Document {
   id          String   @id @default(cuid())
   userId      String
-  skillId     String
-  proficiency String   // beginner, intermediate, advanced, expert
-  verified    Boolean  @default(false)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user        User     @relation(fields: [userId], references: [id])
-  skill       Skill    @relation(fields: [skillId], references: [id])
-
-  @@unique([userId, skillId])
-  @@index([userId])
-  @@index([skillId])
-}
-
-// Join table for Activity <-> Skills
-model ActivitySkill {
-  activityId String
-  skillId    String
-
-  activity   Activity @relation(fields: [activityId], references: [id])
-  skill      Skill    @relation(fields: [skillId], references: [id])
-
-  @@id([activityId, skillId])
-  @@index([activityId])
-  @@index([skillId])
-}
-
-// Generated Content Variants (for LinkedIn Posts)
-model PostVariant {
-  id          String   @id @default(cuid())
-  activityId  String
-  type        String   // story, technical, lesson, outcome
-  content     String   @db.Text
-  hookScore   Float?
-  readability Float?
-  status      String   @default("draft") // draft, scheduled, published
-  scheduledFor DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  activity    Activity @relation(fields: [activityId], references: [id])
-
-  @@index([activityId])
-}
-
-// Networking / Outreach
-model Lead {
-  id          String   @id @default(cuid())
-  userId      String
+  type        String   // resume, cover_letter, portfolio, reference, thank_you, other
   name        String
-  headline    String?
-  company     String?
-  source      String   // linkedin, alumni_dir, manual
-  profileUrl  String?
-  status      String   // identified, contacted, replied, closed
-  matchScore  Float?   // Correlation to user goals
-  lastContactedAt DateTime?
+
+  // Storage
+  s3Key       String
+  s3Url       String?
+  mimeType    String   @default("application/pdf")
+  fileSize    Int?
+
+  // Versioning
+  version     Int      @default(1)
+  isDefault   Boolean  @default(false)
+  parentId    String?  // Previous version
+
+  // For job-specific documents
+  forJobId    String?
+  forCompany  String?
+
+  // AI metadata
+  extractedText String? @db.Text
+  aiSummary     String? @db.Text
+  atsScore      Int?    // ATS compatibility score
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  user        User     @relation(fields: [userId], references: [id])
+  @@index([userId, type])
+  @@index([userId, isDefault])
+}
 
+model Template {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // resume, cover_letter
+  description String?
+
+  content     String   @db.Text  // Template content (HTML/JSON)
+  thumbnail   String?  // Preview image URL
+
+  isPublic    Boolean  @default(true)
+  isPremium   Boolean  @default(false)
+
+  usageCount  Int      @default(0)
+  rating      Float?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type, isPublic])
+}
+
+// ============================================
+// EMAIL & COMMUNICATION
+// ============================================
+
+model Email {
+  id              String       @id @default(cuid())
+  userId          String
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applicationId   String?
+  application     Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  // Email metadata
+  externalId      String       @unique
+  threadId        String?
+  provider        String       // gmail, outlook
+
+  // Addresses
+  from            String
+  fromName        String?
+  to              String
+  toName          String?
+  cc              String[]
+  replyTo         String?
+
+  subject         String
+
+  // Content
+  bodyText        String       @db.Text
+  bodyHtml        String?      @db.Text
+  snippet         String?      // Preview text
+
+  // Attachments
+  hasAttachments  Boolean      @default(false)
+  attachments     Json?
+
+  // AI classification
+  classification  String?      // recruiter, rejection, interview, offer, follow_up, newsletter, spam
+  confidence      Float?
+  sentiment       String?      // positive, neutral, negative
+  extractedInfo   Json?        // Extracted interview dates, names, etc.
+
+  // Actions
+  isRead          Boolean      @default(false)
+  isStarred       Boolean      @default(false)
+  isArchived      Boolean      @default(false)
+  isProcessed     Boolean      @default(false)
+  needsResponse   Boolean      @default(false)
+
+  // AI response
+  suggestedReply  String?      @db.Text
+  replySent       Boolean      @default(false)
+  replySentAt     DateTime?
+
+  receivedAt      DateTime
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([userId, classification])
+  @@index([userId, isRead])
+  @@index([userId, needsResponse])
+  @@index([threadId])
+}
+
+model EmailAccount {
+  id            String   @id @default(cuid())
+  userId        String
+
+  provider      String   // gmail, outlook
+  email         String
+
+  accessToken   String   @db.Text
+  refreshToken  String?  @db.Text
+  tokenExpiry   DateTime?
+
+  isActive      Boolean  @default(true)
+  lastSyncAt    DateTime?
+  syncCursor    String?  // For incremental sync
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, email])
   @@index([userId])
+}
+
+// ============================================
+// INTERVIEWS
+// ============================================
+
+model Interview {
+  id              String      @id @default(cuid())
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applicationId   String
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  // Interview details
+  type            String      // phone_screen, video, technical, behavioral, onsite, panel, final
+  round           Int         @default(1)
+  title           String?     // "Technical Interview with Engineering Team"
+
+  scheduledAt     DateTime?
+  duration        Int?        // minutes
+  timezone        String?
+
+  // Location
+  location        String?     // URL for video, address for onsite
+  meetingLink     String?
+  platform        String?     // zoom, teams, google_meet, in_person
+
+  // Participants
+  interviewers    Json?       // Array of {name, title, linkedinUrl, email}
+
+  status          String      @default("pending")
+  // pending, confirmed, completed, cancelled, rescheduled, no_show
+
+  // Preparation
+  prepMaterials   Json?       // AI-generated prep
+  companyResearch Json?       // Company info
+  practiceQuestions String[]
+  questionsToAsk  String[]
+
+  // Post-interview
+  notes           String?     @db.Text
+  feedback        String?     @db.Text
+  rating          Int?        // 1-5 self-rating
+  outcome         String?     // passed, failed, pending
+
+  // Calendar
+  calendarEventId String?
+
+  // Reminders
+  reminderSent24h Boolean     @default(false)
+  reminderSent1h  Boolean     @default(false)
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([userId, scheduledAt])
+  @@index([userId, status])
+  @@index([applicationId])
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type        String   // interview_reminder, new_match, status_update, deadline, system
+  channel     String   // app, email, sms, whatsapp
+  priority    String   @default("normal") // low, normal, high, urgent
+
+  title       String
+  body        String   @db.Text
+  data        Json?    // Additional context, links
+
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+
+  // Delivery tracking
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  failedAt    DateTime?
+  failureReason String?
+  retryCount  Int      @default(0)
+
+  // Scheduling
+  scheduledFor DateTime?
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([userId, type])
+  @@index([scheduledFor])
+}
+
+model NotificationPreference {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+
+  // Channels enabled
+  emailEnabled    Boolean  @default(true)
+  smsEnabled      Boolean  @default(false)
+  whatsappEnabled Boolean  @default(false)
+  pushEnabled     Boolean  @default(true)
+
+  // Notification types
+  newMatches      Boolean  @default(true)
+  statusUpdates   Boolean  @default(true)
+  interviewReminders Boolean @default(true)
+  deadlineReminders Boolean @default(true)
+  applicationFollowUps Boolean @default(true)
+  weeklyDigest    Boolean  @default(true)
+
+  // Quiet hours
+  quietHoursEnabled Boolean @default(false)
+  quietHoursStart   String? // "22:00"
+  quietHoursEnd     String? // "08:00"
+  quietHoursTimezone String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============================================
+// PLATFORM OPTIMIZATION
+// ============================================
+
+model PlatformAnalysis {
+  id          String   @id @default(cuid())
+  userId      String
+
+  platform    String   // github, linkedin
+  profileUrl  String?
+
+  // Analysis results
+  overallScore Int?    // 0-100
+  analysis    Json     // Detailed analysis
+  suggestions Json     // Improvement suggestions
+
+  // Task tracking
+  completedTasks String[]
+  pendingTasks   Json?
+
+  lastAnalyzedAt DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, platform])
+  @@index([userId])
+}
+
+// ============================================
+// AUTO-APPLY SYSTEM
+// ============================================
+
+model AutoApplyRule {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+
+  isEnabled       Boolean  @default(false)
+
+  // Match filters
+  minMatchScore   Int      @default(75)
+  requiredSkillsMatch Int  @default(60) // Percentage of required skills
+
+  // Rate limiting
+  maxApplicationsPerDay Int @default(10)
+  maxApplicationsPerWeek Int @default(50)
+
+  // Exclusions
+  excludeCompanies String[]
+  excludeKeywords  String[]
+  excludeLocations String[]
+
+  // Inclusions (if set, ONLY apply to these)
+  includeCompanies String[]
+  preferRemote     Boolean  @default(true)
+
+  // Timing
+  applyWindowStart String   @default("09:00")
+  applyWindowEnd   String   @default("17:00")
+  timezone         String   @default("UTC")
+  enableWeekends   Boolean  @default(false)
+
+  // Document preferences
+  defaultResumeId  String?
+  generateCoverLetter Boolean @default(true)
+
+  // Stats
+  totalApplied     Int      @default(0)
+  totalSuccessful  Int      @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============================================
+// SYSTEM & LOGGING
+// ============================================
+
+model JobScrapingLog {
+  id          String   @id @default(cuid())
+  platform    String
+
+  startedAt   DateTime
+  completedAt DateTime?
+
+  jobsFound   Int      @default(0)
+  jobsNew     Int      @default(0)
+  jobsUpdated Int      @default(0)
+  jobsExpired Int      @default(0)
+
+  status      String   @default("running") // running, completed, failed
+  error       String?  @db.Text
+
+  createdAt   DateTime @default(now())
+
+  @@index([platform, startedAt])
+}
+
+model AIUsageLog {
+  id          String   @id @default(cuid())
+  userId      String?
+
+  provider    String   // anthropic, openai
+  model       String
+  operation   String   // job_match, cover_letter, email_classify, etc.
+
+  inputTokens  Int
+  outputTokens Int
+  totalTokens  Int
+
+  latencyMs   Int?
+  success     Boolean  @default(true)
+  error       String?
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([operation])
+}
+
+// ============================================
+// JOB QUEUE (Database-based, no Redis)
+// ============================================
+
+model JobQueue {
+  id          String   @id @default(cuid())
+  queue       String   // Queue name
+  data        Json     // Job payload
+  status      String   @default("pending") // pending, processing, completed, failed
+  priority    Int      @default(0)
+
+  // Timing
+  runAt       DateTime @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  failedAt    DateTime?
+
+  // Retry logic
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(3)
+  error       String?  @db.Text
+
+  // Result
+  result      Json?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([queue, status, runAt])
+  @@index([status])
 }

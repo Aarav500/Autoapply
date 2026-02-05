@@ -1,27 +1,25 @@
 'use client';
 
 import { ReactNode } from 'react';
-import Sidebar from '@/components/Sidebar';
-import { ToastContainer, OfflineIndicator } from '@/components/Notifications';
-import { ErrorBoundary } from '@/lib/error-handling';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 1000,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 interface ClientLayoutProps {
-    children: ReactNode;
+  children: ReactNode;
 }
 
 export default function ClientLayout({ children }: ClientLayoutProps) {
-    return (
-        <>
-            <OfflineIndicator />
-            <ToastContainer />
-            <div className="flex min-h-screen">
-                <Sidebar />
-                <main className="flex-1 p-8 overflow-auto">
-                    <ErrorBoundary>
-                        {children}
-                    </ErrorBoundary>
-                </main>
-            </div>
-        </>
-    );
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  );
 }

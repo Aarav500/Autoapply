@@ -1,363 +1,133 @@
-// ============================================
-// USER PROFILE - Complete Schema
-// Used by Universal Form Filler to auto-fill any form
-// ============================================
-
-export interface WorkExperience {
-    company: string;
-    role: string;
-    startDate: string;
-    endDate: string;
-    description: string;
-    current: boolean;
-}
-
-export interface Education {
-    school: string;
-    degree: string;
-    major: string;
-    gpa: number;
-    graduationYear: number;
-    graduationMonth: string;
-}
+// User profile for job matching
 
 export interface UserProfile {
-    // Personal
-    firstName: string;
-    lastName: string;
-    fullName: string;
-    email: string;
-    phone: string;
-    dateOfBirth: string;
-
-    // Address
-    address: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    country: string;
-
-    // Education (primary)
-    school: string;
-    major: string;
-    gpa: number;
-    graduationYear: number;
-    graduationMonth: string;
+  id: string;
+  name: string;
+  email: string;
+  headline?: string;
+  summary?: string;
+  location?: string;
+  state?: string;
+  citizenship?: string;
+  ethnicity?: string;
+  gender?: string;
+  gpa?: number;
+  major?: string;
+  school?: string;
+  graduationYear?: number;
+  degree?: string;
+  skills: string[];
+  activities?: {
+    name: string;
+    description?: string;
+    role?: string;
+  }[];
+  achievements?: {
+    type: string;
+    title: string;
+    description?: string;
+  }[];
+  experience: {
+    title: string;
+    company: string;
+    years: number;
+    description?: string;
+  }[];
+  education: {
     degree: string;
-
-    // All education history
-    educationHistory: Education[];
-
-    // Demographics (optional - for diversity scholarships)
-    citizenship: string;
-    ethnicity?: string;
-    gender?: string;
-    veteranStatus?: string;
-    disabilityStatus?: string;
-
-    // Work Experience
-    workExperience: WorkExperience[];
-
-    // Skills
-    skills: string[];
-    languages: string[];
-
-    // Skills with proficiency levels
-    skillsTaxonomy?: SkillWithProficiency[];
-
-    // Links
-    linkedIn: string;
-    github?: string;
-    portfolio?: string;
-    personalWebsite?: string;
-
-    // Documents (paths to files)
-    resumePath?: string;
-    coverLetterPath?: string;
-    transcriptPath?: string;
-
-    // Document vault (user-controlled uploads)
-    documentVault?: DocumentVault;
-
-    // Essay answers (pre-written for common prompts)
-    essayAnswers: {
-        whyThisSchool?: string;
-        careerGoals?: string;
-        biggestChallenge?: string;
-        leadershipExperience?: string;
-        communityService?: string;
-    };
-
-    // Job/Opportunity Preferences
-    preferences?: UserJobPreferences;
-
-    // Constraints (for eligibility matching)
-    constraints?: UserEligibilityConstraints;
-
-    // Availability
-    availability?: UserAvailability;
-
-    // Activities (projects, volunteering, clubs)
-    activities?: Activity[];
-
-    // Achievements (awards, honors, publications)
-    achievements?: Achievement[];
-}
-
-// ============================================
-// NEW TYPES FOR ENHANCED MATCHING
-// ============================================
-
-export interface SkillWithProficiency {
-    skill: string;
-    proficiency: 'beginner' | 'intermediate' | 'advanced' | 'expert';
-    yearsOfExperience?: number;
-}
-
-export interface DocumentVault {
-    transcripts?: { name: string; path: string; uploadedAt: string }[];
-    certificates?: { name: string; path: string; uploadedAt: string }[];
-    recommendationLetters?: { name: string; recommenderName: string; path: string; uploadedAt: string }[];
-    idDocuments?: { name: string; path: string; uploadedAt: string }[];
-    portfolioItems?: { name: string; path: string; type: string; uploadedAt: string }[];
-}
-
-export interface UserJobPreferences {
-    // Job preferences
+    institution: string;
+    year?: number;
+  }[];
+  preferences: {
     desiredRoles: string[];
-    desiredIndustries: string[];
     desiredLocations: string[];
     remotePreference: 'remote' | 'hybrid' | 'onsite' | 'any';
-    salaryExpectations?: {
-        min: number;
-        currency: string;
-        period: 'hourly' | 'monthly' | 'yearly';
-    };
-    employmentTypes: ('internship' | 'full-time' | 'part-time' | 'contract')[];
-
-    // Work authorization
-    workAuthorization: {
-        hasUSWorkAuth: boolean;
-        needsVisaSponsorship: boolean;
-        citizenship: string;
-        visaType?: string;
-    };
+    salaryMin?: number;
+    salaryMax?: number;
+    yearsOfExperience?: number;
+  };
 }
 
-export interface UserEligibilityConstraints {
-    citizenship: string;
-    residency?: string;
-    isTransferStudent: boolean;
-    isFirstGen: boolean;
-    isLowIncome: boolean;
-    hasDisability?: boolean;
-    isVeteran?: boolean;
-    age?: number;
-}
-
-export interface UserAvailability {
-    earliestStartDate?: string;
-    hoursPerWeek?: number;
-    availableForFullTime: boolean;
-    availableForPartTime: boolean;
-    summerOnly?: boolean;
-}
-
-export interface Activity {
-    id: string;
-    name: string;
-    type: 'project' | 'volunteering' | 'club' | 'research' | 'work' | 'other';
-    organization?: string;
-    role?: string;
-    startDate: string;
-    endDate?: string;
-    current: boolean;
-    description: string;
-    achievements?: string[];
-    skills?: string[];
-}
-
-export interface Achievement {
-    id: string;
-    title: string;
-    type: 'award' | 'honor' | 'publication' | 'competition' | 'certification' | 'other';
-    issuer?: string;
-    date: string;
-    description?: string;
-    url?: string;
-}
-
-
-
-// Default profile for Aarav Shah
 export const DEFAULT_PROFILE: UserProfile = {
-    // Personal
-    firstName: 'Aarav',
-    lastName: 'Shah',
-    fullName: 'Aarav Shah',
-    email: 'ashah264@ucr.edu',
-    phone: '+19509062964',
-    dateOfBirth: '2004-01-15', // Placeholder
-
-    // Address
-    address: '',
-    city: 'Riverside',
-    state: 'California',
-    zipCode: '92521',
-    country: 'United States',
-
-    // Education
-    school: 'University of California, Riverside',
-    major: 'Computer Science',
-    gpa: 3.9,
-    graduationYear: 2026,
-    graduationMonth: 'June',
-    degree: 'Bachelor of Science',
-
-    educationHistory: [
-        {
-            school: 'University of California, Riverside',
-            degree: 'Bachelor of Science',
-            major: 'Computer Science',
-            gpa: 3.9,
-            graduationYear: 2026,
-            graduationMonth: 'June',
-        }
-    ],
-
-    // Demographics
-    citizenship: 'India',
-    ethnicity: 'Asian',
-    gender: 'Male',
-
-    // Work Experience
-    workExperience: [],
-
-    // Skills
-    skills: [
-        'Python', 'JavaScript', 'TypeScript', 'React', 'Next.js',
-        'Node.js', 'SQL', 'Machine Learning', 'AWS', 'Docker',
-        'Git', 'REST APIs', 'Data Structures', 'Algorithms'
-    ],
-    languages: ['English', 'Hindi', 'Gujarati'],
-
-    // Links
-    linkedIn: 'https://www.linkedin.com/in/aarav-shah-9b878329a/',
-    github: 'https://github.com/ashah264',
-
-    // Essay answers
-    essayAnswers: {},
+  id: '',
+  name: '',
+  email: '',
+  gpa: 0,
+  skills: [],
+  experience: [],
+  education: [],
+  preferences: {
+    desiredRoles: [],
+    desiredLocations: [],
+    remotePreference: 'any',
+  },
 };
 
-// Field mapping patterns - used by AI to match form fields
-export const FIELD_PATTERNS: Record<string, string[]> = {
-    firstName: ['first name', 'fname', 'given name', 'first', 'forename'],
-    lastName: ['last name', 'lname', 'surname', 'family name', 'last'],
-    fullName: ['full name', 'name', 'your name', 'legal name'],
-    email: ['email', 'e-mail', 'email address', 'mail'],
-    phone: ['phone', 'mobile', 'telephone', 'tel', 'cell', 'phone number', 'contact number'],
-    dateOfBirth: ['date of birth', 'dob', 'birthday', 'birth date', 'birthdate'],
+// Create a profile from database data
+export function createProfileFromDb(data: {
+  id: string;
+  name: string | null;
+  email: string | null;
+  profile?: {
+    headline?: string | null;
+    summary?: string | null;
+    location?: string | null;
+    remotePreference?: string | null;
+    salaryMin?: number | null;
+    salaryMax?: number | null;
+    yearsOfExperience?: number | null;
+    skills?: { name: string }[];
+    experiences?: {
+      title: string;
+      company: string;
+      description?: string | null;
+      startDate: Date;
+      endDate?: Date | null;
+    }[];
+    education?: {
+      degree: string;
+      institution: string;
+      endDate?: Date | null;
+    }[];
+  } | null;
+}): UserProfile {
+  const profile = data.profile;
 
-    address: ['address', 'street', 'street address', 'address line'],
-    city: ['city', 'town'],
-    state: ['state', 'province', 'region'],
-    zipCode: ['zip', 'zip code', 'postal', 'postal code', 'zipcode'],
-    country: ['country', 'nation'],
+  return {
+    id: data.id,
+    name: data.name || '',
+    email: data.email || '',
+    headline: profile?.headline || undefined,
+    summary: profile?.summary || undefined,
+    location: profile?.location || undefined,
+    skills: profile?.skills?.map((s) => s.name) || [],
+    experience:
+      profile?.experiences?.map((e) => ({
+        title: e.title,
+        company: e.company,
+        years: calculateYears(e.startDate, e.endDate),
+        description: e.description || undefined,
+      })) || [],
+    education:
+      profile?.education?.map((e) => ({
+        degree: e.degree,
+        institution: e.institution,
+        year: e.endDate?.getFullYear(),
+      })) || [],
+    preferences: {
+      desiredRoles: [],
+      desiredLocations: profile?.location ? [profile.location] : [],
+      remotePreference:
+        (profile?.remotePreference as UserProfile['preferences']['remotePreference']) || 'any',
+      salaryMin: profile?.salaryMin || undefined,
+      salaryMax: profile?.salaryMax || undefined,
+      yearsOfExperience: profile?.yearsOfExperience || undefined,
+    },
+  };
+}
 
-    school: ['school', 'university', 'college', 'institution', 'school name'],
-    major: ['major', 'field of study', 'concentration', 'program', 'degree program'],
-    gpa: ['gpa', 'grade point', 'grade point average', 'cumulative gpa'],
-    graduationYear: ['graduation year', 'grad year', 'expected graduation', 'year of graduation', 'graduation'],
-    degree: ['degree', 'degree type', 'degree level'],
-
-    citizenship: ['citizenship', 'nationality', 'citizen of'],
-    ethnicity: ['ethnicity', 'race', 'ethnic background'],
-    gender: ['gender', 'sex'],
-
-    linkedIn: ['linkedin', 'linked in', 'linkedin url', 'linkedin profile'],
-    github: ['github', 'github url', 'github profile'],
-    portfolio: ['portfolio', 'portfolio url', 'website', 'personal website'],
-
-    resumePath: ['resume', 'cv', 'curriculum vitae', 'upload resume', 'attach resume'],
-    coverLetterPath: ['cover letter', 'cover'],
-    transcriptPath: ['transcript', 'academic record'],
-};
-
-// ============================================
-// PROFILE BUILDER
-// Connects to the main storage.ts to get real user data
-// ============================================
-
-import { activityStorage, achievementStorage, profileStorage } from '../storage';
-
-export function buildFullProfile(): UserProfile {
-    // Start with default as base
-    const fullProfile = { ...DEFAULT_PROFILE };
-
-    // 1. Try to load Profile from storage
-    if (typeof window !== 'undefined') {
-        try {
-            const storedProfile = profileStorage.loadProfile();
-            if (storedProfile) {
-                // Map stored profile to our expanded UserProfile
-                fullProfile.fullName = storedProfile.name || fullProfile.fullName;
-                fullProfile.firstName = storedProfile.name ? storedProfile.name.split(' ')[0] : fullProfile.firstName;
-                fullProfile.lastName = storedProfile.name ? storedProfile.name.split(' ').slice(1).join(' ') : fullProfile.lastName;
-                fullProfile.major = storedProfile.major || fullProfile.major;
-                fullProfile.school = storedProfile.currentSchool || fullProfile.school;
-                fullProfile.gpa = storedProfile.gpa ? Number(storedProfile.gpa) : fullProfile.gpa;
-                fullProfile.graduationYear = storedProfile.graduationYear ? Number(storedProfile.graduationYear) : fullProfile.graduationYear;
-
-                if (storedProfile.interests && storedProfile.interests.length > 0) {
-                    // Add interests to skills if not present
-                    const newSkills = storedProfile.interests.filter(i => !fullProfile.skills.includes(i));
-                    fullProfile.skills = [...fullProfile.skills, ...newSkills];
-                }
-            }
-
-            // 2. Load Activities
-            const storedActivities = activityStorage.loadActivities();
-            if (storedActivities && storedActivities.length > 0) {
-                fullProfile.activities = storedActivities.map(a => ({
-                    id: a.id || `auto-${Math.random()}`,
-                    name: a.name || '',
-                    description: a.description || '',
-                    type: (a.type as any) || 'other',
-                    startDate: a.startDate || '2023-01-01',
-                    current: a.isOngoing || false,
-                    role: a.role || 'Member',
-                    organization: a.organization || 'Organization',
-                    skills: a.skills || []
-                }));
-
-                // Heuristic: If activity name contains "Club", "Society", mark as club
-                // If "Project", "App", mark as project
-                fullProfile.activities.forEach(a => {
-                    const lowerName = a.name.toLowerCase();
-                    if (lowerName.includes('club') || lowerName.includes('society')) a.type = 'club';
-                    else if (lowerName.includes('project') || lowerName.includes('app')) a.type = 'project';
-                    else if (lowerName.includes('volunteer')) a.type = 'volunteering';
-                });
-            }
-
-            // 3. Load Achievements
-            const storedAchievements = achievementStorage.loadAchievements();
-            if (storedAchievements && storedAchievements.length > 0) {
-                fullProfile.achievements = storedAchievements.map(a => ({
-                    id: a.id || `auto-ach-${Math.random()}`,
-                    title: a.title || '',
-                    type: (a.type as any) || 'other',
-                    date: a.date || '2023',
-                    description: a.description || '',
-                    issuer: a.issuer,
-                    url: a.url
-                }));
-            }
-
-        } catch (e) {
-            console.warn('Failed to load user profile from storage, using default', e);
-        }
-    }
-
-    return fullProfile;
+function calculateYears(startDate: Date, endDate?: Date | null): number {
+  const end = endDate || new Date();
+  const diffMs = end.getTime() - startDate.getTime();
+  return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24 * 365)));
 }

@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard,
-  FileText,
   Briefcase,
   FolderOpen,
   Mail,
@@ -29,17 +28,13 @@ import {
   FileCheck,
   BarChart3,
   Clock,
-  Plane
 } from 'lucide-react';
 
 
 const mainNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
-  { icon: Plane, label: 'Transfer Hub', href: '/transfer', badge: 'HOT', badgeColor: 'bg-gradient-to-r from-red-500 to-orange-500' },
-  { icon: FileText, label: 'Essays', href: '/essays' },
   { icon: ScrollText, label: 'CV Builder', href: '/cv-builder', badge: 'NEW' },
   { icon: Briefcase, label: 'Jobs', href: '/jobs' },
-  { icon: Award, label: 'Scholarships', href: '/scholarships', badge: 'NEW' },
   { icon: ClipboardList, label: 'Checklist', href: '/checklist', badge: 'NEW' },
   { icon: GraduationCap, label: 'Interview Prep', href: '/prepare' },
 ];
@@ -93,7 +88,7 @@ export default function Sidebar() {
                 exit={{ opacity: 0, x: -10 }}
               >
                 <h1 className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-                  EssayPro
+                  AutoApply
                 </h1>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>AI-Powered</p>
               </motion.div>
@@ -267,7 +262,7 @@ export default function Sidebar() {
               >
                 <p className="font-medium truncate">Aarav</p>
                 <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
-                  Transfer 2026
+                  Job Seeker
                 </p>
               </motion.div>
             )}
