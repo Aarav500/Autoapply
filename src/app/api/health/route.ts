@@ -11,27 +11,46 @@ import { createLogger } from '@/lib/logger';
 const logger = createLogger('health-check');
 
 interface HealthStatus {
-  status: 'ok' | 'error';
+  status: 'ok' | 'degraded' | 'error';
   timestamp: string;
-  storage: 'connected' | 'error';
+  storage?: 'connected' | 'error';
   error?: string;
+  uptime: number;
 }
 
 export async function GET() {
+  const startTime = Date.now();
+
   try {
-    // Test S3 connection by ensuring bucket exists
-    await storage.ensureBucket();
-
-    // Try to list keys to verify connection
-    await storage.listKeys('health-check/');
-
+    // Basic health check - server is responding
     const response: HealthStatus = {
       status: 'ok',
       timestamp: new Date().toISOString(),
-      storage: 'connected',
+      uptime: process.uptime(),
     };
 
-    logger.info('Health check passed');
+    // Try S3 connection (non-blocking for basic health)
+    try {
+      await Promise.race([
+        storage.ensureBucket(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('S3 timeout')), 3000))
+      ]);
+
+      await Promise.race([
+        storage.listKeys('health-check/'),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('S3 timeout')), 3000))
+      ]);
+
+      response.storage = 'connected';
+      logger.info('Health check passed - full');
+    } catch (storageError) {
+      // Server is up but storage has issues
+      response.status = 'degraded';
+      response.storage = 'error';
+      response.error = storageError instanceof Error ? storageError.message : 'Storage connection failed';
+      logger.warn({ error: storageError }, 'Health check passed - degraded (storage issue)');
+    }
+
     return successResponse(response);
   } catch (error) {
     logger.error({ error }, 'Health check failed');
@@ -41,6 +60,7 @@ export async function GET() {
       timestamp: new Date().toISOString(),
       storage: 'error',
       error: error instanceof Error ? error.message : 'Unknown error',
+      uptime: process.uptime(),
     };
 
     return errorResponse('Health check failed', 503);
