@@ -1,0 +1,30 @@
+import { NextRequest } from 'next/server';
+import { apiResponse, apiError, authenticate, handleError } from '@/lib/api-utils';
+import { searchEngine } from '@/services/jobs/search-engine';
+import { AuthError } from '@/lib/errors';
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Authenticate
+    const { userId } = await authenticate(req);
+
+    const { id: jobId } = await params;
+
+    // Get job
+    const job = await searchEngine.getJob(userId, jobId);
+
+    if (!job) {
+      return apiError(new Error('Job not found'), 404);
+    }
+
+    return apiResponse(job);
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return apiError(error, 401);
+    }
+    return handleError(error);
+  }
+}

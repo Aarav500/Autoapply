@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node fix-api-imports.js)",
+      "Bash(node:*)",
+      "Bash(npx playwright install:*)",
+      "Bash(npx tsx:*)",
+      "Bash(del test-browser-automation.ts)",
+      "Bash(if not exist \"c:\\AutoApply\\src\\types\\application.ts\" echo New file)",
+      "SlashCommand(/implement-design https://www.figma.com/make/3umdpCqTwYozDJU5thJvPQ/User-dashboard?t=Iyg4iN3cFZ18rcJX-1)",
+      "SlashCommand(/implement-design:*)",
+      "Bash(dir:*)",
+      "Bash(test:*)",
+      "Bash(del fix-params.js)",
+      "Bash(if exist fix-params.js del fix-params.js)",
+      "Bash(timeout 300 npm run build)",
+      "Bash(tee:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(NODE_ENV=production npm run build)",
+      "Bash(chmod:*)",
+      "Bash(git init:*)",
+      "Bash(git branch:*)",
+      "Bash(git remote add:*)",
+      "Bash(git remote set-url:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

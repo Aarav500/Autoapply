@@ -1,0 +1,143 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Build and Deploy to AWS EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        env:
+          NODE_ENV: production
+        run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Get EC2 instance IP
+        id: get-ip
+        run: |
+          EC2_IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+          echo "ec2_ip=$EC2_IP" >> $GITHUB_OUTPUT
+          echo "EC2 IP: $EC2_IP"
+
+      - name: Create deployment package
+        run: |
+          mkdir -p deploy
+          cp -r .next deploy/
+          cp -r public deploy/
+          cp package.json package-lock.json deploy/
+          cp next.config.ts deploy/
+          cp Dockerfile deploy/
+          tar -czf deploy.tar.gz deploy/
+
+      - name: Upload to S3
+        run: |
+          aws s3 cp deploy.tar.gz s3://${{ secrets.S3_BUCKET_NAME }}/deployments/autoapply-${{ github.sha }}.tar.gz
+
+      - name: Deploy to EC2 via SSM
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "set -e",
+              "cd /home/ec2-user",
+              "mkdir -p autoapply",
+              "cd autoapply",
+              "aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}/deployments/autoapply-${{ github.sha }}.tar.gz .",
+              "tar -xzf autoapply-${{ github.sha }}.tar.gz",
+              "cd deploy",
+              "docker build -t autoapply:${{ github.sha }} -t autoapply:latest .",
+              "docker stop autoapply || true",
+              "docker rm autoapply || true",
+              "docker run -d --name autoapply --restart unless-stopped -p 80:3000 \
+                -e NODE_ENV=production \
+                -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+                -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+                -e AWS_REGION=${{ secrets.AWS_REGION }} \
+                -e S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }} \
+                -e ANTHROPIC_API_KEY=${{ secrets.CLAUDE_API_KEY }} \
+                -e APP_URL=${{ secrets.NEXTAUTH_URL }} \
+                -e JWT_ACCESS_SECRET=$(openssl rand -hex 32) \
+                -e JWT_REFRESH_SECRET=$(openssl rand -hex 32) \
+                -e ENCRYPTION_KEY=$(openssl rand -hex 32) \
+                -e GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} \
+                -e GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }} \
+                -e GOOGLE_REDIRECT_URI=${{ secrets.NEXTAUTH_URL }}/api/auth/oauth/google/callback \
+                -e TWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }} \
+                -e TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }} \
+                -e TWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }} \
+                -e TWILIO_MESSAGING_SERVICE_SID=${{ secrets.TWILIO_MESSAGING_SERVICE_SID }} \
+                -e SENDGRID_API_KEY=${{ secrets.SENDGRID_API_KEY }} \
+                -e SENDGRID_FROM_EMAIL=${{ secrets.SENDGRID_FROM_EMAIL }} \
+                autoapply:latest",
+              "docker image prune -f"
+            ]' \
+            --output text \
+            --query 'Command.CommandId')
+
+          echo "SSM Command ID: $COMMAND_ID"
+
+          # Wait for command to complete
+          sleep 30
+
+          aws ssm get-command-invocation \
+            --command-id $COMMAND_ID \
+            --instance-id ${{ secrets.EC2_INSTANCE_ID }} \
+            --query 'StandardOutputContent' \
+            --output text
+
+      - name: Health check
+        run: |
+          echo "Waiting for application to start..."
+          sleep 20
+
+          MAX_ATTEMPTS=10
+          ATTEMPT=0
+
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            if curl -f http://${{ steps.get-ip.outputs.ec2_ip }}/api/health; then
+              echo "✅ Health check passed!"
+              exit 0
+            fi
+
+            echo "Health check failed, attempt $((ATTEMPT + 1))/$MAX_ATTEMPTS"
+            ATTEMPT=$((ATTEMPT + 1))
+            sleep 10
+          done
+
+          echo "❌ Health check failed after $MAX_ATTEMPTS attempts"
+          exit 1
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "🎉 Deployment successful!"
+          echo "URL: ${{ secrets.NEXTAUTH_URL }}"
+          echo "Health: http://${{ steps.get-ip.outputs.ec2_ip }}/api/health"
+          echo "Commit: ${{ github.sha }}"

@@ -1,0 +1,28 @@
+Dockerfile
+.dockerignore
+.git
+.gitignore
+.next
+node_modules
+npm-debug.log
+README.md
+.env
+.env.local
+.env*.local
+*.md
+!README.md
+.github
+.vscode
+coverage
+.claude
+User dashboard
+*.log
+*.tsbuildinfo
+*.pdf
+*.pptx
+*.docx
+My papers
+deploy
+DEPLOYMENT.md
+fix-*.js
+test-*.sh
