@@ -52,6 +52,7 @@ jobs:
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
             --document-name "AWS-RunShellScript" \
+            --timeout-seconds 1800 \
             --parameters 'commands=[
               "set -ex",
               "echo \"=== Starting deployment ===\"",
@@ -109,10 +110,10 @@ jobs:
             --query 'Command.CommandId')
 
           echo "SSM Command ID: $COMMAND_ID"
-          echo "Waiting for command to complete (may take 5-10 minutes for Docker build)..."
+          echo "Waiting for command to complete (may take 10-20 minutes for Docker build)..."
 
-          # Poll for command completion (max 15 minutes)
-          MAX_WAIT=900
+          # Poll for command completion (max 30 minutes)
+          MAX_WAIT=1800
           ELAPSED=0
           while [ $ELAPSED -lt $MAX_WAIT ]; do
             STATUS=$(aws ssm get-command-invocation \
