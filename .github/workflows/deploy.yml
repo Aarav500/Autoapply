@@ -55,9 +55,9 @@ jobs:
             --parameters 'commands=[
               "set -ex",
               "echo \"=== Starting deployment ===\"",
-              "cd ~",
-              "mkdir -p autoapply",
-              "cd autoapply",
+              "WORKDIR=/tmp/autoapply-deployment",
+              "mkdir -p $WORKDIR",
+              "cd $WORKDIR",
               "echo \"=== Downloading deployment package ===\"",
               "aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}/deployments/autoapply-${{ github.sha }}.tar.gz . || exit 1",
               "echo \"=== Extracting ===\"",
@@ -101,7 +101,8 @@ jobs:
               "curl -f http://localhost:3000/api/health || echo Health check failed locally",
               "echo \"=== Cleaning up ===\"",
               "docker image prune -f",
-              "rm autoapply-${{ github.sha }}.tar.gz",
+              "cd /tmp",
+              "rm -rf $WORKDIR",
               "echo \"=== Deployment complete ===\""
             ]' \
             --output text \
