@@ -34,12 +34,14 @@ jobs:
       - name: Create deployment package
         run: |
           # Create a clean deployment package (source code only)
+          # Use --warning=no-file-changed to ignore file changes during archiving
           tar --exclude='.git' \
               --exclude='node_modules' \
               --exclude='.next' \
               --exclude='*.log' \
               --exclude='.env' \
-              -czf deploy.tar.gz .
+              --warning=no-file-changed \
+              -czf deploy.tar.gz . || [[ $? -eq 1 ]]
 
       - name: Upload to S3
         run: |
