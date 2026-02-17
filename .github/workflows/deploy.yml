@@ -14,20 +14,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build application
-        env:
-          NODE_ENV: production
-        run: npm run build
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -47,13 +33,13 @@ jobs:
 
       - name: Create deployment package
         run: |
-          mkdir -p deploy
-          cp -r .next deploy/
-          cp -r public deploy/
-          cp package.json package-lock.json deploy/
-          cp next.config.ts deploy/
-          cp Dockerfile deploy/
-          tar -czf deploy.tar.gz deploy/
+          # Create a clean deployment package (source code only)
+          tar --exclude='.git' \
+              --exclude='node_modules' \
+              --exclude='.next' \
+              --exclude='*.log' \
+              --exclude='.env' \
+              -czf deploy.tar.gz .
 
       - name: Upload to S3
         run: |
@@ -66,15 +52,20 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --parameters 'commands=[
               "set -e",
+              "echo \"Starting deployment...\"",
               "cd /home/ec2-user",
               "mkdir -p autoapply",
               "cd autoapply",
+              "echo \"Downloading deployment package...\"",
               "aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}/deployments/autoapply-${{ github.sha }}.tar.gz .",
+              "echo \"Extracting...\"",
               "tar -xzf autoapply-${{ github.sha }}.tar.gz",
-              "cd deploy",
+              "echo \"Building Docker image...\"",
               "docker build -t autoapply:${{ github.sha }} -t autoapply:latest .",
-              "docker stop autoapply || true",
-              "docker rm autoapply || true",
+              "echo \"Stopping old container...\"",
+              "docker stop autoapply 2>/dev/null || true",
+              "docker rm autoapply 2>/dev/null || true",
+              "echo \"Starting new container...\"",
               "docker run -d --name autoapply --restart unless-stopped -p 80:3000 \
                 -e NODE_ENV=production \
                 -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
@@ -96,16 +87,19 @@ jobs:
                 -e SENDGRID_API_KEY=${{ secrets.SENDGRID_API_KEY }} \
                 -e SENDGRID_FROM_EMAIL=${{ secrets.SENDGRID_FROM_EMAIL }} \
                 autoapply:latest",
-              "docker image prune -f"
+              "echo \"Cleaning up...\"",
+              "docker image prune -f",
+              "rm autoapply-${{ github.sha }}.tar.gz",
+              "echo \"Deployment complete!\""
             ]' \
             --output text \
             --query 'Command.CommandId')
 
           echo "SSM Command ID: $COMMAND_ID"
-
-          # Wait for command to complete
+          echo "Waiting for command to complete..."
           sleep 30
 
+          # Get command output
           aws ssm get-command-invocation \
             --command-id $COMMAND_ID \
             --instance-id ${{ secrets.EC2_INSTANCE_ID }} \
@@ -115,23 +109,29 @@ jobs:
       - name: Health check
         run: |
           echo "Waiting for application to start..."
-          sleep 20
+          sleep 30
 
-          MAX_ATTEMPTS=10
+          MAX_ATTEMPTS=15
           ATTEMPT=0
 
           while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-            if curl -f http://${{ steps.get-ip.outputs.ec2_ip }}/api/health; then
+            echo "Attempt $((ATTEMPT + 1))/$MAX_ATTEMPTS..."
+            if curl -f http://${{ steps.get-ip.outputs.ec2_ip }}/api/health 2>/dev/null; then
               echo "✅ Health check passed!"
               exit 0
             fi
 
-            echo "Health check failed, attempt $((ATTEMPT + 1))/$MAX_ATTEMPTS"
             ATTEMPT=$((ATTEMPT + 1))
             sleep 10
           done
 
           echo "❌ Health check failed after $MAX_ATTEMPTS attempts"
+          echo "Fetching container logs..."
+          aws ssm send-command \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=["docker logs autoapply --tail 100"]' \
+            --output text
           exit 1
 
       - name: Deployment summary
