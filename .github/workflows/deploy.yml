@@ -55,7 +55,7 @@ jobs:
             --parameters 'commands=[
               "set -ex",
               "echo \"=== Starting deployment ===\"",
-              "cd /home/ec2-user",
+              "cd ~",
               "mkdir -p autoapply",
               "cd autoapply",
               "echo \"=== Downloading deployment package ===\"",
