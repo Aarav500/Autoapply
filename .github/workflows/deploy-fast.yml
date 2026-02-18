@@ -1,22 +1,55 @@
-name: Deploy via SSH (Backup Method)
+name: Fast Deploy (Build on Runner)
 
 on:
   workflow_dispatch:
     inputs:
-      skip_build:
-        description: 'Skip Docker build (use existing image)'
+      environment:
+        description: 'Deployment environment'
         required: false
-        type: boolean
-        default: false
+        default: 'production'
 
 jobs:
   deploy:
-    name: Deploy to EC2 via SSH
+    name: Build and Deploy (Fast Method)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Build Next.js application
+        env:
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: 1
+        run: npm run build
+
+      - name: Create deployment package
+        run: |
+          # Package only the built files and Dockerfile
+          tar --exclude='.git' \
+              --exclude='node_modules' \
+              --exclude='src' \
+              --exclude='*.md' \
+              --exclude='.env*' \
+              --warning=no-file-changed \
+              -czf deploy-fast.tar.gz \
+              .next \
+              public \
+              Dockerfile.fast \
+              package.json \
+              next.config.ts || [[ $? -eq 1 ]]
+
+          ls -lh deploy-fast.tar.gz
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -24,6 +57,11 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Upload to S3
+        run: |
+          aws s3 cp deploy-fast.tar.gz s3://${{ secrets.S3_BUCKET_NAME }}/deployments/autoapply-fast-${{ github.sha }}.tar.gz
+          echo "Uploaded: s3://${{ secrets.S3_BUCKET_NAME }}/deployments/autoapply-fast-${{ github.sha }}.tar.gz"
 
       - name: Get EC2 instance IP
         id: get-ip
@@ -35,26 +73,11 @@ jobs:
           echo "ec2_ip=$EC2_IP" >> $GITHUB_OUTPUT
           echo "EC2 IP: $EC2_IP"
 
-      - name: Create deployment package
-        run: |
-          tar --exclude='.git' \
-              --exclude='node_modules' \
-              --exclude='.next' \
-              --exclude='*.log' \
-              --exclude='.env' \
-              --warning=no-file-changed \
-              -czf deploy.tar.gz . || [[ $? -eq 1 ]]
-
-      - name: Upload to S3
-        run: |
-          aws s3 cp deploy.tar.gz s3://${{ secrets.S3_BUCKET_NAME }}/deployments/autoapply-${{ github.sha }}.tar.gz
-
-      - name: Deploy via SSH
+      - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         env:
           COMMIT_SHA: ${{ github.sha }}
           S3_BUCKET: ${{ secrets.S3_BUCKET_NAME }}
-          SKIP_BUILD: ${{ inputs.skip_build }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -72,53 +95,44 @@ jobs:
           host: ${{ steps.get-ip.outputs.ec2_ip }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          envs: COMMIT_SHA,S3_BUCKET,SKIP_BUILD,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_REGION,ANTHROPIC_API_KEY,APP_URL,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,TWILIO_ACCOUNT_SID,TWILIO_AUTH_TOKEN,TWILIO_PHONE_NUMBER,TWILIO_MESSAGING_SERVICE_SID,SENDGRID_API_KEY,SENDGRID_FROM_EMAIL
+          envs: COMMIT_SHA,S3_BUCKET,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_REGION,ANTHROPIC_API_KEY,APP_URL,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,TWILIO_ACCOUNT_SID,TWILIO_AUTH_TOKEN,TWILIO_PHONE_NUMBER,TWILIO_MESSAGING_SERVICE_SID,SENDGRID_API_KEY,SENDGRID_FROM_EMAIL
           script_stop: true
-          command_timeout: 45m
+          command_timeout: 10m
           script: |
             set -e
-            echo "=== Starting SSH deployment ==="
+            echo "=== Fast deployment starting ==="
 
-            WORKDIR=/tmp/autoapply-deployment
+            WORKDIR=/tmp/autoapply-fast-$COMMIT_SHA
             mkdir -p $WORKDIR
             cd $WORKDIR
 
-            echo "=== Downloading deployment package from S3 ==="
-            aws s3 cp s3://$S3_BUCKET/deployments/autoapply-$COMMIT_SHA.tar.gz . || {
+            echo "=== Downloading pre-built package from S3 ==="
+            aws s3 cp s3://$S3_BUCKET/deployments/autoapply-fast-$COMMIT_SHA.tar.gz . || {
               echo "❌ Failed to download from S3"
               exit 1
             }
 
             echo "=== Extracting package ==="
-            tar -xzf autoapply-$COMMIT_SHA.tar.gz || {
+            tar -xzf autoapply-fast-$COMMIT_SHA.tar.gz || {
               echo "❌ Failed to extract package"
               exit 1
             }
 
-            if [ "$SKIP_BUILD" != "true" ]; then
-              echo "=== Building Docker image ==="
-              echo "Using BuildKit with caching for faster builds..."
+            echo "=== Building minimal Docker image (should take <1 minute) ==="
+            export DOCKER_BUILDKIT=1
 
-              # Enable BuildKit for better caching and performance
-              export DOCKER_BUILDKIT=1
+            docker build \
+              -f Dockerfile.fast \
+              --progress=plain \
+              -t autoapply:$COMMIT_SHA \
+              -t autoapply:latest \
+              . || {
+              echo "❌ Docker build failed"
+              exit 1
+            }
 
-              # Build with progress output and build cache
-              docker build \
-                --progress=plain \
-                --build-arg BUILDKIT_INLINE_CACHE=1 \
-                -t autoapply:$COMMIT_SHA \
-                -t autoapply:latest \
-                . 2>&1 | tee /tmp/docker-build.log || {
-                echo "❌ Docker build failed"
-                echo "Last 50 lines of build log:"
-                tail -50 /tmp/docker-build.log
-                exit 1
-              }
-              echo "✅ Docker build successful"
-              docker images | grep autoapply
-            else
-              echo "⏭️  Skipping Docker build (using existing image)"
-            fi
+            echo "✅ Docker build successful"
+            docker images | grep autoapply
 
             echo "=== Stopping old container ==="
             docker stop autoapply 2>/dev/null || echo "No running container"
@@ -159,9 +173,6 @@ jobs:
             echo "=== Waiting for app to initialize ==="
             sleep 10
 
-            echo "=== Container logs (last 50 lines) ==="
-            docker logs autoapply --tail 50
-
             echo "=== Testing health endpoint ==="
             for i in {1..10}; do
               if curl -f http://localhost:3000/api/health 2>/dev/null; then
@@ -172,23 +183,26 @@ jobs:
               sleep 3
             done
 
+            echo "=== Container logs (last 30 lines) ==="
+            docker logs autoapply --tail 30
+
             echo "=== Cleaning up ==="
             docker image prune -f
             cd /tmp
             rm -rf $WORKDIR
 
-            echo "=== Deployment complete ==="
+            echo "=== Fast deployment complete ==="
 
-      - name: External health check
+      - name: Health check
         run: |
           echo "Waiting for application to fully start..."
-          sleep 20
+          sleep 15
 
           MAX_ATTEMPTS=10
           ATTEMPT=0
 
           while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-            echo "External health check attempt $((ATTEMPT + 1))/$MAX_ATTEMPTS..."
+            echo "Health check attempt $((ATTEMPT + 1))/$MAX_ATTEMPTS..."
             if curl -f http://${{ steps.get-ip.outputs.ec2_ip }}/api/health 2>/dev/null; then
               echo "✅ External health check passed!"
               exit 0
@@ -198,21 +212,19 @@ jobs:
             sleep 5
           done
 
-          echo "⚠️ External health check failed, but deployment may still be successful"
-          echo "Check manually: http://${{ steps.get-ip.outputs.ec2_ip }}/api/health"
+          echo "⚠️ External health check failed after $MAX_ATTEMPTS attempts"
+          exit 1
 
       - name: Deployment summary
         if: success()
         run: |
-          echo "🎉 Deployment complete!"
+          echo "🎉 Fast deployment complete!"
           echo ""
           echo "📊 Details:"
+          echo "  Method: Pre-built on GitHub Runner"
           echo "  URL: ${{ secrets.NEXTAUTH_URL }}"
           echo "  IP: ${{ steps.get-ip.outputs.ec2_ip }}"
           echo "  Health: http://${{ steps.get-ip.outputs.ec2_ip }}/api/health"
           echo "  Commit: ${{ github.sha }}"
           echo ""
-          echo "🔍 Next steps:"
-          echo "  1. Visit the health endpoint to verify"
-          echo "  2. Check application logs if needed"
-          echo "  3. Test main functionality"
+          echo "⚡ Build time saved by building on runner instead of EC2"
