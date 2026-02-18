@@ -1,6 +1,38 @@
-# AutoApply - Foundation Setup Complete ✅
+# AutoApply - Autonomous Job Application Platform
 
-## What's Been Built
+AI-powered platform that autonomously searches for jobs, generates tailored CVs/cover letters, auto-applies, manages email responses, and coaches for interviews.
+
+## 🚀 Quick Start
+
+### Local Development
+
+```bash
+# Install dependencies
+npm install
+
+# Set up environment
+cp .env.example .env
+# Edit .env with your credentials
+
+# Start development server
+npm run dev
+```
+
+Visit http://localhost:3000
+
+### Production Deployment
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete deployment guide.
+
+```bash
+# Build for production
+NODE_ENV=production npm run build
+
+# Deploy to EC2
+git push origin main
+```
+
+## 📋 Features Implemented
 
 ### 1. Next.js Application Structure
 - Next.js 15.5+ with TypeScript (strict mode)
