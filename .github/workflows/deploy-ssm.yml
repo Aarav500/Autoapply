@@ -60,120 +60,135 @@ jobs:
           aws s3 cp deploy.tar.gz s3://${{ secrets.S3_BUCKET_NAME }}/deployments/autoapply-${{ github.sha }}.tar.gz
           echo "✅ Uploaded to S3"
 
+      - name: Create deployment script
+        id: create-script
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET_NAME }}
+          AWS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          CLAUDE_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          APP_URL: ${{ secrets.NEXTAUTH_URL }}
+          GOOGLE_CID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          TWILIO_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_PHONE: ${{ secrets.TWILIO_PHONE_NUMBER }}
+          TWILIO_MSG_SID: ${{ secrets.TWILIO_MESSAGING_SERVICE_SID }}
+          SENDGRID_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          SENDGRID_EMAIL: ${{ secrets.SENDGRID_FROM_EMAIL }}
+        run: |
+          # Create deployment script file
+          cat > /tmp/deploy.sh << 'SCRIPT_END'
+          #!/bin/bash
+          set -e
+
+          echo "=== AutoApply Deployment Started ==="
+          echo "Commit: ${COMMIT_SHA}"
+          echo "Time: $(date)"
+
+          WORKDIR=/tmp/autoapply-deploy-${COMMIT_SHA}
+          mkdir -p $WORKDIR && cd $WORKDIR
+
+          echo "=== Downloading from S3 ==="
+          aws s3 cp s3://${S3_BUCKET}/deployments/autoapply-${COMMIT_SHA}.tar.gz . || exit 1
+
+          echo "=== Extracting ==="
+          tar -xzf autoapply-${COMMIT_SHA}.tar.gz || exit 1
+
+          echo "=== Building Docker image ==="
+          export DOCKER_BUILDKIT=1
+          docker build -f Dockerfile.fast -t autoapply:latest . || exit 1
+
+          echo "=== Stopping old container ==="
+          docker stop autoapply 2>/dev/null || true
+          docker rm autoapply 2>/dev/null || true
+
+          echo "=== Starting container ==="
+          docker run -d --name autoapply --restart unless-stopped -p 80:3000 \
+            -e NODE_ENV=production \
+            -e AWS_ACCESS_KEY_ID="${AWS_KEY}" \
+            -e AWS_SECRET_ACCESS_KEY="${AWS_SECRET}" \
+            -e AWS_REGION="${AWS_REGION}" \
+            -e S3_BUCKET_NAME="${S3_BUCKET}" \
+            -e ANTHROPIC_API_KEY="${CLAUDE_KEY}" \
+            -e APP_URL="${APP_URL}" \
+            -e JWT_ACCESS_SECRET="$(openssl rand -hex 32)" \
+            -e JWT_REFRESH_SECRET="$(openssl rand -hex 32)" \
+            -e ENCRYPTION_KEY="$(openssl rand -hex 32)" \
+            -e GOOGLE_CLIENT_ID="${GOOGLE_CID}" \
+            -e GOOGLE_CLIENT_SECRET="${GOOGLE_SECRET}" \
+            -e GOOGLE_REDIRECT_URI="${APP_URL}/api/auth/oauth/google/callback" \
+            -e TWILIO_ACCOUNT_SID="${TWILIO_SID}" \
+            -e TWILIO_AUTH_TOKEN="${TWILIO_TOKEN}" \
+            -e TWILIO_PHONE_NUMBER="${TWILIO_PHONE}" \
+            -e TWILIO_MESSAGING_SERVICE_SID="${TWILIO_MSG_SID}" \
+            -e SENDGRID_API_KEY="${SENDGRID_KEY}" \
+            -e SENDGRID_FROM_EMAIL="${SENDGRID_EMAIL}" \
+            autoapply:latest || exit 1
+
+          echo "=== Health check ==="
+          sleep 15
+          for i in {1..20}; do
+            if curl -sf http://localhost:3000/api/health >/dev/null 2>&1; then
+              echo "✅ Health check passed"
+              curl -s http://localhost:3000/api/health
+              break
+            fi
+            echo "Attempt $i/20..."
+            sleep 3
+          done
+
+          echo "=== Container logs ==="
+          docker logs autoapply --tail 30
+
+          echo "=== Cleanup ==="
+          docker image prune -f
+          cd /tmp && rm -rf $WORKDIR
+
+          echo "=== Deployment Complete ==="
+          SCRIPT_END
+
+          # Replace placeholders in script
+          sed -i "s/\${COMMIT_SHA}/$COMMIT_SHA/g" /tmp/deploy.sh
+          sed -i "s|\${S3_BUCKET}|$S3_BUCKET|g" /tmp/deploy.sh
+          sed -i "s|\${AWS_KEY}|$AWS_KEY|g" /tmp/deploy.sh
+          sed -i "s|\${AWS_SECRET}|$AWS_SECRET|g" /tmp/deploy.sh
+          sed -i "s|\${AWS_REGION}|$AWS_REGION|g" /tmp/deploy.sh
+          sed -i "s|\${CLAUDE_KEY}|$CLAUDE_KEY|g" /tmp/deploy.sh
+          sed -i "s|\${APP_URL}|$APP_URL|g" /tmp/deploy.sh
+          sed -i "s|\${GOOGLE_CID}|$GOOGLE_CID|g" /tmp/deploy.sh
+          sed -i "s|\${GOOGLE_SECRET}|$GOOGLE_SECRET|g" /tmp/deploy.sh
+          sed -i "s|\${TWILIO_SID}|$TWILIO_SID|g" /tmp/deploy.sh
+          sed -i "s|\${TWILIO_TOKEN}|$TWILIO_TOKEN|g" /tmp/deploy.sh
+          sed -i "s|\${TWILIO_PHONE}|$TWILIO_PHONE|g" /tmp/deploy.sh
+          sed -i "s|\${TWILIO_MSG_SID}|$TWILIO_MSG_SID|g" /tmp/deploy.sh
+          sed -i "s|\${SENDGRID_KEY}|$SENDGRID_KEY|g" /tmp/deploy.sh
+          sed -i "s|\${SENDGRID_EMAIL}|$SENDGRID_EMAIL|g" /tmp/deploy.sh
+
+          # Upload script to S3
+          aws s3 cp /tmp/deploy.sh s3://$S3_BUCKET/deployments/deploy-script-${{ github.sha }}.sh
+          echo "✅ Script uploaded to S3"
+
       - name: Deploy via SSM
         id: deploy
         run: |
           echo "Starting SSM deployment..."
 
+          # Download and execute script via SSM
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
             --document-name "AWS-RunShellScript" \
             --timeout-seconds 3600 \
             --comment "AutoApply deployment - commit ${{ github.sha }}" \
-            --parameters '{
-              "commands": [
-                "set -e",
-                "echo \"=== AutoApply Deployment Started ===\"",
-                "echo \"Commit: ${{ github.sha }}\"",
-                "echo \"Time: $(date)\"",
-                "",
-                "WORKDIR=/tmp/autoapply-deploy-${{ github.sha }}",
-                "mkdir -p $WORKDIR",
-                "cd $WORKDIR",
-                "",
-                "echo \"=== Downloading from S3 ===\"",
-                "aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}/deployments/autoapply-${{ github.sha }}.tar.gz . || {",
-                "  echo \"❌ S3 download failed\"",
-                "  exit 1",
-                "}",
-                "",
-                "echo \"=== Extracting package ===\"",
-                "tar -xzf autoapply-${{ github.sha }}.tar.gz || {",
-                "  echo \"❌ Extraction failed\"",
-                "  exit 1",
-                "}",
-                "",
-                "echo \"=== Building Docker image ===\"",
-                "export DOCKER_BUILDKIT=1",
-                "docker build -f Dockerfile.fast --progress=plain -t autoapply:${{ github.sha }} -t autoapply:latest . || {",
-                "  echo \"❌ Docker build failed\"",
-                "  exit 1",
-                "}",
-                "",
-                "echo \"✅ Docker image built\"",
-                "docker images | grep autoapply | head -2",
-                "",
-                "echo \"=== Stopping old container ===\"",
-                "docker stop autoapply 2>/dev/null || echo \"No container to stop\"",
-                "docker rm autoapply 2>/dev/null || echo \"No container to remove\"",
-                "",
-                "echo \"=== Starting new container ===\"",
-                "docker run -d \\",
-                "  --name autoapply \\",
-                "  --restart unless-stopped \\",
-                "  -p 80:3000 \\",
-                "  -e NODE_ENV=production \\",
-                "  -e AWS_ACCESS_KEY_ID=\"${{ secrets.AWS_ACCESS_KEY_ID }}\" \\",
-                "  -e AWS_SECRET_ACCESS_KEY=\"${{ secrets.AWS_SECRET_ACCESS_KEY }}\" \\",
-                "  -e AWS_REGION=\"${{ secrets.AWS_REGION }}\" \\",
-                "  -e S3_BUCKET_NAME=\"${{ secrets.S3_BUCKET_NAME }}\" \\",
-                "  -e ANTHROPIC_API_KEY=\"${{ secrets.CLAUDE_API_KEY }}\" \\",
-                "  -e APP_URL=\"${{ secrets.NEXTAUTH_URL }}\" \\",
-                "  -e JWT_ACCESS_SECRET=\"$(openssl rand -hex 32)\" \\",
-                "  -e JWT_REFRESH_SECRET=\"$(openssl rand -hex 32)\" \\",
-                "  -e ENCRYPTION_KEY=\"$(openssl rand -hex 32)\" \\",
-                "  -e GOOGLE_CLIENT_ID=\"${{ secrets.GOOGLE_CLIENT_ID }}\" \\",
-                "  -e GOOGLE_CLIENT_SECRET=\"${{ secrets.GOOGLE_CLIENT_SECRET }}\" \\",
-                "  -e GOOGLE_REDIRECT_URI=\"${{ secrets.NEXTAUTH_URL }}/api/auth/oauth/google/callback\" \\",
-                "  -e TWILIO_ACCOUNT_SID=\"${{ secrets.TWILIO_ACCOUNT_SID }}\" \\",
-                "  -e TWILIO_AUTH_TOKEN=\"${{ secrets.TWILIO_AUTH_TOKEN }}\" \\",
-                "  -e TWILIO_PHONE_NUMBER=\"${{ secrets.TWILIO_PHONE_NUMBER }}\" \\",
-                "  -e TWILIO_MESSAGING_SERVICE_SID=\"${{ secrets.TWILIO_MESSAGING_SERVICE_SID }}\" \\",
-                "  -e SENDGRID_API_KEY=\"${{ secrets.SENDGRID_API_KEY }}\" \\",
-                "  -e SENDGRID_FROM_EMAIL=\"${{ secrets.SENDGRID_FROM_EMAIL }}\" \\",
-                "  autoapply:latest || {",
-                "    echo \"❌ Container start failed\"",
-                "    exit 1",
-                "  }",
-                "",
-                "echo \"✅ Container started\"",
-                "docker ps | grep autoapply",
-                "",
-                "echo \"=== Waiting for application ===\"",
-                "sleep 15",
-                "",
-                "echo \"=== Health check ===\"",
-                "for i in {1..20}; do",
-                "  if curl -sf http://localhost:3000/api/health >/dev/null 2>&1; then",
-                "    echo \"✅ Health check passed\"",
-                "    curl -s http://localhost:3000/api/health | head -5",
-                "    break",
-                "  fi",
-                "  echo \"Attempt $i/20...\"",
-                "  sleep 3",
-                "done",
-                "",
-                "echo \"=== Container logs ===\"",
-                "docker logs autoapply --tail 30",
-                "",
-                "echo \"=== Cleanup ===\"",
-                "docker image prune -f",
-                "cd /tmp",
-                "rm -rf $WORKDIR",
-                "",
-                "echo \"=== Deployment Complete ===\"",
-                "echo \"Commit: ${{ github.sha }}\"",
-                "echo \"Time: $(date)\""
-              ]
-            }' \
+            --parameters 'commands=["aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}/deployments/deploy-script-${{ github.sha }}.sh /tmp/deploy.sh && chmod +x /tmp/deploy.sh && /tmp/deploy.sh"]' \
             --output text \
             --query 'Command.CommandId')
 
           echo "SSM Command ID: $COMMAND_ID"
           echo "command_id=$COMMAND_ID" >> $GITHUB_OUTPUT
-
-          echo "⏳ Waiting for deployment to complete..."
-          echo "This may take 10-15 minutes for the build..."
+          echo "⏳ Waiting for deployment to complete (10-15 minutes)..."
 
       - name: Monitor SSM Command
         run: |
