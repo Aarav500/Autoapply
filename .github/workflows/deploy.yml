@@ -5,199 +5,159 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  AWS_REGION: us-east-1
+  INSTANCE_ID: i-0ac8fbf952ab92a65
+  S3_BUCKET: autoapply-deployments
+
 jobs:
   deploy:
-    name: Build and Deploy to AWS EC2
+    name: Build and Deploy
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js application
+        env:
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: 1
+        run: npm run build
+
+      - name: Create deployment package
+        run: |
+          mkdir -p deploy
+          cp -r .next/standalone/* deploy/
+          cp -r .next/static deploy/.next/static
+          cp -r public deploy/public
+          cp Dockerfile.fast deploy/Dockerfile
+          cp docker-compose.yml deploy/ || true
+
+          # Create .env file
+          cat > deploy/.env << EOF
+          NODE_ENV=production
+          AWS_REGION=${{ env.AWS_REGION }}
+          AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}
+          ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+          TWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }}
+          TWILIO_WHATSAPP_NUMBER=${{ secrets.TWILIO_WHATSAPP_NUMBER }}
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
+          NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
+          EOF
+
+          tar -czf deploy.tar.gz -C deploy .
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Get EC2 instance IP
+      - name: Upload to S3
+        run: |
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          S3_PATH="s3://${{ env.S3_BUCKET }}/deployments/${TIMESTAMP}/deploy.tar.gz"
+          aws s3 cp deploy.tar.gz "$S3_PATH"
+          echo "S3_PATH=$S3_PATH" >> $GITHUB_ENV
+
+      - name: Get EC2 IP address
         id: get-ip
         run: |
           EC2_IP=$(aws ec2 describe-instances \
-            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --instance-ids ${{ env.INSTANCE_ID }} \
             --query 'Reservations[0].Instances[0].PublicIpAddress' \
             --output text)
           echo "ec2_ip=$EC2_IP" >> $GITHUB_OUTPUT
           echo "EC2 IP: $EC2_IP"
 
-      - name: Create deployment package
-        run: |
-          # Create a clean deployment package (source code only)
-          # Use --warning=no-file-changed to ignore file changes during archiving
-          tar --exclude='.git' \
-              --exclude='node_modules' \
-              --exclude='.next' \
-              --exclude='*.log' \
-              --exclude='.env' \
-              --warning=no-file-changed \
-              -czf deploy.tar.gz . || [[ $? -eq 1 ]]
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ steps.get-ip.outputs.ec2_ip }}
+          username: ubuntu
+          key: ${{ secrets.SECRET_KEY }}
+          command_timeout: 20m
+          script: |
+            set -e
 
-      - name: Upload to S3
-        run: |
-          aws s3 cp deploy.tar.gz s3://${{ secrets.S3_BUCKET_NAME }}/deployments/autoapply-${{ github.sha }}.tar.gz
+            echo "=== Starting deployment ==="
 
-      - name: Deploy to EC2 via SSM
-        run: |
-          COMMAND_ID=$(aws ssm send-command \
-            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
-            --document-name "AWS-RunShellScript" \
-            --timeout-seconds 1800 \
-            --parameters 'commands=[
-              "set -ex",
-              "echo \"=== Starting deployment ===\"",
-              "WORKDIR=/tmp/autoapply-deployment",
-              "mkdir -p $WORKDIR",
-              "cd $WORKDIR",
-              "echo \"=== Downloading deployment package ===\"",
-              "aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}/deployments/autoapply-${{ github.sha }}.tar.gz . || exit 1",
-              "echo \"=== Extracting ===\"",
-              "tar -xzf autoapply-${{ github.sha }}.tar.gz || exit 1",
-              "echo \"=== Building Docker image ===\"",
-              "docker build -t autoapply:${{ github.sha }} -t autoapply:latest . || exit 1",
-              "echo \"=== Docker build successful ===\"",
-              "docker images | grep autoapply",
-              "echo \"=== Stopping old container ===\"",
-              "docker stop autoapply 2>/dev/null || true",
-              "docker rm autoapply 2>/dev/null || true",
-              "echo \"=== Starting new container ===\"",
-              "docker run -d --name autoapply --restart unless-stopped -p 80:3000 \
-                -e NODE_ENV=production \
-                -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
-                -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
-                -e AWS_REGION=${{ secrets.AWS_REGION }} \
-                -e S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }} \
-                -e ANTHROPIC_API_KEY=${{ secrets.CLAUDE_API_KEY }} \
-                -e APP_URL=${{ secrets.NEXTAUTH_URL }} \
-                -e JWT_ACCESS_SECRET=$(openssl rand -hex 32) \
-                -e JWT_REFRESH_SECRET=$(openssl rand -hex 32) \
-                -e ENCRYPTION_KEY=$(openssl rand -hex 32) \
-                -e GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} \
-                -e GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }} \
-                -e GOOGLE_REDIRECT_URI=${{ secrets.NEXTAUTH_URL }}/api/auth/oauth/google/callback \
-                -e TWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }} \
-                -e TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }} \
-                -e TWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }} \
-                -e TWILIO_MESSAGING_SERVICE_SID=${{ secrets.TWILIO_MESSAGING_SERVICE_SID }} \
-                -e SENDGRID_API_KEY=${{ secrets.SENDGRID_API_KEY }} \
-                -e SENDGRID_FROM_EMAIL=${{ secrets.SENDGRID_FROM_EMAIL }} \
-                autoapply:latest || exit 1",
-              "echo \"=== Container started ===\"",
-              "docker ps | grep autoapply",
-              "echo \"=== Waiting for app to start ===\"",
-              "sleep 10",
-              "echo \"=== Checking container logs ===\"",
-              "docker logs autoapply --tail 50",
-              "echo \"=== Testing health endpoint locally ===\"",
-              "curl -f http://localhost:3000/api/health || echo Health check failed locally",
-              "echo \"=== Cleaning up ===\"",
-              "docker image prune -f",
-              "cd /tmp",
-              "rm -rf $WORKDIR",
-              "echo \"=== Deployment complete ===\""
-            ]' \
-            --output text \
-            --query 'Command.CommandId')
+            # Stop existing containers
+            echo "Stopping existing containers..."
+            cd /home/ubuntu/autoapply || true
+            docker-compose down || docker stop autoapply-app || true
+            docker rm autoapply-app || true
 
-          echo "SSM Command ID: $COMMAND_ID"
-          echo "Waiting for command to complete (may take 10-20 minutes for Docker build)..."
+            # Download from S3
+            echo "Downloading deployment package..."
+            mkdir -p /home/ubuntu/autoapply
+            cd /home/ubuntu/autoapply
+            aws s3 cp ${{ env.S3_PATH }} deploy.tar.gz
 
-          # Poll for command completion (max 30 minutes)
-          MAX_WAIT=1800
-          ELAPSED=0
-          while [ $ELAPSED -lt $MAX_WAIT ]; do
-            STATUS=$(aws ssm get-command-invocation \
-              --command-id $COMMAND_ID \
-              --instance-id ${{ secrets.EC2_INSTANCE_ID }} \
-              --query 'Status' \
-              --output text 2>/dev/null || echo "Pending")
+            # Extract
+            echo "Extracting package..."
+            rm -rf app
+            mkdir -p app
+            tar -xzf deploy.tar.gz -C app
+            cd app
 
-            echo "Status at ${ELAPSED}s: $STATUS"
+            # Build Docker image
+            echo "Building Docker image..."
+            docker build -f Dockerfile -t autoapply:latest .
 
-            if [ "$STATUS" = "Success" ] || [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "TimedOut" ]; then
-              echo "Command finished with status: $STATUS"
-              break
-            fi
+            # Run container
+            echo "Starting container..."
+            docker run -d \
+              --name autoapply-app \
+              --restart unless-stopped \
+              -p 3000:3000 \
+              --env-file .env \
+              autoapply:latest
 
-            sleep 15
-            ELAPSED=$((ELAPSED + 15))
-          done
+            # Wait for health check
+            echo "Waiting for application to start..."
+            for i in {1..30}; do
+              if curl -f http://localhost:3000/api/health > /dev/null 2>&1; then
+                echo "✅ Application is healthy"
+                docker logs autoapply-app --tail 20
+                exit 0
+              fi
+              echo "Attempt $i/30: waiting..."
+              sleep 2
+            done
 
-          # Get command output and error
-          echo ""
-          echo "=== STDOUT ==="
-          aws ssm get-command-invocation \
-            --command-id $COMMAND_ID \
-            --instance-id ${{ secrets.EC2_INSTANCE_ID }} \
-            --query 'StandardOutputContent' \
-            --output text || echo "Could not retrieve STDOUT"
-
-          echo ""
-          echo "=== STDERR ==="
-          aws ssm get-command-invocation \
-            --command-id $COMMAND_ID \
-            --instance-id ${{ secrets.EC2_INSTANCE_ID }} \
-            --query 'StandardErrorContent' \
-            --output text || echo "Could not retrieve STDERR"
-
-          echo ""
-          echo "=== FINAL STATUS ==="
-          FINAL_STATUS=$(aws ssm get-command-invocation \
-            --command-id $COMMAND_ID \
-            --instance-id ${{ secrets.EC2_INSTANCE_ID }} \
-            --query 'Status' \
-            --output text)
-          echo "Final Status: $FINAL_STATUS"
-
-          # Exit with error if deployment failed
-          if [ "$FINAL_STATUS" != "Success" ]; then
-            echo "❌ Deployment failed with status: $FINAL_STATUS"
+            echo "❌ Application failed to start"
+            docker logs autoapply-app
             exit 1
-          fi
-
-      - name: Health check
-        if: success()
-        run: |
-          echo "Waiting for application to start..."
-          sleep 30
-
-          MAX_ATTEMPTS=15
-          ATTEMPT=0
-
-          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-            echo "Attempt $((ATTEMPT + 1))/$MAX_ATTEMPTS..."
-            if curl -f http://${{ steps.get-ip.outputs.ec2_ip }}/api/health 2>/dev/null; then
-              echo "✅ Health check passed!"
-              exit 0
-            fi
-
-            ATTEMPT=$((ATTEMPT + 1))
-            sleep 10
-          done
-
-          echo "❌ Health check failed after $MAX_ATTEMPTS attempts"
-          echo "Fetching container logs..."
-          aws ssm send-command \
-            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
-            --document-name "AWS-RunShellScript" \
-            --parameters 'commands=["docker logs autoapply --tail 100"]' \
-            --output text
-          exit 1
 
       - name: Deployment summary
-        if: success()
+        if: always()
         run: |
-          echo "🎉 Deployment successful!"
-          echo "URL: ${{ secrets.NEXTAUTH_URL }}"
-          echo "Health: http://${{ steps.get-ip.outputs.ec2_ip }}/api/health"
-          echo "Commit: ${{ github.sha }}"
+          echo "### Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Instance**: ${{ env.INSTANCE_ID }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **IP**: ${{ steps.get-ip.outputs.ec2_ip }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **S3 Package**: ${{ env.S3_PATH }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **Application URL**: http://${{ steps.get-ip.outputs.ec2_ip }}:3000" >> $GITHUB_STEP_SUMMARY
+          fi
