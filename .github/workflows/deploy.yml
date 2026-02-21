@@ -38,10 +38,21 @@ jobs:
       - name: Create deployment package
         run: |
           mkdir -p deploy
+
+          # Copy standalone output
           cp -r .next/standalone/* deploy/
+
+          # Copy static files (create .next directory structure first)
+          mkdir -p deploy/.next
           cp -r .next/static deploy/.next/static
+
+          # Copy public files
           cp -r public deploy/public
+
+          # Copy Dockerfile
           cp Dockerfile.fast deploy/Dockerfile
+
+          # Copy docker-compose.yml if it exists
           cp docker-compose.yml deploy/ || true
 
           # Create .env file
