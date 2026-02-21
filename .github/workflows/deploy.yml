@@ -8,7 +8,6 @@ on:
 env:
   AWS_REGION: us-east-1
   INSTANCE_ID: i-0ac8fbf952ab92a65
-  S3_BUCKET: autoapply-deployments
 
 jobs:
   deploy:
@@ -84,7 +83,7 @@ jobs:
       - name: Upload to S3
         run: |
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          S3_PATH="s3://${{ env.S3_BUCKET }}/deployments/${TIMESTAMP}/deploy.tar.gz"
+          S3_PATH="s3://${{ secrets.S3_BUCKET_NAME }}/deployments/${TIMESTAMP}/deploy.tar.gz"
           aws s3 cp deploy.tar.gz "$S3_PATH"
           echo "S3_PATH=$S3_PATH" >> $GITHUB_ENV
 
