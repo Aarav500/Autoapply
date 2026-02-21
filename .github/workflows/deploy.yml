@@ -7,7 +7,6 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  INSTANCE_ID: i-0ac8fbf952ab92a65
 
 jobs:
   deploy:
@@ -91,7 +90,7 @@ jobs:
         id: get-ip
         run: |
           EC2_IP=$(aws ec2 describe-instances \
-            --instance-ids ${{ env.INSTANCE_ID }} \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
             --query 'Reservations[0].Instances[0].PublicIpAddress' \
             --output text)
           echo "ec2_ip=$EC2_IP" >> $GITHUB_OUTPUT
@@ -162,7 +161,7 @@ jobs:
         run: |
           echo "### Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Instance**: ${{ env.INSTANCE_ID }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Instance**: ${{ secrets.EC2_INSTANCE_ID }}" >> $GITHUB_STEP_SUMMARY
           echo "- **IP**: ${{ steps.get-ip.outputs.ec2_ip }}" >> $GITHUB_STEP_SUMMARY
           echo "- **S3 Package**: ${{ env.S3_PATH }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
