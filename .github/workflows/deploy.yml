@@ -86,7 +86,7 @@ jobs:
           aws s3 cp deploy.tar.gz "$S3_PATH"
           echo "S3_PATH=$S3_PATH" >> $GITHUB_ENV
 
-      - name: Get EC2 IP address and verify connectivity
+      - name: Get EC2 IP address
         id: get-ip
         run: |
           # Get instance details
@@ -108,75 +108,88 @@ jobs:
             exit 1
           fi
 
-          # Test connectivity
-          echo "Testing SSH connectivity..."
-          timeout 10 nc -zv $EC2_IP 22 || {
-            echo "❌ ERROR: Cannot connect to port 22"
-            echo "Security group must allow SSH (port 22) from GitHub Actions IPs:"
-            echo "  - Add 0.0.0.0/0 to allow from anywhere, or"
-            echo "  - Add GitHub's IP ranges: https://api.github.com/meta (hooks)"
-            exit 1
-          }
+      - name: Deploy via AWS Systems Manager
+        run: |
+          echo "🚀 Deploying via AWS Systems Manager..."
 
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ steps.get-ip.outputs.ec2_ip }}
-          username: ubuntu
-          key: ${{ secrets.SECRET_KEY }}
-          command_timeout: 20m
-          script: |
-            set -e
+          # Send deployment command via SSM
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "AutoApply deployment - ${{ github.sha }}" \
+            --timeout-seconds 1800 \
+            --parameters commands="[
+              \"set -e\",
+              \"echo '=== Starting deployment ==='\",
+              \"echo 'Stopping existing containers...'\",
+              \"docker stop autoapply-app 2>/dev/null || true\",
+              \"docker rm autoapply-app 2>/dev/null || true\",
+              \"echo 'Downloading deployment package...'\",
+              \"mkdir -p /home/ubuntu/autoapply\",
+              \"cd /home/ubuntu/autoapply\",
+              \"aws s3 cp '${{ env.S3_PATH }}' deploy.tar.gz\",
+              \"echo 'Extracting package...'\",
+              \"rm -rf app\",
+              \"mkdir -p app\",
+              \"tar -xzf deploy.tar.gz -C app\",
+              \"cd app\",
+              \"echo 'Building Docker image...'\",
+              \"docker build -f Dockerfile -t autoapply:latest .\",
+              \"echo 'Starting container...'\",
+              \"docker run -d --name autoapply-app --restart unless-stopped -p 3000:3000 --env-file .env autoapply:latest\",
+              \"echo 'Waiting for application to start...'\",
+              \"for i in {1..30}; do if curl -f http://localhost:3000/api/health >/dev/null 2>&1; then echo '✅ Application is healthy'; docker logs autoapply-app --tail 20; exit 0; fi; echo \\\"Attempt \$i/30: waiting...\\\"; sleep 2; done\",
+              \"echo '❌ Application failed to start'\",
+              \"docker logs autoapply-app\",
+              \"exit 1\"
+            ]" \
+            --query "Command.CommandId" \
+            --output text)
 
-            echo "=== Starting deployment ==="
+          echo "SSM Command ID: $COMMAND_ID"
+          echo "Waiting for deployment to complete..."
 
-            # Stop existing containers
-            echo "Stopping existing containers..."
-            cd /home/ubuntu/autoapply || true
-            docker-compose down || docker stop autoapply-app || true
-            docker rm autoapply-app || true
+          # Wait for command to complete (max 30 minutes)
+          for i in {1..120}; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
 
-            # Download from S3
-            echo "Downloading deployment package..."
-            mkdir -p /home/ubuntu/autoapply
-            cd /home/ubuntu/autoapply
-            aws s3 cp ${{ env.S3_PATH }} deploy.tar.gz
+            echo "[$((i * 5))s] Status: $STATUS"
 
-            # Extract
-            echo "Extracting package..."
-            rm -rf app
-            mkdir -p app
-            tar -xzf deploy.tar.gz -C app
-            cd app
+            if [ "$STATUS" = "Success" ]; then
+              echo "✅ Deployment succeeded!"
+              echo ""
+              echo "=== DEPLOYMENT OUTPUT ==="
+              aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" \
+                --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+                --query "StandardOutputContent" \
+                --output text
+              break
+            elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "TimedOut" ]; then
+              echo "❌ Deployment failed with status: $STATUS"
+              echo ""
+              echo "=== STDOUT ==="
+              aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" \
+                --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+                --query "StandardOutputContent" \
+                --output text || echo "(empty)"
+              echo ""
+              echo "=== STDERR ==="
+              aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" \
+                --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+                --query "StandardErrorContent" \
+                --output text || echo "(empty)"
+              exit 1
+            fi
 
-            # Build Docker image
-            echo "Building Docker image..."
-            docker build -f Dockerfile -t autoapply:latest .
-
-            # Run container
-            echo "Starting container..."
-            docker run -d \
-              --name autoapply-app \
-              --restart unless-stopped \
-              -p 3000:3000 \
-              --env-file .env \
-              autoapply:latest
-
-            # Wait for health check
-            echo "Waiting for application to start..."
-            for i in {1..30}; do
-              if curl -f http://localhost:3000/api/health > /dev/null 2>&1; then
-                echo "✅ Application is healthy"
-                docker logs autoapply-app --tail 20
-                exit 0
-              fi
-              echo "Attempt $i/30: waiting..."
-              sleep 2
-            done
-
-            echo "❌ Application failed to start"
-            docker logs autoapply-app
-            exit 1
+            sleep 5
+          done
 
       - name: Deployment summary
         if: always()
