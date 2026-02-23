@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Settings,
   Bell,
@@ -441,6 +441,19 @@ function ToggleRow({
   checked: boolean;
   onChange: (value: boolean) => void;
 }) {
+  const [localChecked, setLocalChecked] = useState(checked);
+
+  // Sync with prop when API responds
+  useEffect(() => {
+    setLocalChecked(checked);
+  }, [checked]);
+
+  const handleToggle = () => {
+    const next = !localChecked;
+    setLocalChecked(next);
+    onChange(next);
+  };
+
   return (
     <div className="flex items-center justify-between py-1">
       <div>
@@ -452,17 +465,17 @@ function ToggleRow({
         </p>
       </div>
       <button
-        onClick={() => onChange(!checked)}
+        onClick={handleToggle}
         className="w-11 h-6 rounded-full transition-all relative flex-shrink-0"
         style={{
-          background: checked ? "rgba(0, 255, 224, 0.3)" : "rgba(255, 255, 255, 0.08)",
+          background: localChecked ? "rgba(0, 255, 224, 0.3)" : "rgba(255, 255, 255, 0.08)",
         }}
       >
         <motion.div
-          animate={{ x: checked ? 20 : 2 }}
+          animate={{ x: localChecked ? 20 : 2 }}
           transition={{ type: "spring", stiffness: 500, damping: 30 }}
           className="w-5 h-5 rounded-full absolute top-0.5"
-          style={{ background: checked ? "#00FFE0" : "#4A4A64" }}
+          style={{ background: localChecked ? "#00FFE0" : "#4A4A64" }}
         />
       </button>
     </div>
