@@ -1,13 +1,12 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  // Instrumentation hook is enabled by default in Next.js 14+
-  // The instrumentation.ts file will be automatically detected
-
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   // Enable standalone output for Docker deployment
   output: 'standalone',
 
-  serverExternalPackages: ['googleapis', 'nodemailer', 'puppeteer', 'playwright'],
+  experimental: {
+    serverComponentsExternalPackages: ['googleapis', 'nodemailer', 'puppeteer', 'playwright'],
+    instrumentationHook: true,
+  },
 
   webpack: (config, { isServer }) => {
     // Fix for googleapis module resolution issues
