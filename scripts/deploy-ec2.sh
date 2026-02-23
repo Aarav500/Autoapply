@@ -68,10 +68,11 @@ sudo docker build -f Dockerfile -t autoapply:latest .
 
 echo ""
 echo "Step 7: Starting container..."
+# Use host network so container can access EC2 instance metadata (IAM role credentials)
 sudo docker run -d \
   --name autoapply-app \
   --restart unless-stopped \
-  -p 3000:3000 \
+  --network host \
   --env-file .env \
   autoapply:latest
 

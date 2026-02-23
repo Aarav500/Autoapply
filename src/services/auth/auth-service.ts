@@ -119,8 +119,9 @@ export async function register(
     if (error instanceof ValidationError || error instanceof AuthError) {
       throw error;
     }
+    const errMsg = error instanceof Error ? error.message : 'Unknown error';
     logger.error({ error, email }, 'Registration failed');
-    throw new AuthError('Failed to register user');
+    throw new AuthError(`Failed to register user: ${errMsg}`);
   }
 }
 

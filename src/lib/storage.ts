@@ -18,7 +18,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 interface StorageConfig {
   endpoint?: string;
   region: string;
-  credentials: {
+  credentials?: {
     accessKeyId: string;
     secretAccessKey: string;
   };
@@ -33,12 +33,19 @@ class StorageClient {
   private retryDelay = 1000; // ms
 
   constructor(config: StorageConfig) {
-    this.s3 = new S3Client({
-      endpoint: config.endpoint,
+    const s3Options: ConstructorParameters<typeof S3Client>[0] = {
       region: config.region,
-      credentials: config.credentials,
       forcePathStyle: config.forcePathStyle,
-    });
+    };
+    if (config.endpoint) {
+      s3Options.endpoint = config.endpoint;
+    }
+    if (config.credentials) {
+      s3Options.credentials = config.credentials;
+    }
+    // When credentials are omitted, AWS SDK auto-discovers via:
+    // env vars → IAM role → instance metadata
+    this.s3 = new S3Client(s3Options);
     this.bucket = config.bucket;
   }
 
@@ -221,14 +228,21 @@ class StorageClient {
   }
 }
 
-// Singleton instance
+// Singleton instance — when running on EC2 with IAM role, omit explicit credentials
+// so the AWS SDK uses the instance metadata service automatically
+const hasExplicitCredentials = !!(
+  process.env.AWS_ACCESS_KEY_ID || process.env.S3_ACCESS_KEY
+);
+
 const storageConfig: StorageConfig = {
   endpoint: process.env.S3_ENDPOINT, // Only for MinIO/local dev, omit for AWS S3
   region: process.env.AWS_REGION || process.env.S3_REGION || 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || process.env.S3_ACCESS_KEY || 'minioadmin',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || process.env.S3_SECRET_KEY || 'minioadmin',
-  },
+  credentials: hasExplicitCredentials
+    ? {
+        accessKeyId: (process.env.AWS_ACCESS_KEY_ID || process.env.S3_ACCESS_KEY)!,
+        secretAccessKey: (process.env.AWS_SECRET_ACCESS_KEY || process.env.S3_SECRET_KEY)!,
+      }
+    : undefined as unknown as StorageConfig['credentials'],
   bucket: process.env.S3_BUCKET_NAME || process.env.S3_BUCKET || 'autoapply',
   forcePathStyle: !!process.env.S3_ENDPOINT, // Only for MinIO, not AWS S3
 };
