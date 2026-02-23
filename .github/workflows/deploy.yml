@@ -74,43 +74,27 @@ jobs:
           cp docker-compose.yml deploy/ || true
 
           # Create .env file with ALL required environment variables
-          cat > deploy/.env << EOF
-          # Node environment
-          NODE_ENV=production
-
-          # AWS S3 Configuration (production uses real S3, not MinIO)
-          AWS_REGION=${{ env.AWS_REGION }}
-          S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
-          S3_REGION=${{ env.AWS_REGION }}
-
-          # AWS credentials will be provided via EC2 IAM role (no keys needed)
-          # If using IAM user instead, add AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY secrets
-
-          # AI Services
-          ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
-
-          # Twilio (SMS/WhatsApp)
-          TWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }}
-          TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }}
-          TWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }}
-          TWILIO_WHATSAPP_NUMBER=${{ secrets.TWILIO_WHATSAPP_NUMBER }}
-
-          # Google OAuth (Gmail, Calendar)
-          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-
-          # JWT Secrets
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-          JWT_ACCESS_SECRET=${{ secrets.JWT_SECRET }}
-          JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
-
-          # Encryption
-          ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
-
-          # Application URL
-          NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
-          APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
-          EOF
+          cat > deploy/.env <<'ENVEOF'
+NODE_ENV=production
+ENVEOF
+          cat >> deploy/.env <<ENVEOF
+AWS_REGION=${{ env.AWS_REGION }}
+S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
+S3_REGION=${{ env.AWS_REGION }}
+ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+TWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }}
+TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }}
+TWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }}
+TWILIO_WHATSAPP_NUMBER=${{ secrets.TWILIO_WHATSAPP_NUMBER }}
+GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+JWT_SECRET=${{ secrets.JWT_SECRET }}
+JWT_ACCESS_SECRET=${{ secrets.JWT_SECRET }}
+JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
+NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
+APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
+ENVEOF
 
           tar -czf deploy.tar.gz -C deploy .
 
@@ -150,50 +134,25 @@ jobs:
             exit 1
           fi
 
+      - name: Upload deploy script to S3
+        run: |
+          aws s3 cp scripts/deploy-ec2.sh "s3://${{ secrets.S3_BUCKET_NAME }}/deployments/deploy-ec2.sh"
+
       - name: Deploy via AWS Systems Manager
         run: |
           echo "🚀 Deploying via AWS Systems Manager..."
 
-          # Send deployment command via SSM (includes dependency installation)
+          # Send deployment command via SSM - download and run the deploy script
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
             --document-name "AWS-RunShellScript" \
             --comment "AutoApply deployment - ${{ github.sha }}" \
             --timeout-seconds 1800 \
             --parameters commands="[
-              \"set -e\",
-              \"echo '=== AutoApply Deployment ==='\",
-              \"echo ''\",
-              \"echo 'Step 1: Checking dependencies...'\",
-              \"if ! command -v aws &> /dev/null; then echo '  Installing AWS CLI...'; sudo apt-get update -qq && sudo apt-get install -y -qq unzip && curl -s https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip && unzip -q awscliv2.zip && sudo ./aws/install && rm -rf aws awscliv2.zip; else echo '  ✅ AWS CLI installed'; fi\",
-              \"if ! command -v docker &> /dev/null; then echo '  Installing Docker...'; sudo apt-get update -qq && sudo apt-get install -y -qq ca-certificates curl gnupg && sudo install -m 0755 -d /etc/apt/keyrings && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg && sudo chmod a+r /etc/apt/keyrings/docker.gpg && echo \\\"deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \$(lsb_release -cs) stable\\\" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null && sudo apt-get update -qq && sudo apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin && sudo usermod -aG docker ubuntu && sudo systemctl enable docker && sudo systemctl start docker; else echo '  ✅ Docker installed'; fi\",
-              \"echo ''\",
-              \"echo 'Step 2: Stopping existing containers...'\",
-              \"sudo docker stop autoapply-app 2>/dev/null || true\",
-              \"sudo docker rm autoapply-app 2>/dev/null || true\",
-              \"echo ''\",
-              \"echo 'Step 3: Downloading deployment package...'\",
-              \"mkdir -p /home/ubuntu/autoapply\",
-              \"cd /home/ubuntu/autoapply\",
-              \"aws s3 cp '${{ env.S3_PATH }}' deploy.tar.gz\",
-              \"echo ''\",
-              \"echo 'Step 4: Extracting package...'\",
-              \"rm -rf app\",
-              \"mkdir -p app\",
-              \"tar -xzf deploy.tar.gz -C app\",
-              \"cd app\",
-              \"echo ''\",
-              \"echo 'Step 5: Building Docker image (this may take 10-15 minutes)...'\",
-              \"sudo docker build -f Dockerfile -t autoapply:latest .\",
-              \"echo ''\",
-              \"echo 'Step 6: Starting container...'\",
-              \"sudo docker run -d --name autoapply-app --restart unless-stopped -p 3000:3000 --env-file .env autoapply:latest\",
-              \"echo ''\",
-              \"echo 'Step 7: Waiting for application to start...'\",
-              \"i=1; while [ \\$i -le 30 ]; do if curl -f http://localhost:3000/api/health >/dev/null 2>&1; then echo '✅ Application is healthy'; sudo docker logs autoapply-app --tail 20; echo ''; echo '=== Deployment Complete ==='; exit 0; fi; echo \\\"  Attempt \\$i/30: waiting...\\\"; sleep 2; i=\\$((i+1)); done\",
-              \"echo '❌ Application failed to start'\",
-              \"sudo docker logs autoapply-app\",
-              \"exit 1\"
+              \"export S3_DEPLOY_PATH='${{ env.S3_PATH }}'\",
+              \"aws s3 cp 's3://${{ secrets.S3_BUCKET_NAME }}/deployments/deploy-ec2.sh' /tmp/deploy-ec2.sh\",
+              \"chmod +x /tmp/deploy-ec2.sh\",
+              \"bash /tmp/deploy-ec2.sh\"
             ]" \
             --query "Command.CommandId" \
             --output text)
