@@ -267,3 +267,4 @@ docker compose logs -f minio
 See [CLAUDE.md](claude.md) for development guidelines and code rules.
 
 
+# Test deployment
