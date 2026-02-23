@@ -4,6 +4,8 @@ import { encrypt } from '@/lib/encryption';
 import type { UserSettings } from '@/types/notifications';
 import { google } from 'googleapis';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/auth/oauth/google/callback
  * Handle Google OAuth callback for Calendar integration
