@@ -1,6 +1,6 @@
 # AutoApply - Autonomous Job Application Platform
 
-AI-powered platform that autonomously searches for jobs, generates tailored CVs/cover letters, auto-applies, manages email responses, and coaches for interviews.
+AI-powered platform that autonomously searches for jobs, generates tailored CVs/cover letters, auto-applies, manages email responses, and coaches for interviews. Zero human intervention after setup.
 
 ## 🚀 Quick Start
 
