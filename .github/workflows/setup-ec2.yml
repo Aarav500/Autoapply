@@ -1,0 +1,156 @@
+name: Setup EC2 Instance
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  setup:
+    name: Install AWS CLI and Docker on EC2
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup EC2 via SSM
+        run: |
+          echo "🚀 Setting up EC2 instance..."
+          echo ""
+
+          # Read the setup script
+          SETUP_SCRIPT=$(cat scripts/setup-ec2.sh | base64 -w 0)
+
+          # Send setup command via SSM
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "AutoApply EC2 setup - install AWS CLI and Docker" \
+            --timeout-seconds 900 \
+            --parameters commands="[
+              \"echo '$SETUP_SCRIPT' | base64 -d > /tmp/setup-ec2.sh\",
+              \"chmod +x /tmp/setup-ec2.sh\",
+              \"bash /tmp/setup-ec2.sh\"
+            ]" \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "SSM Command ID: $COMMAND_ID"
+          echo "Installing AWS CLI and Docker (this may take 5-10 minutes)..."
+          echo ""
+
+          # Wait for command to complete
+          for i in {1..90}; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+
+            echo "[$((i * 5))s] Status: $STATUS"
+
+            if [ "$STATUS" = "Success" ]; then
+              echo ""
+              echo "✅ Setup completed successfully!"
+              echo ""
+              echo "=== SETUP OUTPUT ==="
+              aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" \
+                --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+                --query "StandardOutputContent" \
+                --output text
+              echo ""
+              echo "=========================================="
+              echo "EC2 instance is now ready for deployment!"
+              echo "=========================================="
+              exit 0
+            elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "TimedOut" ]; then
+              echo ""
+              echo "❌ Setup failed with status: $STATUS"
+              echo ""
+              echo "=== STDOUT ==="
+              aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" \
+                --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+                --query "StandardOutputContent" \
+                --output text || echo "(empty)"
+              echo ""
+              echo "=== STDERR ==="
+              aws ssm get-command-invocation \
+                --command-id "$COMMAND_ID" \
+                --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+                --query "StandardErrorContent" \
+                --output text || echo "(empty)"
+              exit 1
+            fi
+
+            sleep 5
+          done
+
+          echo "❌ Timeout waiting for setup"
+          exit 1
+
+      - name: Verify Installation
+        run: |
+          echo ""
+          echo "=== Verifying Installation ==="
+
+          # Test AWS CLI and Docker
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Verify AWS CLI and Docker installation" \
+            --parameters 'commands=[
+              "echo \"AWS CLI version:\"",
+              "aws --version",
+              "echo \"\"",
+              "echo \"Docker version:\"",
+              "docker --version",
+              "echo \"\"",
+              "echo \"Docker Compose version:\"",
+              "docker compose version || docker-compose --version",
+              "echo \"\"",
+              "echo \"Docker status:\"",
+              "sudo systemctl status docker --no-pager | head -n 10"
+            ]' \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "Waiting for verification..."
+          sleep 5
+
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+            --query "StandardOutputContent" \
+            --output text
+
+      - name: Summary
+        if: success()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "✅ EC2 SETUP COMPLETE!"
+          echo "=========================================="
+          echo ""
+          echo "Your EC2 instance now has:"
+          echo "  ✅ AWS CLI v2"
+          echo "  ✅ Docker"
+          echo "  ✅ Docker Compose"
+          echo ""
+          echo "Next steps:"
+          echo "1. Run the 'Deploy to EC2' workflow"
+          echo "2. It should work now!"
+          echo ""
+          echo "Go to: https://github.com/${{ github.repository }}/actions/workflows/deploy.yml"
+          echo "=========================================="
