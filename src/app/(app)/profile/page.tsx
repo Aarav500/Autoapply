@@ -4,36 +4,7 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { Edit2, Trash2, Plus, Upload, Github, Linkedin } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
-// API functions
-async function fetchProfile() {
-  const response = await fetch("/api/profile", {
-    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
-  });
-  if (!response.ok) throw new Error("Failed to fetch profile");
-  return response.json();
-}
-
-async function fetchCompleteness() {
-  const response = await fetch("/api/profile/completeness", {
-    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
-  });
-  if (!response.ok) throw new Error("Failed to fetch completeness");
-  return response.json();
-}
-
-async function updateExperience(experience: any) {
-  const response = await fetch("/api/profile/experience", {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-    },
-    body: JSON.stringify(experience),
-  });
-  if (!response.ok) throw new Error("Failed to update experience");
-  return response.json();
-}
+import { apiFetch } from "@/lib/api-client";
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState("Experience");
@@ -44,13 +15,15 @@ export default function ProfilePage() {
   // Fetch profile data
   const { data: profileData, isLoading: profileLoading } = useQuery({
     queryKey: ["profile"],
-    queryFn: fetchProfile,
+    queryFn: () => apiFetch<{ data: any }>("/api/profile"),
+    retry: false,
   });
 
   // Fetch completeness
   const { data: completenessData } = useQuery({
     queryKey: ["profileCompleteness"],
-    queryFn: fetchCompleteness,
+    queryFn: () => apiFetch<{ data: any }>("/api/profile/completeness"),
+    retry: false,
   });
 
   const profile = profileData?.data;

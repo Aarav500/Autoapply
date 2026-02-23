@@ -4,49 +4,7 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { Calendar, CheckCircle2, ExternalLink, Send, Sparkles } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
-// API functions
-async function fetchEmailThreads() {
-  const response = await fetch("/api/comms/email/threads", {
-    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
-  });
-  if (!response.ok) throw new Error("Failed to fetch email threads");
-  return response.json();
-}
-
-async function fetchEmail(id: string) {
-  const response = await fetch(`/api/comms/email/${id}`, {
-    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
-  });
-  if (!response.ok) throw new Error("Failed to fetch email");
-  return response.json();
-}
-
-async function sendReply(emailId: string, body: string) {
-  const response = await fetch("/api/comms/email/send", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-    },
-    body: JSON.stringify({ inReplyTo: emailId, body }),
-  });
-  if (!response.ok) throw new Error("Failed to send reply");
-  return response.json();
-}
-
-async function generateReply(emailId: string) {
-  const response = await fetch("/api/comms/email/generate-reply", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-    },
-    body: JSON.stringify({ emailId }),
-  });
-  if (!response.ok) throw new Error("Failed to generate reply");
-  return response.json();
-}
+import { apiFetch } from "@/lib/api-client";
 
 export default function CommsPage() {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
@@ -59,20 +17,26 @@ export default function CommsPage() {
   // Fetch email threads
   const { data: threadsData, isLoading: threadsLoading } = useQuery({
     queryKey: ["emailThreads"],
-    queryFn: fetchEmailThreads,
+    queryFn: () => apiFetch<{ data: any[] }>("/api/comms/email/threads"),
+    retry: false,
   });
 
   // Fetch selected email
   const { data: emailData, isLoading: emailLoading } = useQuery({
     queryKey: ["email", selectedThreadId],
-    queryFn: () => fetchEmail(selectedThreadId!),
+    queryFn: () => apiFetch<{ data: any }>(`/api/comms/email/${selectedThreadId}`),
     enabled: !!selectedThreadId,
+    retry: false,
   });
 
   // Send reply mutation
   const replyMutation = useMutation({
     mutationFn: ({ emailId, body }: { emailId: string; body: string }) =>
-      sendReply(emailId, body),
+      apiFetch("/api/comms/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inReplyTo: emailId, body }),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["emailThreads"] });
       queryClient.invalidateQueries({ queryKey: ["email", selectedThreadId] });
@@ -122,7 +86,11 @@ export default function CommsPage() {
     if (!selectedThreadId) return;
     setIsGeneratingReply(true);
     try {
-      const response = await generateReply(selectedThreadId);
+      const response = await apiFetch<{ data: { reply: string } }>("/api/comms/email/generate-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emailId: selectedThreadId }),
+      });
       setReplyText(response.data.reply);
     } catch (error) {
       console.error("Failed to generate reply:", error);

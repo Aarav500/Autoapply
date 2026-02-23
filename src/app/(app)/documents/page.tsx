@@ -4,24 +4,7 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { FileText, Download, Plus, AlertCircle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
-// API functions
-async function fetchDocuments() {
-  const response = await fetch("/api/documents", {
-    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
-  });
-  if (!response.ok) throw new Error("Failed to fetch documents");
-  return response.json();
-}
-
-async function deleteDocument(id: string) {
-  const response = await fetch(`/api/documents/${id}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
-  });
-  if (!response.ok) throw new Error("Failed to delete document");
-  return response.json();
-}
+import { apiFetch } from "@/lib/api-client";
 
 export default function DocumentsPage() {
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
@@ -32,12 +15,13 @@ export default function DocumentsPage() {
   // Fetch documents
   const { data: documentsData, isLoading } = useQuery({
     queryKey: ["documents"],
-    queryFn: fetchDocuments,
+    queryFn: () => apiFetch<{ data: any[] }>("/api/documents"),
+    retry: false,
   });
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: deleteDocument,
+    mutationFn: (id: string) => apiFetch(`/api/documents/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
       setSelectedDocId(null);

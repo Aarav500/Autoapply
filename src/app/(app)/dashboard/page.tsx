@@ -3,66 +3,31 @@
 import { motion } from "framer-motion";
 import { ArrowRight, Video, FileText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-
-// Fetch dashboard statistics
-async function fetchDashboardStats() {
-  const response = await fetch("/api/dashboard/stats", {
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch dashboard stats");
-  }
-
-  return response.json();
-}
-
-// Fetch recent activity
-async function fetchRecentActivity() {
-  const response = await fetch("/api/dashboard/activity", {
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch recent activity");
-  }
-
-  return response.json();
-}
-
-// Fetch upcoming interviews
-async function fetchUpcomingInterviews() {
-  const response = await fetch("/api/interview?status=scheduled&limit=3", {
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch upcoming interviews");
-  }
-
-  return response.json();
-}
+import { apiFetch } from "@/lib/api-client";
 
 export default function DashboardPage() {
-  const { data: statsData, isLoading: statsLoading } = useQuery({
+  const { data: statsData } = useQuery({
     queryKey: ["dashboardStats"],
-    queryFn: fetchDashboardStats,
+    queryFn: () => apiFetch("/api/dashboard/stats"),
+    retry: false,
   });
 
-  const { data: activityData, isLoading: activityLoading } = useQuery({
+  const { data: activityData } = useQuery({
     queryKey: ["recentActivity"],
-    queryFn: fetchRecentActivity,
+    queryFn: () => apiFetch("/api/dashboard/activity"),
+    retry: false,
   });
 
   const { data: interviewsData, isLoading: interviewsLoading } = useQuery({
     queryKey: ["upcomingInterviews"],
-    queryFn: fetchUpcomingInterviews,
+    queryFn: () => apiFetch("/api/interview?status=scheduled&limit=3"),
+    retry: false,
+  });
+
+  const { data: pipelineData } = useQuery({
+    queryKey: ["pipeline"],
+    queryFn: () => apiFetch("/api/jobs/pipeline"),
+    retry: false,
   });
 
   // Stats from API
@@ -74,29 +39,16 @@ export default function DashboardPage() {
     sub?: string;
     subColor?: string;
     accent?: boolean;
-  }> = statsData?.stats || [
-    { number: "0", label: "Jobs Found", trend: "Loading...", trendColor: "#00E676" },
-    { number: "0", label: "Applied", trend: "Loading...", trendColor: "#00E676" },
-    { number: "0%", label: "Response Rate", trend: "Loading...", trendColor: "#00E676" },
-    { number: "0", label: "Interviews", sub: "Loading...", subColor: "#FFAB00", accent: true },
-    { number: "0", label: "Offers", sub: "Loading...", subColor: "#7E7E98", accent: true },
+  }> = (statsData as Record<string, unknown>)?.stats as typeof stats || [
+    { number: "0", label: "Jobs Found", trend: "—", trendColor: "#00E676" },
+    { number: "0", label: "Applied", trend: "—", trendColor: "#00E676" },
+    { number: "0%", label: "Response Rate", trend: "—", trendColor: "#00E676" },
+    { number: "0", label: "Interviews", sub: "—", subColor: "#FFAB00", accent: true },
+    { number: "0", label: "Offers", sub: "—", subColor: "#7E7E98", accent: true },
   ];
 
-  // Fetch pipeline data
-  const { data: pipelineData } = useQuery({
-    queryKey: ["pipeline"],
-    queryFn: async () => {
-      const response = await fetch("/api/jobs/pipeline", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-        },
-      });
-      if (!response.ok) throw new Error("Failed to fetch pipeline");
-      return response.json();
-    },
-  });
-
-  const rawPipeline: Array<{status: string; count: number}> = pipelineData?.data?.pipeline || [];
+  const rawPipeline: Array<{status: string; count: number}> =
+    (pipelineData as Record<string, Record<string, unknown>>)?.data?.pipeline as typeof rawPipeline || [];
   const maxCount = Math.max(...rawPipeline.map((s) => s.count), 1);
   const pipelineStages = rawPipeline.map((stage) => {
     const colors: Record<string, string> = {
@@ -121,9 +73,7 @@ export default function DashboardPage() {
     time: string;
     description: string;
     dotColor: string;
-  }> = activityData?.data || [
-    { time: "Loading...", description: "Fetching recent activity...", dotColor: "#00E676" },
-  ];
+  }> = (activityData as Record<string, unknown>)?.data as typeof activities || [];
 
   const currentHour = new Date().getHours();
   const greeting =
@@ -160,13 +110,13 @@ export default function DashboardPage() {
             className="text-[32px] font-bold mb-2"
             style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}
           >
-            {greeting}, Aarav
+            {greeting}
           </h1>
           <p
             className="text-[15px]"
             style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}
           >
-            Your job search is active. {statsData?.applicationsToday || 0} applications sent today.
+            Your job search is active. {(statsData as Record<string, number>)?.applicationsToday || 0} applications sent today.
           </p>
         </div>
 
@@ -287,34 +237,40 @@ export default function DashboardPage() {
 
           {/* Bar Chart */}
           <div className="flex items-end justify-between gap-2 h-48">
-            {pipelineStages.map((stage, index) => (
-              <div key={index} className="flex-1 flex flex-col items-center">
-                <div className="w-full flex items-end justify-center mb-4" style={{ height: "160px" }}>
-                  <motion.div
-                    initial={{ height: 0 }}
-                    animate={{ height: `${stage.height}px` }}
-                    transition={{ delay: 0.3 + index * 0.1, duration: 0.5 }}
-                    className="w-full rounded-t-lg"
-                    style={{
-                      background: stage.color,
-                      border: `1px solid ${stage.color}`,
-                    }}
-                  />
+            {pipelineStages.length === 0 ? (
+              <p className="text-[13px] text-[#7E7E98] w-full text-center self-center">
+                No pipeline data yet. Start searching for jobs!
+              </p>
+            ) : (
+              pipelineStages.map((stage, index) => (
+                <div key={index} className="flex-1 flex flex-col items-center">
+                  <div className="w-full flex items-end justify-center mb-4" style={{ height: "160px" }}>
+                    <motion.div
+                      initial={{ height: 0 }}
+                      animate={{ height: `${stage.height}px` }}
+                      transition={{ delay: 0.3 + index * 0.1, duration: 0.5 }}
+                      className="w-full rounded-t-lg"
+                      style={{
+                        background: stage.color,
+                        border: `1px solid ${stage.color}`,
+                      }}
+                    />
+                  </div>
+                  <p
+                    className="text-[11px] font-medium mb-1 text-center"
+                    style={{ fontFamily: "'Outfit', sans-serif", color: "#7E7E98" }}
+                  >
+                    {stage.name}
+                  </p>
+                  <p
+                    className="text-[13px] font-medium"
+                    style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#E8E8F0" }}
+                  >
+                    {stage.count}
+                  </p>
                 </div>
-                <p
-                  className="text-[11px] font-medium mb-1 text-center"
-                  style={{ fontFamily: "'Outfit', sans-serif", color: "#7E7E98" }}
-                >
-                  {stage.name}
-                </p>
-                <p
-                  className="text-[13px] font-medium"
-                  style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#E8E8F0" }}
-                >
-                  {stage.count}
-                </p>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -336,47 +292,51 @@ export default function DashboardPage() {
 
           {/* Timeline */}
           <div className="relative">
-            {/* Vertical line */}
-            <div
-              className="absolute left-0 top-0 bottom-8 w-px"
-              style={{ background: "rgba(255, 255, 255, 0.06)" }}
-            />
-
-            <div className="space-y-6">
-              {activities.slice(0, 6).map((activity, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4 + index * 0.05 }}
-                  className="relative pl-6"
-                >
-                  {/* Dot */}
-                  <div
-                    className="absolute left-0 top-0 w-2 h-2 rounded-full"
-                    style={{
-                      background: activity.dotColor,
-                      transform: "translateX(-50%)",
-                    }}
-                  />
-
-                  <div className="flex items-start gap-3">
-                    <p
-                      className="text-[11px] w-14 flex-shrink-0"
-                      style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#4A4A64" }}
+            {activities.length === 0 ? (
+              <p className="text-[13px] text-[#7E7E98]">
+                No recent activity. Your actions will appear here.
+              </p>
+            ) : (
+              <>
+                <div
+                  className="absolute left-0 top-0 bottom-8 w-px"
+                  style={{ background: "rgba(255, 255, 255, 0.06)" }}
+                />
+                <div className="space-y-6">
+                  {activities.slice(0, 6).map((activity, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.4 + index * 0.05 }}
+                      className="relative pl-6"
                     >
-                      {activity.time}
-                    </p>
-                    <p
-                      className="text-[13px] flex-1"
-                      style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}
-                    >
-                      {activity.description}
-                    </p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+                      <div
+                        className="absolute left-0 top-0 w-2 h-2 rounded-full"
+                        style={{
+                          background: activity.dotColor,
+                          transform: "translateX(-50%)",
+                        }}
+                      />
+                      <div className="flex items-start gap-3">
+                        <p
+                          className="text-[11px] w-14 flex-shrink-0"
+                          style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#4A4A64" }}
+                        >
+                          {activity.time}
+                        </p>
+                        <p
+                          className="text-[13px] flex-1"
+                          style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}
+                        >
+                          {activity.description}
+                        </p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </motion.div>
@@ -409,7 +369,7 @@ export default function DashboardPage() {
                 className="text-[13px]"
                 style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}
               >
-                {interviewsData?.data?.length || 0} scheduled
+                {(interviewsData as Record<string, unknown[]>)?.data?.length || 0} scheduled
               </p>
             </div>
             <button
@@ -432,10 +392,10 @@ export default function DashboardPage() {
           <div className="space-y-4">
             {interviewsLoading ? (
               <p className="text-[13px] text-[#7E7E98]">Loading interviews...</p>
-            ) : interviewsData?.data?.length === 0 ? (
+            ) : !((interviewsData as Record<string, unknown[]>)?.data?.length) ? (
               <p className="text-[13px] text-[#7E7E98]">No upcoming interviews</p>
             ) : (
-              interviewsData?.data?.slice(0, 3).map((interview: any, index: number) => (
+              ((interviewsData as Record<string, Array<Record<string, string>>>)?.data || []).slice(0, 3).map((interview, index: number) => (
                 <div
                   key={index}
                   className="p-4 rounded-lg border"

@@ -14,36 +14,7 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
-// API functions
-async function fetchInterviews() {
-  const response = await fetch("/api/interview?status=scheduled", {
-    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
-  });
-  if (!response.ok) throw new Error("Failed to fetch interviews");
-  return response.json();
-}
-
-async function fetchPrepPackage(interviewId: string) {
-  const response = await fetch(`/api/interview/${interviewId}/prep`, {
-    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
-  });
-  if (!response.ok) throw new Error("Failed to fetch prep package");
-  return response.json();
-}
-
-async function startMockInterview(interviewId: string, mode: string) {
-  const response = await fetch(`/api/interview/${interviewId}/mock`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-    },
-    body: JSON.stringify({ mode }),
-  });
-  if (!response.ok) throw new Error("Failed to start mock interview");
-  return response.json();
-}
+import { apiFetch } from "@/lib/api-client";
 
 interface Section {
   id: string;
@@ -66,7 +37,8 @@ export default function InterviewPrepPage() {
   // Fetch interviews
   const { data: interviewsData, isLoading: interviewsLoading } = useQuery({
     queryKey: ["upcomingInterviews"],
-    queryFn: fetchInterviews,
+    queryFn: () => apiFetch<{ data: any[] }>("/api/interview?status=scheduled"),
+    retry: false,
   });
 
   const interviews = interviewsData?.data || [];
@@ -75,8 +47,9 @@ export default function InterviewPrepPage() {
   // Fetch prep package for next interview
   const { data: prepData, isLoading: prepLoading } = useQuery({
     queryKey: ["interviewPrep", nextInterview?.id],
-    queryFn: () => fetchPrepPackage(nextInterview.id),
+    queryFn: () => apiFetch<{ data: any }>(`/api/interview/${nextInterview.id}/prep`),
     enabled: !!nextInterview,
+    retry: false,
   });
 
   const prep = prepData?.data;

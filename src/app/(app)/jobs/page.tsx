@@ -13,34 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
-// API functions
-async function fetchJobs(filters: any = {}) {
-  const params = new URLSearchParams(filters);
-  const response = await fetch(`/api/jobs?${params}`, {
-    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
-  });
-  if (!response.ok) throw new Error("Failed to fetch jobs");
-  return response.json();
-}
-
-async function saveJob(jobId: string) {
-  const response = await fetch(`/api/jobs/${jobId}/save`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
-  });
-  if (!response.ok) throw new Error("Failed to save job");
-  return response.json();
-}
-
-async function applyToJob(jobId: string) {
-  const response = await fetch(`/api/jobs/${jobId}/apply`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
-  });
-  if (!response.ok) throw new Error("Failed to apply");
-  return response.json();
-}
+import { apiFetch } from "@/lib/api-client";
 
 export default function JobsPage() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
@@ -52,7 +25,8 @@ export default function JobsPage() {
   // Fetch jobs
   const { data: jobsData, isLoading: jobsLoading } = useQuery({
     queryKey: ["jobs", searchQuery],
-    queryFn: () => fetchJobs({ q: searchQuery }),
+    queryFn: () => apiFetch<{ data: any[] }>(`/api/jobs?${new URLSearchParams({ q: searchQuery })}`),
+    retry: false,
   });
 
   const jobs = jobsData?.data || [];
@@ -65,7 +39,7 @@ export default function JobsPage() {
 
   // Save job mutation
   const saveMutation = useMutation({
-    mutationFn: saveJob,
+    mutationFn: (jobId: string) => apiFetch(`/api/jobs/${jobId}/save`, { method: "POST" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
     },
@@ -73,7 +47,7 @@ export default function JobsPage() {
 
   // Apply mutation
   const applyMutation = useMutation({
-    mutationFn: applyToJob,
+    mutationFn: (jobId: string) => apiFetch(`/api/jobs/${jobId}/apply`, { method: "POST" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
     },
