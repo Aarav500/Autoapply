@@ -69,12 +69,16 @@ if sudo docker images autoapply:latest --format "{{.ID}}" | grep -q .; then
 fi
 
 echo ""
-echo "Step 7: Building Docker image (with progress)..."
+echo "Step 7: Pruning stale Docker cache..."
+sudo docker builder prune -f 2>/dev/null || true
+
+echo ""
+echo "Step 8: Building Docker image (with progress)..."
 # Use --progress=plain to get line-by-line output (keeps SSM alive)
 sudo docker build --progress=plain -f Dockerfile -t autoapply:latest . 2>&1
 
 echo ""
-echo "Step 8: Starting container..."
+echo "Step 9: Starting container..."
 # Use host network so container can access EC2 instance metadata (IAM role credentials)
 sudo docker run -d \
   --name autoapply-app \
@@ -84,7 +88,7 @@ sudo docker run -d \
   autoapply:latest
 
 echo ""
-echo "Step 9: Waiting for application to start..."
+echo "Step 10: Waiting for application to start..."
 i=1
 while [ $i -le 30 ]; do
   if curl -sf http://localhost:3000/api/health > /dev/null 2>&1; then
