@@ -22,11 +22,8 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # Copy pre-built application
-# The deployment package has standalone files at root, .next/static, and public folders
-COPY --chown=nextjs:nodejs public ./public
-COPY --chown=nextjs:nodejs server.js ./
-COPY --chown=nextjs:nodejs package.json ./
-COPY --chown=nextjs:nodejs .next ./.next
+# The deployment package has standalone output with all dependencies
+COPY --chown=nextjs:nodejs . ./
 
 USER nextjs
 
