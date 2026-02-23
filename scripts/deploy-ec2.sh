@@ -54,20 +54,27 @@ echo ""
 echo "Step 5: Verifying build artifacts..."
 if [ ! -f ".next/BUILD_ID" ]; then
   echo "ERROR: .next/BUILD_ID not found!"
-  echo "Contents of current directory:"
   ls -la
-  echo "Contents of .next/ (if exists):"
   ls -la .next/ 2>/dev/null || echo ".next/ directory does not exist"
   exit 1
 fi
 echo "  BUILD_ID: $(cat .next/BUILD_ID)"
 
 echo ""
-echo "Step 6: Building Docker image..."
-sudo docker build -f Dockerfile -t autoapply:latest .
+echo "Step 6: Checking for cached Docker image..."
+# Check if we already have the base image cached
+NEEDS_BUILD=true
+if sudo docker images autoapply:latest --format "{{.ID}}" | grep -q .; then
+  echo "  Found existing image, will rebuild with cache"
+fi
 
 echo ""
-echo "Step 7: Starting container..."
+echo "Step 7: Building Docker image (with progress)..."
+# Use --progress=plain to get line-by-line output (keeps SSM alive)
+sudo docker build --progress=plain -f Dockerfile -t autoapply:latest . 2>&1
+
+echo ""
+echo "Step 8: Starting container..."
 # Use host network so container can access EC2 instance metadata (IAM role credentials)
 sudo docker run -d \
   --name autoapply-app \
@@ -77,7 +84,7 @@ sudo docker run -d \
   autoapply:latest
 
 echo ""
-echo "Step 8: Waiting for application to start..."
+echo "Step 9: Waiting for application to start..."
 i=1
 while [ $i -le 30 ]; do
   if curl -sf http://localhost:3000/api/health > /dev/null 2>&1; then
