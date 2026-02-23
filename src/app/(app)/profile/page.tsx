@@ -82,10 +82,12 @@ export default function ProfilePage() {
     retry: false,
   });
 
-  const profile = profileData?.data as Record<string, unknown> | undefined;
+  const profileInner = (profileData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+  const profile = (profileInner?.profile || profileInner) as Record<string, unknown> | undefined;
   const personalInfo = profile?.personalInfo as Record<string, string> | undefined;
   const jobPreferences = profile?.jobPreferences as Record<string, unknown> | undefined;
-  const completeness = (completenessData?.data || {}) as Record<string, unknown>;
+  const completenessInner = (completenessData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+  const completeness = (completenessInner || {}) as Record<string, unknown>;
   const profileCompletion = (completeness.percentage as number) || 0;
   const radius = 60;
   const circumference = 2 * Math.PI * radius;

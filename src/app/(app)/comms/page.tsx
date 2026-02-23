@@ -44,13 +44,15 @@ export default function CommsPage() {
     },
   });
 
-  const threads = threadsData?.data || [];
-  const selectedEmail = emailData?.data;
+  const threadsInner = (threadsData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+  const threads: Record<string, unknown>[] = (threadsInner?.threads as Record<string, unknown>[]) || [];
+  const emailInner = (emailData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+  const selectedEmail = (emailInner?.email || emailInner) as any;
 
   // Set first thread as selected by default
   useEffect(() => {
     if (!selectedThreadId && threads.length > 0) {
-      setSelectedThreadId(threads[0].id);
+      setSelectedThreadId(threads[0].id as string);
     }
   }, [threads, selectedThreadId]);
 

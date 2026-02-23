@@ -28,13 +28,14 @@ export default function DocumentsPage() {
     },
   });
 
-  const documents = documentsData?.data || [];
-  const selectedDocument = documents.find((doc: any) => doc.id === selectedDocId) || documents[0];
+  const docsInner = (documentsData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+  const documents: Record<string, unknown>[] = (docsInner?.documents as Record<string, unknown>[]) || [];
+  const selectedDocument: any = documents.find((doc) => doc.id === selectedDocId) || documents[0];
 
   // Set first document as selected by default
   useEffect(() => {
     if (!selectedDocId && documents.length > 0) {
-      setSelectedDocId(documents[0].id);
+      setSelectedDocId(documents[0].id as string);
     }
   }, [documents, selectedDocId]);
 

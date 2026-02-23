@@ -369,7 +369,7 @@ export default function DashboardPage() {
                 className="text-[13px]"
                 style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}
               >
-                {(interviewsData as Record<string, unknown[]>)?.data?.length || 0} scheduled
+                {((interviewsData as Record<string, Record<string, unknown[]>>)?.data?.interviews?.length) || 0} scheduled
               </p>
             </div>
             <button
@@ -392,10 +392,10 @@ export default function DashboardPage() {
           <div className="space-y-4">
             {interviewsLoading ? (
               <p className="text-[13px] text-[#7E7E98]">Loading interviews...</p>
-            ) : !((interviewsData as Record<string, unknown[]>)?.data?.length) ? (
+            ) : !(((interviewsData as Record<string, Record<string, unknown[]>>)?.data?.interviews?.length)) ? (
               <p className="text-[13px] text-[#7E7E98]">No upcoming interviews</p>
             ) : (
-              ((interviewsData as Record<string, Array<Record<string, string>>>)?.data || []).slice(0, 3).map((interview, index: number) => (
+              ((interviewsData as Record<string, Record<string, Array<Record<string, string>>>>)?.data?.interviews || []).slice(0, 3).map((interview, index: number) => (
                 <div
                   key={index}
                   className="p-4 rounded-lg border"

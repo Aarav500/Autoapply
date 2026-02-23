@@ -29,13 +29,14 @@ export default function JobsPage() {
     retry: false,
   });
 
-  const jobs = jobsData?.data || [];
-  const selectedJob = jobs.find((job: any) => job.id === selectedJobId) || jobs[0];
+  const jobsInner = (jobsData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+  const jobs: Record<string, unknown>[] = (jobsInner?.jobs as Record<string, unknown>[]) || [];
+  const selectedJob: any = jobs.find((job: any) => job.id === selectedJobId) || jobs[0];
 
   // Set first job as selected by default
   useEffect(() => {
     if (!selectedJobId && jobs.length > 0) {
-      setSelectedJobId(jobs[0].id);
+      setSelectedJobId(jobs[0].id as string);
     }
   }, [jobs, selectedJobId]);
 

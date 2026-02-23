@@ -41,8 +41,9 @@ export default function InterviewPrepPage() {
     retry: false,
   });
 
-  const interviews = interviewsData?.data || [];
-  const nextInterview = interviews[0];
+  const interviewsInner = (interviewsData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+  const interviews: Record<string, unknown>[] = (interviewsInner?.interviews as Record<string, unknown>[]) || [];
+  const nextInterview: any = interviews[0];
 
   // Fetch prep package for next interview
   const { data: prepData, isLoading: prepLoading } = useQuery({
@@ -52,7 +53,8 @@ export default function InterviewPrepPage() {
     retry: false,
   });
 
-  const prep = prepData?.data;
+  const prepInner = (prepData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+  const prep: any = prepInner;
 
   // Countdown timer
   const [countdown, setCountdown] = useState({ hours: 0, minutes: 0, seconds: 0 });
