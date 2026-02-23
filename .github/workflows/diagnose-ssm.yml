@@ -50,31 +50,9 @@ jobs:
             exit 1
           else
             echo "✅ Instance Profile: $PROFILE_ARN"
-
-            # Get role name from profile ARN
-            ROLE_NAME=$(echo $PROFILE_ARN | sed 's/.*instance-profile\///' | sed 's/\/.*//')
-
             echo ""
-            echo "=== IAM Role Policies ==="
-            aws iam list-attached-role-policies \
-              --role-name $ROLE_NAME \
-              --query 'AttachedPolicies[*].[PolicyName,PolicyArn]' \
-              --output table
-
-            # Check if has SSM policy
-            HAS_SSM=$(aws iam list-attached-role-policies \
-              --role-name $ROLE_NAME \
-              --query 'AttachedPolicies[?contains(PolicyName, `SSM`) || contains(PolicyArn, `SSM`)].PolicyName' \
-              --output text)
-
-            if [ -z "$HAS_SSM" ]; then
-              echo ""
-              echo "⚠️  WARNING: No SSM policy found!"
-              echo "Attach 'AmazonSSMManagedInstanceCore' to role: $ROLE_NAME"
-            else
-              echo ""
-              echo "✅ SSM policy found"
-            fi
+            echo "Note: IAM role should have 'AmazonSSMManagedInstanceCore' policy"
+            echo "      (Cannot verify due to IAM permissions, but continuing...)"
           fi
 
       - name: Check SSM Agent Status
