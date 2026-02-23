@@ -74,27 +74,25 @@ jobs:
           cp docker-compose.yml deploy/ || true
 
           # Create .env file with ALL required environment variables
-          cat > deploy/.env <<'ENVEOF'
-NODE_ENV=production
-ENVEOF
-          cat >> deploy/.env <<ENVEOF
-AWS_REGION=${{ env.AWS_REGION }}
-S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
-S3_REGION=${{ env.AWS_REGION }}
-ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
-TWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }}
-TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }}
-TWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }}
-TWILIO_WHATSAPP_NUMBER=${{ secrets.TWILIO_WHATSAPP_NUMBER }}
-GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-JWT_SECRET=${{ secrets.JWT_SECRET }}
-JWT_ACCESS_SECRET=${{ secrets.JWT_SECRET }}
-JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
-ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
-NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
-APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
-ENVEOF
+          {
+            echo "NODE_ENV=production"
+            echo "AWS_REGION=${{ env.AWS_REGION }}"
+            echo "S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}"
+            echo "S3_REGION=${{ env.AWS_REGION }}"
+            echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}"
+            echo "TWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }}"
+            echo "TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }}"
+            echo "TWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }}"
+            echo "TWILIO_WHATSAPP_NUMBER=${{ secrets.TWILIO_WHATSAPP_NUMBER }}"
+            echo "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}"
+            echo "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}"
+            echo "JWT_SECRET=${{ secrets.JWT_SECRET }}"
+            echo "JWT_ACCESS_SECRET=${{ secrets.JWT_SECRET }}"
+            echo "JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}"
+            echo "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}"
+            echo "NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}"
+            echo "APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}"
+          } > deploy/.env
 
           tar -czf deploy.tar.gz -C deploy .
 
