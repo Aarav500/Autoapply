@@ -42,17 +42,14 @@ jobs:
         run: |
           mkdir -p deploy
 
-          # Copy standalone output (server.js, node_modules, etc.)
+          # Copy EVERYTHING from standalone output
+          # This includes: server.js, node_modules, .next/ (with server, BUILD_ID, manifests)
           cp -r .next/standalone/* deploy/
 
-          # Copy ALL .next files (not just static)
-          mkdir -p deploy/.next
+          # Standalone .next ONLY missing static folder - add it
           cp -r .next/static deploy/.next/static
-          cp -r .next/server deploy/.next/server
-          cp .next/BUILD_ID deploy/.next/BUILD_ID
-          cp .next/*.json deploy/.next/ 2>/dev/null || true
 
-          # Copy public files
+          # Copy public files (not included in standalone)
           cp -r public deploy/public
 
           # Copy Dockerfile
@@ -61,21 +58,43 @@ jobs:
           # Copy docker-compose.yml if it exists
           cp docker-compose.yml deploy/ || true
 
-          # Create .env file
+          # Create .env file with ALL required environment variables
           cat > deploy/.env << EOF
+          # Node environment
           NODE_ENV=production
+
+          # AWS S3 Configuration (production uses real S3, not MinIO)
           AWS_REGION=${{ env.AWS_REGION }}
-          AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}
+          S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
+          S3_REGION=${{ env.AWS_REGION }}
+
+          # AWS credentials will be provided via EC2 IAM role (no keys needed)
+          # If using IAM user instead, add AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY secrets
+
+          # AI Services
           ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+
+          # Twilio (SMS/WhatsApp)
           TWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }}
           TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }}
           TWILIO_PHONE_NUMBER=${{ secrets.TWILIO_PHONE_NUMBER }}
           TWILIO_WHATSAPP_NUMBER=${{ secrets.TWILIO_WHATSAPP_NUMBER }}
+
+          # Google OAuth (Gmail, Calendar)
           GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+
+          # JWT Secrets
           JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_ACCESS_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+
+          # Encryption
           ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
+
+          # Application URL
           NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
+          APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
           EOF
 
           tar -czf deploy.tar.gz -C deploy .
