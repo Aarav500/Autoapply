@@ -7,17 +7,7 @@ const nextConfig: NextConfig = {
   // Enable standalone output for Docker deployment
   output: 'standalone',
 
-  // Disable static error pages to avoid Html import issues with Next 15 + React 19
-  generateBuildId: async () => {
-    return 'build-' + Date.now();
-  },
-
   serverExternalPackages: ['googleapis', 'nodemailer', 'puppeteer', 'playwright'],
-
-  // Experimental: skip default error page static generation
-  experimental: {
-    skipMiddlewareUrlNormalize: true,
-  },
 
   webpack: (config, { isServer }) => {
     // Fix for googleapis module resolution issues
