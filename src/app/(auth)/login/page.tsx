@@ -28,7 +28,8 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Login failed");
+        const message = data.error?.message || data.error || "Login failed";
+        throw new Error(message);
       }
 
       // Store tokens
