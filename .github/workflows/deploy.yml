@@ -46,11 +46,20 @@ jobs:
           # This includes: server.js, node_modules, .next/ (with server, BUILD_ID, manifests)
           cp -r .next/standalone/* deploy/
 
-          # Standalone .next ONLY missing static folder - add it
-          cp -r .next/static deploy/.next/static
+          # Standalone .next ONLY missing static folder - add it if it exists
+          if [ -d ".next/static" ]; then
+            cp -r .next/static deploy/.next/static
+          else
+            echo "Warning: .next/static not found, creating empty directory"
+            mkdir -p deploy/.next/static
+          fi
 
           # Copy public files (not included in standalone)
-          cp -r public deploy/public
+          if [ -d "public" ]; then
+            cp -r public deploy/public
+          else
+            mkdir -p deploy/public
+          fi
 
           # Copy Dockerfile
           cp Dockerfile.fast deploy/Dockerfile
