@@ -211,6 +211,13 @@ export default function InterviewPrepPage() {
             {/* Quick Actions */}
             <div className="flex gap-3">
               <button
+                onClick={() => {
+                  if (nextInterview.meetingLink) {
+                    window.open(nextInterview.meetingLink, '_blank');
+                  } else {
+                    alert('No meeting link available yet. Check your email for the interview link.');
+                  }
+                }}
                 className="px-5 py-2.5 rounded-lg font-semibold transition-all"
                 style={{
                   background: "#00FFE0",
@@ -410,6 +417,16 @@ export default function InterviewPrepPage() {
                 </p>
                 <div className="flex gap-3 justify-center">
                   <button
+                    onClick={async () => {
+                      if (!nextInterview) return;
+                      try {
+                        const res = await apiFetch<{ data: any }>(`/api/interview/${nextInterview.id}/mock`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "behavioral" }) });
+                        alert('Mock interview started! Session ID: ' + (res.data?.sessionId || 'unknown'));
+                      } catch (err) {
+                        console.error("Failed to start mock:", err);
+                        alert('Failed to start mock interview. Make sure you have an upcoming interview scheduled.');
+                      }
+                    }}
                     className="px-5 py-2.5 rounded-lg font-semibold transition-all"
                     style={{
                       background: "#00FFE0",
@@ -420,6 +437,16 @@ export default function InterviewPrepPage() {
                     Start Behavioral Mock
                   </button>
                   <button
+                    onClick={async () => {
+                      if (!nextInterview) return;
+                      try {
+                        const res = await apiFetch<{ data: any }>(`/api/interview/${nextInterview.id}/mock`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "technical" }) });
+                        alert('Mock interview started! Session ID: ' + (res.data?.sessionId || 'unknown'));
+                      } catch (err) {
+                        console.error("Failed to start mock:", err);
+                        alert('Failed to start mock interview. Make sure you have an upcoming interview scheduled.');
+                      }
+                    }}
                     className="px-5 py-2.5 rounded-lg font-semibold border transition-all hover:bg-white/5"
                     style={{
                       borderColor: "rgba(255, 255, 255, 0.08)",
@@ -442,6 +469,16 @@ export default function InterviewPrepPage() {
                   Send thank-you emails and follow up professionally
                 </p>
                 <button
+                  onClick={async () => {
+                    if (!nextInterview) return;
+                    try {
+                      const res = await apiFetch<{ data: any }>(`/api/interview/${nextInterview.id}/thank-you`, { method: "POST" });
+                      alert('Thank you email draft generated! Check the post-interview section.');
+                    } catch (err) {
+                      console.error("Failed to generate thank you:", err);
+                      alert('Failed to generate thank you email.');
+                    }
+                  }}
                   className="px-5 py-2.5 rounded-lg font-semibold transition-all"
                   style={{
                     background: "#00FFE0",

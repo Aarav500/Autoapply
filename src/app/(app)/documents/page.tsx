@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileText, Download, Plus, AlertCircle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
@@ -32,9 +32,11 @@ export default function DocumentsPage() {
   const selectedDocument = documents.find((doc: any) => doc.id === selectedDocId) || documents[0];
 
   // Set first document as selected by default
-  if (!selectedDocId && documents.length > 0) {
-    setSelectedDocId(documents[0].id);
-  }
+  useEffect(() => {
+    if (!selectedDocId && documents.length > 0) {
+      setSelectedDocId(documents[0].id);
+    }
+  }, [documents, selectedDocId]);
 
   const categories = [
     { id: "all", label: "All", count: documents.length },
@@ -94,6 +96,14 @@ export default function DocumentsPage() {
 
         {/* Generate Button */}
         <button
+          onClick={async () => {
+            try {
+              await apiFetch("/api/documents/cv/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+              queryClient.invalidateQueries({ queryKey: ["documents"] });
+            } catch (err) {
+              console.error("Failed to generate document:", err);
+            }
+          }}
           className="w-full px-4 py-3 rounded-lg font-semibold transition-all"
           style={{
             background: "#00FFE0",

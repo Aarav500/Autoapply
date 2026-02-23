@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Search,
   Heart,
@@ -33,9 +33,11 @@ export default function JobsPage() {
   const selectedJob = jobs.find((job: any) => job.id === selectedJobId) || jobs[0];
 
   // Set first job as selected by default
-  if (!selectedJobId && jobs.length > 0) {
-    setSelectedJobId(jobs[0].id);
-  }
+  useEffect(() => {
+    if (!selectedJobId && jobs.length > 0) {
+      setSelectedJobId(jobs[0].id);
+    }
+  }, [jobs, selectedJobId]);
 
   // Save job mutation
   const saveMutation = useMutation({
@@ -347,6 +349,7 @@ export default function JobsPage() {
                   : "Apply Now"}
               </button>
               <button
+                onClick={() => window.open(`https://www.google.com/search?q=${encodeURIComponent(selectedJob.company)}`, '_blank')}
                 className="px-4 py-3 rounded-lg font-semibold transition-all border hover:bg-white/5"
                 style={{
                   borderColor: "rgba(255, 255, 255, 0.08)",

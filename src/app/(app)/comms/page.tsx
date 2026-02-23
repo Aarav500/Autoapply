@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calendar, CheckCircle2, ExternalLink, Send, Sparkles } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
@@ -48,9 +48,11 @@ export default function CommsPage() {
   const selectedEmail = emailData?.data;
 
   // Set first thread as selected by default
-  if (!selectedThreadId && threads.length > 0) {
-    setSelectedThreadId(threads[0].id);
-  }
+  useEffect(() => {
+    if (!selectedThreadId && threads.length > 0) {
+      setSelectedThreadId(threads[0].id);
+    }
+  }, [threads, selectedThreadId]);
 
   const filters = [
     { id: "All", label: "All", count: threads.length },
