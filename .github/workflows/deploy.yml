@@ -42,17 +42,22 @@ jobs:
         run: |
           mkdir -p deploy
 
-          # Copy EVERYTHING from standalone output
-          # This includes: server.js, node_modules, .next/ (with server, BUILD_ID, manifests)
-          cp -r .next/standalone/* deploy/
+          # Copy EVERYTHING from standalone output (including dotfiles like .next/)
+          cp -r .next/standalone/. deploy/
 
-          # Standalone .next is missing the static folder - add it
-          mkdir -p deploy/.next
+          # Standalone output excludes static files - add them
           if [ -d ".next/static" ]; then
             cp -r .next/static deploy/.next/static
           else
             echo "Warning: .next/static not found, creating empty directory"
             mkdir -p deploy/.next/static
+          fi
+
+          # Verify BUILD_ID exists (required for production server)
+          if [ ! -f "deploy/.next/BUILD_ID" ]; then
+            echo "ERROR: BUILD_ID not found in deploy/.next/"
+            ls -la deploy/.next/ || echo "deploy/.next/ does not exist"
+            exit 1
           fi
 
           # Copy public files (not included in standalone)
@@ -185,7 +190,7 @@ jobs:
               \"sudo docker run -d --name autoapply-app --restart unless-stopped -p 3000:3000 --env-file .env autoapply:latest\",
               \"echo ''\",
               \"echo 'Step 7: Waiting for application to start...'\",
-              \"for i in {1..30}; do if curl -f http://localhost:3000/api/health >/dev/null 2>&1; then echo '✅ Application is healthy'; sudo docker logs autoapply-app --tail 20; echo ''; echo '=== Deployment Complete ==='; exit 0; fi; echo \\\"  Attempt \$i/30: waiting...\\\"; sleep 2; done\",
+              \"i=1; while [ \\$i -le 30 ]; do if curl -f http://localhost:3000/api/health >/dev/null 2>&1; then echo '✅ Application is healthy'; sudo docker logs autoapply-app --tail 20; echo ''; echo '=== Deployment Complete ==='; exit 0; fi; echo \\\"  Attempt \\$i/30: waiting...\\\"; sleep 2; i=\\$((i+1)); done\",
               \"echo '❌ Application failed to start'\",
               \"sudo docker logs autoapply-app\",
               \"exit 1\"
