@@ -663,25 +663,34 @@ function IntegrationsTab({
   const [whatsappPhone, setWhatsappPhone] = useState("");
   const [smsStatus, setSmsStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [whatsappStatus, setWhatsappStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [oauthStatus, setOauthStatus] = useState<"idle" | "loading" | "error">("idle");
-  const [oauthError, setOauthError] = useState("");
+  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
 
-  const handleOAuthConnect = async (endpoint: string) => {
-    setOauthStatus("loading");
-    setOauthError("");
+  // Fetch integration status
+  const { data: statusData } = useQuery({
+    queryKey: ["integrationStatus"],
+    queryFn: () => apiFetch<Record<string, unknown>>("/api/settings/integrations"),
+    retry: false,
+  });
+
+  const statusInner = (statusData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+  const gmail = statusInner?.gmail as Record<string, unknown> | undefined;
+  const calendar = statusInner?.calendar as Record<string, unknown> | undefined;
+  const sms = statusInner?.sms as Record<string, unknown> | undefined;
+  const whatsapp = statusInner?.whatsapp as Record<string, unknown> | undefined;
+
+  const handleOAuthConnect = async (endpoint: string, name: string) => {
+    setOauthLoading(name);
     try {
       const res = await apiFetch<Record<string, unknown>>(endpoint);
       const data = (res as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
       const authUrl = (data?.authUrl || data?.url) as string;
       if (authUrl) {
         window.location.href = authUrl;
-      } else {
-        setOauthError("OAuth not configured on server. Contact admin.");
-        setOauthStatus("error");
       }
-    } catch (err) {
-      setOauthError((err as Error)?.message || "Failed to connect");
-      setOauthStatus("error");
+    } catch {
+      // Error handled by status display
+    } finally {
+      setOauthLoading(null);
     }
   };
 
@@ -705,26 +714,25 @@ function IntegrationsTab({
     }
   };
 
+  const envHint = (vars: string[]) => (
+    <p className="text-[11px] mt-2" style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#4A4A64" }}>
+      Required env vars: {vars.join(", ")}
+    </p>
+  );
+
   return (
     <div className="space-y-6">
       <SectionTitle>Email</SectionTitle>
-      <IntegrationCard
+      <IntegrationStatus
         icon={Mail}
         title="Gmail"
         description="Connect Gmail to sync emails and send replies"
-        connected={!!autoReply?.autoReplyEnabled}
-        onConnect={() => handleOAuthConnect("/api/comms/email/connect")}
+        serverConfigured={!!gmail?.serverConfigured}
+        userConnected={!!gmail?.userConnected}
+        onConnect={() => handleOAuthConnect("/api/comms/email/connect", "gmail")}
+        loading={oauthLoading === "gmail"}
+        envVars={["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URI"]}
       />
-      {oauthStatus === "loading" && (
-        <p className="text-[12px] text-[#7E7E98]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-          Redirecting to Google OAuth...
-        </p>
-      )}
-      {oauthError && (
-        <p className="text-[12px] text-[#FF4757]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-          {oauthError}
-        </p>
-      )}
       <ToggleRow
         label="Auto-Reply"
         description="Automatically respond to certain email categories"
@@ -736,112 +744,209 @@ function IntegrationsTab({
       <SectionTitle>Messaging</SectionTitle>
 
       {/* SMS */}
-      <div
-        className="p-4 rounded-lg border"
-        style={{ background: "rgba(255, 255, 255, 0.02)", borderColor: "rgba(255, 255, 255, 0.04)" }}
-      >
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(0, 255, 224, 0.08)" }}>
-            <Phone size={18} className="text-[#00FFE0]" />
-          </div>
-          <div>
-            <p className="text-[13px] font-medium" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>
-              SMS (Twilio)
-            </p>
-            <p className="text-[11px]" style={{ fontFamily: "'DM Sans', sans-serif", color: "#4A4A64" }}>
-              Receive SMS notifications for urgent updates
-            </p>
-          </div>
-          {!!prefs?.smsEnabled && (
-            <span className="ml-auto text-[11px] font-semibold px-3 py-1 rounded-lg"
-              style={{ background: "rgba(0, 230, 118, 0.08)", border: "1px solid rgba(0, 230, 118, 0.2)", color: "#00E676", fontFamily: "'Outfit', sans-serif" }}>
-              Connected
-            </span>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <input
-            type="tel"
-            value={smsPhone}
-            onChange={(e) => setSmsPhone(e.target.value)}
-            placeholder="+1 (555) 123-4567"
-            className="flex-1 px-4 py-2 rounded-lg border bg-transparent outline-none"
-            style={{ borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "#E8E8F0" }}
-          />
-          <button
-            onClick={() => handlePhoneConfigure("/api/comms/sms/configure", smsPhone, setSmsStatus)}
-            disabled={!smsPhone.trim() || smsStatus === "saving"}
-            className="px-4 py-2 rounded-lg text-[12px] font-semibold transition-all disabled:opacity-30"
-            style={{ background: "rgba(0, 255, 224, 0.08)", border: "1px solid rgba(0, 255, 224, 0.2)", color: "#00FFE0", fontFamily: "'Outfit', sans-serif" }}
-          >
-            {smsStatus === "saving" ? "Saving..." : smsStatus === "saved" ? "Saved!" : "Configure"}
-          </button>
-        </div>
-        {smsStatus === "error" && (
-          <p className="text-[11px] text-[#FF4757] mt-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-            Failed to configure SMS. Check your phone number.
-          </p>
-        )}
-      </div>
+      <PhoneIntegration
+        icon={Phone}
+        title="SMS (Twilio)"
+        description="Receive SMS notifications for urgent updates"
+        serverConfigured={!!sms?.serverConfigured}
+        userConnected={!!sms?.userConnected}
+        savedPhone={(sms?.phoneNumber as string) || ""}
+        phone={smsPhone}
+        onPhoneChange={setSmsPhone}
+        onConfigure={() => handlePhoneConfigure("/api/comms/sms/configure", smsPhone, setSmsStatus)}
+        status={smsStatus}
+        envVars={["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER"]}
+      />
 
       {/* WhatsApp */}
-      <div
-        className="p-4 rounded-lg border"
-        style={{ background: "rgba(255, 255, 255, 0.02)", borderColor: "rgba(255, 255, 255, 0.04)" }}
-      >
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(0, 255, 224, 0.08)" }}>
-            <MessageSquare size={18} className="text-[#00FFE0]" />
-          </div>
-          <div>
-            <p className="text-[13px] font-medium" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>
-              WhatsApp (Twilio)
-            </p>
-            <p className="text-[11px]" style={{ fontFamily: "'DM Sans', sans-serif", color: "#4A4A64" }}>
-              Get WhatsApp messages for job updates
-            </p>
-          </div>
-          {!!prefs?.whatsappEnabled && (
-            <span className="ml-auto text-[11px] font-semibold px-3 py-1 rounded-lg"
-              style={{ background: "rgba(0, 230, 118, 0.08)", border: "1px solid rgba(0, 230, 118, 0.2)", color: "#00E676", fontFamily: "'Outfit', sans-serif" }}>
-              Connected
-            </span>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <input
-            type="tel"
-            value={whatsappPhone}
-            onChange={(e) => setWhatsappPhone(e.target.value)}
-            placeholder="+1 (555) 123-4567"
-            className="flex-1 px-4 py-2 rounded-lg border bg-transparent outline-none"
-            style={{ borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "#E8E8F0" }}
-          />
-          <button
-            onClick={() => handlePhoneConfigure("/api/comms/whatsapp/configure", whatsappPhone, setWhatsappStatus)}
-            disabled={!whatsappPhone.trim() || whatsappStatus === "saving"}
-            className="px-4 py-2 rounded-lg text-[12px] font-semibold transition-all disabled:opacity-30"
-            style={{ background: "rgba(0, 255, 224, 0.08)", border: "1px solid rgba(0, 255, 224, 0.2)", color: "#00FFE0", fontFamily: "'Outfit', sans-serif" }}
-          >
-            {whatsappStatus === "saving" ? "Saving..." : whatsappStatus === "saved" ? "Saved!" : "Configure"}
-          </button>
-        </div>
-        {whatsappStatus === "error" && (
-          <p className="text-[11px] text-[#FF4757] mt-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-            Failed to configure WhatsApp. Check your phone number.
-          </p>
-        )}
-      </div>
+      <PhoneIntegration
+        icon={MessageSquare}
+        title="WhatsApp (Twilio)"
+        description="Get WhatsApp messages for job updates"
+        serverConfigured={!!whatsapp?.serverConfigured}
+        userConnected={!!whatsapp?.userConnected}
+        savedPhone={(whatsapp?.phoneNumber as string) || ""}
+        phone={whatsappPhone}
+        onPhoneChange={setWhatsappPhone}
+        onConfigure={() => handlePhoneConfigure("/api/comms/whatsapp/configure", whatsappPhone, setWhatsappStatus)}
+        status={whatsappStatus}
+        envVars={["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_WHATSAPP_NUMBER"]}
+      />
 
       <Divider />
       <SectionTitle>Calendar</SectionTitle>
-      <IntegrationCard
+      <IntegrationStatus
         icon={Clock}
         title="Google Calendar"
         description="Auto-schedule interviews and get calendar reminders"
-        connected={false}
-        onConnect={() => handleOAuthConnect("/api/comms/calendar/connect")}
+        serverConfigured={!!calendar?.serverConfigured}
+        userConnected={!!calendar?.userConnected}
+        onConnect={() => handleOAuthConnect("/api/comms/calendar/connect", "calendar")}
+        loading={oauthLoading === "calendar"}
+        envVars={["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]}
       />
+    </div>
+  );
+}
+
+function IntegrationStatus({
+  icon: Icon,
+  title,
+  description,
+  serverConfigured,
+  userConnected,
+  onConnect,
+  loading,
+  envVars,
+}: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  serverConfigured: boolean;
+  userConnected: boolean;
+  onConnect: () => void;
+  loading: boolean;
+  envVars: string[];
+}) {
+  return (
+    <div
+      className="p-4 rounded-lg border"
+      style={{ background: "rgba(255, 255, 255, 0.02)", borderColor: "rgba(255, 255, 255, 0.04)" }}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(0, 255, 224, 0.08)" }}>
+            <Icon size={18} className="text-[#00FFE0]" />
+          </div>
+          <div>
+            <p className="text-[13px] font-medium" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>
+              {title}
+            </p>
+            <p className="text-[11px]" style={{ fontFamily: "'DM Sans', sans-serif", color: "#4A4A64" }}>
+              {description}
+            </p>
+          </div>
+        </div>
+        {userConnected ? (
+          <span className="text-[11px] font-semibold px-3 py-1.5 rounded-lg"
+            style={{ background: "rgba(0, 230, 118, 0.08)", border: "1px solid rgba(0, 230, 118, 0.2)", color: "#00E676", fontFamily: "'Outfit', sans-serif" }}>
+            Connected
+          </span>
+        ) : serverConfigured ? (
+          <button
+            onClick={onConnect}
+            disabled={loading}
+            className="px-4 py-1.5 rounded-lg text-[12px] font-semibold transition-all disabled:opacity-50"
+            style={{ background: "rgba(0, 255, 224, 0.08)", border: "1px solid rgba(0, 255, 224, 0.2)", color: "#00FFE0", fontFamily: "'Outfit', sans-serif" }}
+          >
+            {loading ? "Connecting..." : "Connect"}
+          </button>
+        ) : (
+          <span className="text-[11px] font-semibold px-3 py-1.5 rounded-lg"
+            style={{ background: "rgba(255, 171, 0, 0.08)", border: "1px solid rgba(255, 171, 0, 0.2)", color: "#FFAB00", fontFamily: "'Outfit', sans-serif" }}>
+            Not Configured
+          </span>
+        )}
+      </div>
+      {!serverConfigured && (
+        <div className="mt-3 p-3 rounded-lg" style={{ background: "rgba(255, 171, 0, 0.05)", border: "1px solid rgba(255, 171, 0, 0.1)" }}>
+          <p className="text-[11px]" style={{ fontFamily: "'DM Sans', sans-serif", color: "#FFAB00" }}>
+            Server-side credentials not configured. Add these environment variables to your .env file on the server:
+          </p>
+          <p className="text-[11px] mt-1" style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#7E7E98" }}>
+            {envVars.join(", ")}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PhoneIntegration({
+  icon: Icon,
+  title,
+  description,
+  serverConfigured,
+  userConnected,
+  savedPhone,
+  phone,
+  onPhoneChange,
+  onConfigure,
+  status,
+  envVars,
+}: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  serverConfigured: boolean;
+  userConnected: boolean;
+  savedPhone: string;
+  phone: string;
+  onPhoneChange: (v: string) => void;
+  onConfigure: () => void;
+  status: "idle" | "saving" | "saved" | "error";
+  envVars: string[];
+}) {
+  return (
+    <div
+      className="p-4 rounded-lg border"
+      style={{ background: "rgba(255, 255, 255, 0.02)", borderColor: "rgba(255, 255, 255, 0.04)" }}
+    >
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(0, 255, 224, 0.08)" }}>
+          <Icon size={18} className="text-[#00FFE0]" />
+        </div>
+        <div className="flex-1">
+          <p className="text-[13px] font-medium" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>
+            {title}
+          </p>
+          <p className="text-[11px]" style={{ fontFamily: "'DM Sans', sans-serif", color: "#4A4A64" }}>
+            {description}
+          </p>
+        </div>
+        {userConnected && (
+          <span className="text-[11px] font-semibold px-3 py-1.5 rounded-lg"
+            style={{ background: "rgba(0, 230, 118, 0.08)", border: "1px solid rgba(0, 230, 118, 0.2)", color: "#00E676", fontFamily: "'Outfit', sans-serif" }}>
+            Connected{savedPhone ? ` (${savedPhone})` : ""}
+          </span>
+        )}
+      </div>
+      {!serverConfigured ? (
+        <div className="p-3 rounded-lg" style={{ background: "rgba(255, 171, 0, 0.05)", border: "1px solid rgba(255, 171, 0, 0.1)" }}>
+          <p className="text-[11px]" style={{ fontFamily: "'DM Sans', sans-serif", color: "#FFAB00" }}>
+            Server-side Twilio credentials not configured. Add these environment variables:
+          </p>
+          <p className="text-[11px] mt-1" style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#7E7E98" }}>
+            {envVars.join(", ")}
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="flex gap-2">
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => onPhoneChange(e.target.value)}
+              placeholder={savedPhone || "+1 (555) 123-4567"}
+              className="flex-1 px-4 py-2 rounded-lg border bg-transparent outline-none"
+              style={{ borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "#E8E8F0" }}
+            />
+            <button
+              onClick={onConfigure}
+              disabled={!phone.trim() || status === "saving"}
+              className="px-4 py-2 rounded-lg text-[12px] font-semibold transition-all disabled:opacity-30"
+              style={{ background: "rgba(0, 255, 224, 0.08)", border: "1px solid rgba(0, 255, 224, 0.2)", color: "#00FFE0", fontFamily: "'Outfit', sans-serif" }}
+            >
+              {status === "saving" ? "Saving..." : status === "saved" ? "Saved!" : "Configure"}
+            </button>
+          </div>
+          {status === "error" && (
+            <p className="text-[11px] text-[#FF4757] mt-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+              Failed to configure. Check your phone number format (+1XXXXXXXXXX).
+            </p>
+          )}
+        </>
+      )}
     </div>
   );
 }
