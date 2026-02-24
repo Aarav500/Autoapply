@@ -56,22 +56,37 @@ Every component: typed props, forwardRef, className prop, Framer Motion
 | 10 | Interview Coach | ✅ | 02/15/2026 |
 | 11 | Auto-Apply Engine | ✅ | 02/15/2026 |
 | 12 | Background Job Runner | ✅ | 02/16/2026 |
-| 13 | Design System + Components | ⬜ | |
-| 14 | Layout + Auth Pages | ⬜ | |
-| 15 | Dashboard | ⬜ | |
-| 16 | Profile Page | ⬜ | |
-| 17 | Jobs Page | ⬜ | |
-| 18 | Documents Page | ⬜ | |
-| 19 | Comms Page | ⬜ | |
-| 20 | Interview Page | ⬜ | |
-| 21 | Settings Page | ⬜ | |
-| 22 | Polish + Testing | ⬜ | |
+| 13 | Design System + Components | ✅ | 02/18/2026 |
+| 14 | Layout + Auth Pages | ✅ | 02/18/2026 |
+| 15 | Dashboard | ✅ | 02/18/2026 |
+| 16 | Profile Page | ✅ | 02/20/2026 |
+| 17 | Jobs Page | ✅ | 02/20/2026 |
+| 18 | Documents Page | ✅ | 02/20/2026 |
+| 19 | Comms Page | ✅ | 02/20/2026 |
+| 20 | Interview Page | ✅ | 02/20/2026 |
+| 21 | Settings Page | ✅ | 02/23/2026 |
+| 22 | Optimize Pages (GitHub + LinkedIn) | ✅ | 02/23/2026 |
+| 23 | Production Polish + Error Handling | ✅ | 02/23/2026 |
 
 ## Working Features
-(none yet)
+- User registration and login (JWT auth with S3 storage)
+- Dashboard with stats, activity feed, interview countdown, pipeline visualization
+- Profile management with experience, education, skills, projects, preferences editing
+- Job search with RemoteOK and HackerNews integrations
+- Document generation (CV + cover letter) with ATS scoring
+- Email thread viewer with AI-generated reply suggestions
+- Interview prep with mock interviews, company research, STAR answers
+- Auto-apply engine with browser automation
+- Background job scheduler (auto-search, email sync, interview reminders, auto-apply, daily digest)
+- GitHub profile optimizer (fetches public GitHub data, AI analysis)
+- LinkedIn profile optimizer (uses saved profile data, AI analysis)
+- Settings with notification toggles, auto-apply rules, integration status, quiet hours
+- CI/CD deployment to EC2 via GitHub Actions + AWS SSM
 
 ## Known Issues
-(none yet)
+- Gmail/Calendar require Google OAuth credentials (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET) in GitHub secrets
+- SMS/WhatsApp require Twilio credentials in GitHub secrets
+- Integration status properly shown as "Not Configured" when env vars missing
 
 ## Session Log
 (append after each session)

@@ -11,11 +11,12 @@ export default function CommsPage() {
   const [activeFilter, setActiveFilter] = useState("All");
   const [replyText, setReplyText] = useState("");
   const [isGeneratingReply, setIsGeneratingReply] = useState(false);
+  const [generateReplyError, setGenerateReplyError] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
   // Fetch email threads
-  const { data: threadsData, isLoading: threadsLoading } = useQuery({
+  const { data: threadsData, isLoading: threadsLoading, isError: threadsError } = useQuery({
     queryKey: ["emailThreads"],
     queryFn: () => apiFetch<{ data: any[] }>("/api/comms/email/threads"),
     retry: false,
@@ -89,6 +90,7 @@ export default function CommsPage() {
   const handleGenerateReply = async () => {
     if (!selectedThreadId) return;
     setIsGeneratingReply(true);
+    setGenerateReplyError(null);
     try {
       const response = await apiFetch<{ data: { reply: string } }>("/api/comms/email/generate-reply", {
         method: "POST",
@@ -96,8 +98,8 @@ export default function CommsPage() {
         body: JSON.stringify({ emailId: selectedThreadId }),
       });
       setReplyText(response.data.reply);
-    } catch (error) {
-      console.error("Failed to generate reply:", error);
+    } catch {
+      setGenerateReplyError("Failed to generate reply. Please try again.");
     } finally {
       setIsGeneratingReply(false);
     }
@@ -145,7 +147,22 @@ export default function CommsPage() {
 
         {/* Thread List */}
         <div className="flex-1 overflow-y-auto space-y-2">
-          {threadsLoading ? (
+          {threadsError ? (
+            <div
+              className="p-4 rounded-lg"
+              style={{
+                background: "rgba(255, 71, 87, 0.08)",
+                border: "1px solid rgba(255, 71, 87, 0.2)",
+              }}
+            >
+              <p
+                className="text-sm"
+                style={{ fontFamily: "'DM Sans', sans-serif", color: "#FF4757" }}
+              >
+                Failed to load messages. Please try again later.
+              </p>
+            </div>
+          ) : threadsLoading ? (
             <div className="space-y-2">
               {[...Array(5)].map((_, i) => (
                 <div
@@ -366,6 +383,22 @@ export default function CommsPage() {
                   {isGeneratingReply ? "Generating..." : "AI Generate"}
                 </button>
               </div>
+              {generateReplyError && (
+                <div
+                  className="p-3 rounded-lg mb-3"
+                  style={{
+                    background: "rgba(255, 71, 87, 0.08)",
+                    border: "1px solid rgba(255, 71, 87, 0.2)",
+                  }}
+                >
+                  <p
+                    className="text-sm"
+                    style={{ fontFamily: "'DM Sans', sans-serif", color: "#FF4757" }}
+                  >
+                    {generateReplyError}
+                  </p>
+                </div>
+              )}
               <textarea
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
@@ -379,6 +412,22 @@ export default function CommsPage() {
                   color: "#E8E8F0",
                 }}
               />
+              {replyMutation.isError && (
+                <div
+                  className="p-3 rounded-lg mb-3"
+                  style={{
+                    background: "rgba(255, 71, 87, 0.08)",
+                    border: "1px solid rgba(255, 71, 87, 0.2)",
+                  }}
+                >
+                  <p
+                    className="text-sm"
+                    style={{ fontFamily: "'DM Sans', sans-serif", color: "#FF4757" }}
+                  >
+                    Failed to send reply. Please try again.
+                  </p>
+                </div>
+              )}
               <div className="flex gap-2">
                 <button
                   onClick={handleSendReply}

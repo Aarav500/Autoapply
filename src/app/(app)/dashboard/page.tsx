@@ -1,36 +1,65 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowRight, Video, FileText } from "lucide-react";
+import { ArrowRight, Video, FileText, AlertTriangle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
 
+function ErrorBanner({ message }: { message: string }) {
+  return (
+    <div
+      className="flex items-center gap-3 px-4 py-3 rounded-lg mb-4"
+      style={{
+        background: "rgba(255, 71, 87, 0.08)",
+        border: "1px solid rgba(255, 71, 87, 0.2)",
+      }}
+    >
+      <AlertTriangle size={16} className="text-[#FF4757] flex-shrink-0" />
+      <p
+        className="text-[13px]"
+        style={{ fontFamily: "'DM Sans', sans-serif", color: "#FF4757" }}
+      >
+        {message}
+      </p>
+    </div>
+  );
+}
+
+const defaultStats = [
+  { number: "0", label: "Jobs Found", trend: "—", trendColor: "#00E676" },
+  { number: "0", label: "Applied", trend: "—", trendColor: "#00E676" },
+  { number: "0%", label: "Response Rate", trend: "—", trendColor: "#00E676" },
+  { number: "0", label: "Interviews", sub: "—", subColor: "#FFAB00", accent: true },
+  { number: "0", label: "Offers", sub: "—", subColor: "#7E7E98", accent: true },
+];
+
 export default function DashboardPage() {
-  const { data: statsData } = useQuery({
+  const { data: statsData, error: statsError } = useQuery({
     queryKey: ["dashboardStats"],
     queryFn: () => apiFetch("/api/dashboard/stats"),
     retry: false,
   });
 
-  const { data: activityData } = useQuery({
+  const { data: activityData, error: activityError } = useQuery({
     queryKey: ["recentActivity"],
     queryFn: () => apiFetch("/api/dashboard/activity"),
     retry: false,
   });
 
-  const { data: interviewsData, isLoading: interviewsLoading } = useQuery({
+  const { data: interviewsData, isLoading: interviewsLoading, error: interviewsError } = useQuery({
     queryKey: ["upcomingInterviews"],
     queryFn: () => apiFetch("/api/interview?status=scheduled&limit=3"),
     retry: false,
   });
 
-  const { data: pipelineData } = useQuery({
+  const { data: pipelineData, error: pipelineError } = useQuery({
     queryKey: ["pipeline"],
     queryFn: () => apiFetch("/api/jobs/pipeline"),
     retry: false,
   });
 
-  // Stats from API
+  const hasAnyError = statsError || activityError || interviewsError || pipelineError;
+
   const stats: Array<{
     number: string;
     label: string;
@@ -39,17 +68,11 @@ export default function DashboardPage() {
     sub?: string;
     subColor?: string;
     accent?: boolean;
-  }> = (statsData as Record<string, unknown>)?.stats as typeof stats || [
-    { number: "0", label: "Jobs Found", trend: "—", trendColor: "#00E676" },
-    { number: "0", label: "Applied", trend: "—", trendColor: "#00E676" },
-    { number: "0%", label: "Response Rate", trend: "—", trendColor: "#00E676" },
-    { number: "0", label: "Interviews", sub: "—", subColor: "#FFAB00", accent: true },
-    { number: "0", label: "Offers", sub: "—", subColor: "#7E7E98", accent: true },
-  ];
+  }> = (statsData as any)?.stats ?? defaultStats;
 
   const rawPipeline: Array<{status: string; count: number}> =
-    (pipelineData as Record<string, Record<string, unknown>>)?.data?.pipeline as typeof rawPipeline || [];
-  const maxCount = Math.max(...rawPipeline.map((s) => s.count), 1);
+    (pipelineData as any)?.data?.pipeline ?? [];
+  const maxCount = Math.max(...(rawPipeline.length > 0 ? rawPipeline.map((s) => s.count) : [1]), 1);
   const pipelineStages = rawPipeline.map((stage) => {
     const colors: Record<string, string> = {
       discovered: "#15152A",
@@ -73,7 +96,7 @@ export default function DashboardPage() {
     time: string;
     description: string;
     dotColor: string;
-  }> = (activityData as Record<string, unknown>)?.data as typeof activities || [];
+  }> = (activityData as any)?.data ?? [];
 
   const currentHour = new Date().getHours();
   const greeting =
@@ -91,6 +114,10 @@ export default function DashboardPage() {
 
   return (
     <div className="w-full">
+      {hasAnyError && (
+        <ErrorBanner message="Some dashboard data could not be loaded. Showing available information." />
+      )}
+
       {/* Background texture */}
       <div
         className="fixed inset-0 opacity-[0.015] pointer-events-none"
@@ -116,7 +143,7 @@ export default function DashboardPage() {
             className="text-[15px]"
             style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}
           >
-            Your job search is active. {(statsData as Record<string, number>)?.applicationsToday || 0} applications sent today.
+            Your job search is active. {(statsData as any)?.applicationsToday ?? 0} applications sent today.
           </p>
         </div>
 
@@ -369,7 +396,7 @@ export default function DashboardPage() {
                 className="text-[13px]"
                 style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}
               >
-                {((interviewsData as Record<string, Record<string, unknown[]>>)?.data?.interviews?.length) || 0} scheduled
+                {(interviewsData as any)?.data?.interviews?.length ?? 0} scheduled
               </p>
             </div>
             <button
@@ -392,10 +419,12 @@ export default function DashboardPage() {
           <div className="space-y-4">
             {interviewsLoading ? (
               <p className="text-[13px] text-[#7E7E98]">Loading interviews...</p>
-            ) : !(((interviewsData as Record<string, Record<string, unknown[]>>)?.data?.interviews?.length)) ? (
+            ) : interviewsError ? (
+              <p className="text-[13px] text-[#7E7E98]">Unable to load interviews.</p>
+            ) : !((interviewsData as any)?.data?.interviews?.length) ? (
               <p className="text-[13px] text-[#7E7E98]">No upcoming interviews</p>
             ) : (
-              ((interviewsData as Record<string, Record<string, Array<Record<string, string>>>>)?.data?.interviews || []).slice(0, 3).map((interview, index: number) => (
+              ((interviewsData as any)?.data?.interviews ?? []).slice(0, 3).map((interview: any, index: number) => (
                 <div
                   key={index}
                   className="p-4 rounded-lg border"

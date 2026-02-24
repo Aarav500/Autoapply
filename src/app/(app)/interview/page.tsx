@@ -23,8 +23,14 @@ interface Section {
   isExpanded: boolean;
 }
 
+interface FeedbackMessage {
+  type: "success" | "error";
+  text: string;
+}
+
 export default function InterviewPrepPage() {
   const [activeTab, setActiveTab] = useState("prep");
+  const [feedbackMessage, setFeedbackMessage] = useState<FeedbackMessage | null>(null);
   const [sections, setSections] = useState<Section[]>([
     { id: "company", title: "Company Research", isExpanded: true },
     { id: "behavioral", title: "Behavioral Questions", count: 10, isExpanded: false },
@@ -34,8 +40,12 @@ export default function InterviewPrepPage() {
 
   const queryClient = useQueryClient();
 
-  // Fetch interviews
-  const { data: interviewsData, isLoading: interviewsLoading } = useQuery({
+  const showFeedback = (type: "success" | "error", text: string) => {
+    setFeedbackMessage({ type, text });
+    setTimeout(() => setFeedbackMessage(null), 5000);
+  };
+
+  const { data: interviewsData, isLoading: interviewsLoading, isError: interviewsError } = useQuery({
     queryKey: ["upcomingInterviews"],
     queryFn: () => apiFetch<{ data: any[] }>("/api/interview?status=scheduled"),
     retry: false,
@@ -63,16 +73,21 @@ export default function InterviewPrepPage() {
     if (!nextInterview?.scheduledAt) return;
 
     const timer = setInterval(() => {
-      const now = new Date().getTime();
-      const target = new Date(nextInterview.scheduledAt).getTime();
-      const diff = target - now;
+      try {
+        const now = new Date().getTime();
+        const target = new Date(nextInterview.scheduledAt).getTime();
+        if (isNaN(target)) return;
+        const diff = target - now;
 
-      if (diff > 0) {
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-        setCountdown({ hours, minutes, seconds });
-      } else {
+        if (diff > 0) {
+          const hours = Math.floor(diff / (1000 * 60 * 60));
+          const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+          const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+          setCountdown({ hours, minutes, seconds });
+        } else {
+          setCountdown({ hours: 0, minutes: 0, seconds: 0 });
+        }
+      } catch {
         setCountdown({ hours: 0, minutes: 0, seconds: 0 });
       }
     }, 1000);
@@ -100,7 +115,40 @@ export default function InterviewPrepPage() {
         }}
       />
 
-      {nextInterview ? (
+      {feedbackMessage && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          className="mb-4 px-4 py-3 rounded-lg text-sm font-medium"
+          style={{
+            background: feedbackMessage.type === "success" ? "rgba(0, 255, 224, 0.1)" : "rgba(255, 71, 87, 0.1)",
+            border: `1px solid ${feedbackMessage.type === "success" ? "rgba(0, 255, 224, 0.3)" : "rgba(255, 71, 87, 0.3)"}`,
+            color: feedbackMessage.type === "success" ? "#00FFE0" : "#FF4757",
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
+          {feedbackMessage.text}
+        </motion.div>
+      )}
+
+      {interviewsError ? (
+        <div className="text-center py-20">
+          <AlertTriangle size={64} className="mx-auto mb-4" style={{ color: "#FF4757" }} />
+          <h2
+            className="text-2xl font-bold mb-2"
+            style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}
+          >
+            Failed to Load Interviews
+          </h2>
+          <p
+            className="text-sm"
+            style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}
+          >
+            Could not fetch your interviews. Please try refreshing the page.
+          </p>
+        </div>
+      ) : nextInterview ? (
         <>
           {/* HERO CARD - Next Interview */}
           <motion.div
@@ -140,7 +188,7 @@ export default function InterviewPrepPage() {
                   className="text-sm"
                   style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#4A4A64" }}
                 >
-                  {new Date(nextInterview.scheduledAt).toLocaleString()} · {nextInterview.type || "Video Call"}
+                  {(() => { try { return new Date(nextInterview.scheduledAt).toLocaleString(); } catch { return "Date unavailable"; } })()} · {nextInterview.type || "Video Call"}
                 </p>
               </div>
 
@@ -217,7 +265,7 @@ export default function InterviewPrepPage() {
                   if (nextInterview.meetingLink) {
                     window.open(nextInterview.meetingLink, '_blank');
                   } else {
-                    alert('No meeting link available yet. Check your email for the interview link.');
+                    showFeedback("error", "No meeting link available yet. Check your email for the interview link.");
                   }
                 }}
                 className="px-5 py-2.5 rounded-lg font-semibold transition-all"
@@ -423,10 +471,9 @@ export default function InterviewPrepPage() {
                       if (!nextInterview) return;
                       try {
                         const res = await apiFetch<{ data: any }>(`/api/interview/${nextInterview.id}/mock`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "behavioral" }) });
-                        alert('Mock interview started! Session ID: ' + (res.data?.sessionId || 'unknown'));
-                      } catch (err) {
-                        console.error("Failed to start mock:", err);
-                        alert('Failed to start mock interview. Make sure you have an upcoming interview scheduled.');
+                        showFeedback("success", "Mock interview started! Session ID: " + (res.data?.sessionId || "unknown"));
+                      } catch {
+                        showFeedback("error", "Failed to start mock interview. Make sure you have an upcoming interview scheduled.");
                       }
                     }}
                     className="px-5 py-2.5 rounded-lg font-semibold transition-all"
@@ -443,10 +490,9 @@ export default function InterviewPrepPage() {
                       if (!nextInterview) return;
                       try {
                         const res = await apiFetch<{ data: any }>(`/api/interview/${nextInterview.id}/mock`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "technical" }) });
-                        alert('Mock interview started! Session ID: ' + (res.data?.sessionId || 'unknown'));
-                      } catch (err) {
-                        console.error("Failed to start mock:", err);
-                        alert('Failed to start mock interview. Make sure you have an upcoming interview scheduled.');
+                        showFeedback("success", "Mock interview started! Session ID: " + (res.data?.sessionId || "unknown"));
+                      } catch {
+                        showFeedback("error", "Failed to start mock interview. Make sure you have an upcoming interview scheduled.");
                       }
                     }}
                     className="px-5 py-2.5 rounded-lg font-semibold border transition-all hover:bg-white/5"
@@ -474,11 +520,10 @@ export default function InterviewPrepPage() {
                   onClick={async () => {
                     if (!nextInterview) return;
                     try {
-                      const res = await apiFetch<{ data: any }>(`/api/interview/${nextInterview.id}/thank-you`, { method: "POST" });
-                      alert('Thank you email draft generated! Check the post-interview section.');
-                    } catch (err) {
-                      console.error("Failed to generate thank you:", err);
-                      alert('Failed to generate thank you email.');
+                      await apiFetch<{ data: any }>(`/api/interview/${nextInterview.id}/thank-you`, { method: "POST" });
+                      showFeedback("success", "Thank you email draft generated! Check the post-interview section.");
+                    } catch {
+                      showFeedback("error", "Failed to generate thank you email.");
                     }
                   }}
                   className="px-5 py-2.5 rounded-lg font-semibold transition-all"

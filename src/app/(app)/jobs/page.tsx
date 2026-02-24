@@ -23,7 +23,7 @@ export default function JobsPage() {
   const queryClient = useQueryClient();
 
   // Fetch jobs
-  const { data: jobsData, isLoading: jobsLoading } = useQuery({
+  const { data: jobsData, isLoading: jobsLoading, isError, error } = useQuery({
     queryKey: ["jobs", searchQuery],
     queryFn: () => apiFetch<{ data: any[] }>(`/api/jobs?${new URLSearchParams({ q: searchQuery })}`),
     retry: false,
@@ -31,7 +31,7 @@ export default function JobsPage() {
 
   const jobsInner = (jobsData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
   const jobs: Record<string, unknown>[] = (jobsInner?.jobs as Record<string, unknown>[]) || [];
-  const selectedJob: any = jobs.find((job: any) => job.id === selectedJobId) || jobs[0];
+  const selectedJob: any = jobs.find((job: any) => job.id === selectedJobId) || (jobs.length > 0 ? jobs[0] : null);
 
   // Set first job as selected by default
   useEffect(() => {
@@ -85,6 +85,24 @@ export default function JobsPage() {
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
         }}
       />
+
+      {isError && (
+        <div
+          className="absolute top-0 left-0 right-0 z-10 flex items-center gap-3 px-4 py-3 rounded-lg"
+          style={{
+            background: "rgba(255, 71, 87, 0.12)",
+            border: "1px solid rgba(255, 71, 87, 0.3)",
+          }}
+        >
+          <AlertTriangle size={16} className="text-[#FF4757] flex-shrink-0" />
+          <p
+            className="text-sm text-[#FF4757]"
+            style={{ fontFamily: "'DM Sans', sans-serif" }}
+          >
+            {error instanceof Error ? error.message : "Failed to load jobs. Please try again."}
+          </p>
+        </div>
+      )}
 
       {/* LEFT PANEL - JOB LIST */}
       <div className="w-[400px] flex flex-col gap-4">

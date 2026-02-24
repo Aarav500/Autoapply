@@ -9,11 +9,12 @@ import { apiFetch } from "@/lib/api-client";
 export default function DocumentsPage() {
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState("all");
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
   // Fetch documents
-  const { data: documentsData, isLoading } = useQuery({
+  const { data: documentsData, isLoading, isError: isQueryError, error: queryError } = useQuery({
     queryKey: ["documents"],
     queryFn: () => apiFetch<{ data: any[] }>("/api/documents"),
     retry: false,
@@ -99,10 +100,11 @@ export default function DocumentsPage() {
         <button
           onClick={async () => {
             try {
+              setGenerateError(null);
               await apiFetch("/api/documents/cv/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
               queryClient.invalidateQueries({ queryKey: ["documents"] });
             } catch (err) {
-              console.error("Failed to generate document:", err);
+              setGenerateError(err instanceof Error ? err.message : "Failed to generate document");
             }
           }}
           className="w-full px-4 py-3 rounded-lg font-semibold transition-all"
@@ -116,9 +118,61 @@ export default function DocumentsPage() {
           Generate Document
         </button>
 
+        {generateError && (
+          <div
+            className="flex items-center gap-2 px-3 py-2 rounded-lg"
+            style={{
+              background: "rgba(255, 71, 87, 0.08)",
+              border: "1px solid rgba(255, 71, 87, 0.2)",
+            }}
+          >
+            <AlertCircle size={14} style={{ color: "#FF4757", flexShrink: 0 }} />
+            <span
+              className="text-[12px]"
+              style={{ fontFamily: "'DM Sans', sans-serif", color: "#FF4757" }}
+            >
+              {generateError}
+            </span>
+          </div>
+        )}
+
+        {deleteMutation.isError && (
+          <div
+            className="flex items-center gap-2 px-3 py-2 rounded-lg"
+            style={{
+              background: "rgba(255, 71, 87, 0.08)",
+              border: "1px solid rgba(255, 71, 87, 0.2)",
+            }}
+          >
+            <AlertCircle size={14} style={{ color: "#FF4757", flexShrink: 0 }} />
+            <span
+              className="text-[12px]"
+              style={{ fontFamily: "'DM Sans', sans-serif", color: "#FF4757" }}
+            >
+              {deleteMutation.error instanceof Error ? deleteMutation.error.message : "Failed to delete document"}
+            </span>
+          </div>
+        )}
+
         {/* Document List */}
         <div className="flex-1 overflow-y-auto space-y-3">
-          {isLoading ? (
+          {isQueryError ? (
+            <div className="text-center py-12">
+              <AlertCircle size={48} className="mx-auto mb-4" style={{ color: "#FF4757" }} />
+              <p
+                className="text-[14px] font-semibold mb-2"
+                style={{ fontFamily: "'Outfit', sans-serif", color: "#FF4757" }}
+              >
+                Failed to load documents
+              </p>
+              <p
+                className="text-[12px]"
+                style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}
+              >
+                {queryError instanceof Error ? queryError.message : "An unexpected error occurred"}
+              </p>
+            </div>
+          ) : isLoading ? (
             <div className="space-y-3">
               {[...Array(4)].map((_, i) => (
                 <div
