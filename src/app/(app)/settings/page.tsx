@@ -283,57 +283,11 @@ export default function SettingsPage() {
 
         {/* Integrations Tab */}
         {activeTab === "integrations" && (
-          <div className="space-y-6">
-            <SectionTitle>Email</SectionTitle>
-            <IntegrationCard
-              icon={Mail}
-              title="Gmail"
-              description="Connect Gmail to sync emails and send replies"
-              connected={!!autoReply?.autoReplyEnabled !== undefined}
-              onConnect={() => {
-                window.location.href = "/api/comms/email/connect";
-              }}
-            />
-            <ToggleRow
-              label="Auto-Reply"
-              description="Automatically respond to certain email categories"
-              checked={!!autoReply?.enabled}
-              onChange={(v) => updateAutoReplyMutation.mutate({ enabled: v })}
-            />
-
-            <Divider />
-            <SectionTitle>Messaging</SectionTitle>
-            <IntegrationCard
-              icon={Phone}
-              title="SMS (Twilio)"
-              description="Receive SMS notifications for urgent updates"
-              connected={!!prefs?.smsEnabled}
-              onConnect={() => {
-                window.location.href = "/api/comms/sms/configure";
-              }}
-            />
-            <IntegrationCard
-              icon={MessageSquare}
-              title="WhatsApp (Twilio)"
-              description="Get WhatsApp messages for job updates"
-              connected={!!prefs?.whatsappEnabled}
-              onConnect={() => {
-                window.location.href = "/api/comms/whatsapp/configure";
-              }}
-            />
-
-            <Divider />
-            <SectionTitle>Calendar</SectionTitle>
-            <IntegrationCard
-              icon={Clock}
-              title="Google Calendar"
-              description="Auto-schedule interviews and get calendar reminders"
-              connected={false}
-              onConnect={() => {
-                window.location.href = "/api/comms/calendar/connect";
-              }}
-            />
-          </div>
+          <IntegrationsTab
+            prefs={prefs}
+            autoReply={autoReply}
+            updateAutoReplyMutation={updateAutoReplyMutation}
+          />
         )}
 
         {/* General Tab */}
@@ -691,6 +645,202 @@ function TimeInput({
           color: "#E8E8F0",
           colorScheme: "dark",
         }}
+      />
+    </div>
+  );
+}
+
+function IntegrationsTab({
+  prefs,
+  autoReply,
+  updateAutoReplyMutation,
+}: {
+  prefs: Record<string, unknown> | undefined;
+  autoReply: Record<string, unknown> | undefined;
+  updateAutoReplyMutation: { mutate: (data: Record<string, unknown>) => void };
+}) {
+  const [smsPhone, setSmsPhone] = useState("");
+  const [whatsappPhone, setWhatsappPhone] = useState("");
+  const [smsStatus, setSmsStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [whatsappStatus, setWhatsappStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [oauthStatus, setOauthStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [oauthError, setOauthError] = useState("");
+
+  const handleOAuthConnect = async (endpoint: string) => {
+    setOauthStatus("loading");
+    setOauthError("");
+    try {
+      const res = await apiFetch<Record<string, unknown>>(endpoint);
+      const data = (res as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+      const authUrl = (data?.authUrl || data?.url) as string;
+      if (authUrl) {
+        window.location.href = authUrl;
+      } else {
+        setOauthError("OAuth not configured on server. Contact admin.");
+        setOauthStatus("error");
+      }
+    } catch (err) {
+      setOauthError((err as Error)?.message || "Failed to connect");
+      setOauthStatus("error");
+    }
+  };
+
+  const handlePhoneConfigure = async (
+    endpoint: string,
+    phone: string,
+    setStatus: (s: "idle" | "saving" | "saved" | "error") => void
+  ) => {
+    if (!phone.trim()) return;
+    setStatus("saving");
+    try {
+      await apiFetch(endpoint, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber: phone.trim(), enabled: true }),
+      });
+      setStatus("saved");
+      setTimeout(() => setStatus("idle"), 2000);
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <SectionTitle>Email</SectionTitle>
+      <IntegrationCard
+        icon={Mail}
+        title="Gmail"
+        description="Connect Gmail to sync emails and send replies"
+        connected={!!autoReply?.autoReplyEnabled}
+        onConnect={() => handleOAuthConnect("/api/comms/email/connect")}
+      />
+      {oauthStatus === "loading" && (
+        <p className="text-[12px] text-[#7E7E98]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+          Redirecting to Google OAuth...
+        </p>
+      )}
+      {oauthError && (
+        <p className="text-[12px] text-[#FF4757]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+          {oauthError}
+        </p>
+      )}
+      <ToggleRow
+        label="Auto-Reply"
+        description="Automatically respond to certain email categories"
+        checked={!!autoReply?.enabled}
+        onChange={(v) => updateAutoReplyMutation.mutate({ enabled: v })}
+      />
+
+      <Divider />
+      <SectionTitle>Messaging</SectionTitle>
+
+      {/* SMS */}
+      <div
+        className="p-4 rounded-lg border"
+        style={{ background: "rgba(255, 255, 255, 0.02)", borderColor: "rgba(255, 255, 255, 0.04)" }}
+      >
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(0, 255, 224, 0.08)" }}>
+            <Phone size={18} className="text-[#00FFE0]" />
+          </div>
+          <div>
+            <p className="text-[13px] font-medium" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>
+              SMS (Twilio)
+            </p>
+            <p className="text-[11px]" style={{ fontFamily: "'DM Sans', sans-serif", color: "#4A4A64" }}>
+              Receive SMS notifications for urgent updates
+            </p>
+          </div>
+          {!!prefs?.smsEnabled && (
+            <span className="ml-auto text-[11px] font-semibold px-3 py-1 rounded-lg"
+              style={{ background: "rgba(0, 230, 118, 0.08)", border: "1px solid rgba(0, 230, 118, 0.2)", color: "#00E676", fontFamily: "'Outfit', sans-serif" }}>
+              Connected
+            </span>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="tel"
+            value={smsPhone}
+            onChange={(e) => setSmsPhone(e.target.value)}
+            placeholder="+1 (555) 123-4567"
+            className="flex-1 px-4 py-2 rounded-lg border bg-transparent outline-none"
+            style={{ borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "#E8E8F0" }}
+          />
+          <button
+            onClick={() => handlePhoneConfigure("/api/comms/sms/configure", smsPhone, setSmsStatus)}
+            disabled={!smsPhone.trim() || smsStatus === "saving"}
+            className="px-4 py-2 rounded-lg text-[12px] font-semibold transition-all disabled:opacity-30"
+            style={{ background: "rgba(0, 255, 224, 0.08)", border: "1px solid rgba(0, 255, 224, 0.2)", color: "#00FFE0", fontFamily: "'Outfit', sans-serif" }}
+          >
+            {smsStatus === "saving" ? "Saving..." : smsStatus === "saved" ? "Saved!" : "Configure"}
+          </button>
+        </div>
+        {smsStatus === "error" && (
+          <p className="text-[11px] text-[#FF4757] mt-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            Failed to configure SMS. Check your phone number.
+          </p>
+        )}
+      </div>
+
+      {/* WhatsApp */}
+      <div
+        className="p-4 rounded-lg border"
+        style={{ background: "rgba(255, 255, 255, 0.02)", borderColor: "rgba(255, 255, 255, 0.04)" }}
+      >
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(0, 255, 224, 0.08)" }}>
+            <MessageSquare size={18} className="text-[#00FFE0]" />
+          </div>
+          <div>
+            <p className="text-[13px] font-medium" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>
+              WhatsApp (Twilio)
+            </p>
+            <p className="text-[11px]" style={{ fontFamily: "'DM Sans', sans-serif", color: "#4A4A64" }}>
+              Get WhatsApp messages for job updates
+            </p>
+          </div>
+          {!!prefs?.whatsappEnabled && (
+            <span className="ml-auto text-[11px] font-semibold px-3 py-1 rounded-lg"
+              style={{ background: "rgba(0, 230, 118, 0.08)", border: "1px solid rgba(0, 230, 118, 0.2)", color: "#00E676", fontFamily: "'Outfit', sans-serif" }}>
+              Connected
+            </span>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="tel"
+            value={whatsappPhone}
+            onChange={(e) => setWhatsappPhone(e.target.value)}
+            placeholder="+1 (555) 123-4567"
+            className="flex-1 px-4 py-2 rounded-lg border bg-transparent outline-none"
+            style={{ borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "#E8E8F0" }}
+          />
+          <button
+            onClick={() => handlePhoneConfigure("/api/comms/whatsapp/configure", whatsappPhone, setWhatsappStatus)}
+            disabled={!whatsappPhone.trim() || whatsappStatus === "saving"}
+            className="px-4 py-2 rounded-lg text-[12px] font-semibold transition-all disabled:opacity-30"
+            style={{ background: "rgba(0, 255, 224, 0.08)", border: "1px solid rgba(0, 255, 224, 0.2)", color: "#00FFE0", fontFamily: "'Outfit', sans-serif" }}
+          >
+            {whatsappStatus === "saving" ? "Saving..." : whatsappStatus === "saved" ? "Saved!" : "Configure"}
+          </button>
+        </div>
+        {whatsappStatus === "error" && (
+          <p className="text-[11px] text-[#FF4757] mt-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            Failed to configure WhatsApp. Check your phone number.
+          </p>
+        )}
+      </div>
+
+      <Divider />
+      <SectionTitle>Calendar</SectionTitle>
+      <IntegrationCard
+        icon={Clock}
+        title="Google Calendar"
+        description="Auto-schedule interviews and get calendar reminders"
+        connected={false}
+        onConnect={() => handleOAuthConnect("/api/comms/calendar/connect")}
       />
     </div>
   );
