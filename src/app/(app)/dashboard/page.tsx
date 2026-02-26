@@ -1,29 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowRight, Video, FileText, AlertTriangle } from "lucide-react";
+import { ArrowRight, Video, FileText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
-
-function ErrorBanner({ message }: { message: string }) {
-  return (
-    <div
-      className="flex items-center gap-3 px-4 py-3 rounded-lg mb-4"
-      style={{
-        background: "rgba(255, 71, 87, 0.08)",
-        border: "1px solid rgba(255, 71, 87, 0.2)",
-      }}
-    >
-      <AlertTriangle size={16} className="text-[#FF4757] flex-shrink-0" />
-      <p
-        className="text-[13px]"
-        style={{ fontFamily: "'DM Sans', sans-serif", color: "#FF4757" }}
-      >
-        {message}
-      </p>
-    </div>
-  );
-}
 
 const defaultStats = [
   { number: "0", label: "Jobs Found", trend: "—", trendColor: "#00E676" },
@@ -34,31 +14,34 @@ const defaultStats = [
 ];
 
 export default function DashboardPage() {
-  const { data: statsData, error: statsError } = useQuery({
+  const { data: statsData } = useQuery({
     queryKey: ["dashboardStats"],
     queryFn: () => apiFetch("/api/dashboard/stats"),
     retry: false,
   });
 
-  const { data: activityData, error: activityError } = useQuery({
+  const { data: activityData } = useQuery({
     queryKey: ["recentActivity"],
     queryFn: () => apiFetch("/api/dashboard/activity"),
     retry: false,
   });
 
-  const { data: interviewsData, isLoading: interviewsLoading, error: interviewsError } = useQuery({
+  const { data: interviewsData, isLoading: interviewsLoading } = useQuery({
     queryKey: ["upcomingInterviews"],
     queryFn: () => apiFetch("/api/interview?status=scheduled&limit=3"),
     retry: false,
   });
 
-  const { data: pipelineData, error: pipelineError } = useQuery({
+  const { data: pipelineData } = useQuery({
     queryKey: ["pipeline"],
     queryFn: () => apiFetch("/api/jobs/pipeline"),
     retry: false,
   });
 
-  const hasAnyError = statsError || activityError || interviewsError || pipelineError;
+  // Unwrap API envelope: { success: true, data: { ... } }
+  const statsInner = (statsData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+  const activityInner = (activityData as Record<string, unknown>)?.data as unknown;
+  const pipelineInner = (pipelineData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
 
   const stats: Array<{
     number: string;
@@ -68,10 +51,12 @@ export default function DashboardPage() {
     sub?: string;
     subColor?: string;
     accent?: boolean;
-  }> = (statsData as any)?.stats ?? defaultStats;
+  }> = (statsInner?.stats as typeof defaultStats) ?? defaultStats;
+
+  const applicationsToday = (statsInner?.applicationsToday as number) ?? 0;
 
   const rawPipeline: Array<{status: string; count: number}> =
-    (pipelineData as any)?.data?.pipeline ?? [];
+    (pipelineInner?.pipeline as Array<{status: string; count: number}>) ?? [];
   const maxCount = Math.max(...(rawPipeline.length > 0 ? rawPipeline.map((s) => s.count) : [1]), 1);
   const pipelineStages = rawPipeline.map((stage) => {
     const colors: Record<string, string> = {
@@ -96,7 +81,10 @@ export default function DashboardPage() {
     time: string;
     description: string;
     dotColor: string;
-  }> = (activityData as any)?.data ?? [];
+  }> = (Array.isArray(activityInner) ? activityInner : []) as Array<{time: string; description: string; dotColor: string}>;
+
+  const interviewsInner = (interviewsData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+  const upcomingInterviews: Array<Record<string, unknown>> = (interviewsInner?.interviews as Array<Record<string, unknown>>) || [];
 
   const currentHour = new Date().getHours();
   const greeting =
@@ -114,10 +102,6 @@ export default function DashboardPage() {
 
   return (
     <div className="w-full">
-      {hasAnyError && (
-        <ErrorBanner message="Some dashboard data could not be loaded. Showing available information." />
-      )}
-
       {/* Background texture */}
       <div
         className="fixed inset-0 opacity-[0.015] pointer-events-none"
@@ -143,7 +127,7 @@ export default function DashboardPage() {
             className="text-[15px]"
             style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}
           >
-            Your job search is active. {(statsData as any)?.applicationsToday ?? 0} applications sent today.
+            Your job search is active. {applicationsToday} applications sent today.
           </p>
         </div>
 
@@ -396,7 +380,7 @@ export default function DashboardPage() {
                 className="text-[13px]"
                 style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}
               >
-                {(interviewsData as any)?.data?.interviews?.length ?? 0} scheduled
+                {upcomingInterviews.length} scheduled
               </p>
             </div>
             <button
@@ -419,12 +403,10 @@ export default function DashboardPage() {
           <div className="space-y-4">
             {interviewsLoading ? (
               <p className="text-[13px] text-[#7E7E98]">Loading interviews...</p>
-            ) : interviewsError ? (
-              <p className="text-[13px] text-[#7E7E98]">Unable to load interviews.</p>
-            ) : !((interviewsData as any)?.data?.interviews?.length) ? (
+            ) : upcomingInterviews.length === 0 ? (
               <p className="text-[13px] text-[#7E7E98]">No upcoming interviews</p>
             ) : (
-              ((interviewsData as any)?.data?.interviews ?? []).slice(0, 3).map((interview: any, index: number) => (
+              upcomingInterviews.slice(0, 3).map((interview: Record<string, unknown>, index: number) => (
                 <div
                   key={index}
                   className="p-4 rounded-lg border"
@@ -439,24 +421,21 @@ export default function DashboardPage() {
                       className="text-[14px] font-medium"
                       style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}
                     >
-                      {interview.company}
+                      {String(interview.company || "")}
                     </p>
                   </div>
                   <p
                     className="text-[12px] mb-1"
                     style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}
                   >
-                    {interview.role}
+                    {String(interview.role || "")}
                   </p>
                   <p
                     className="text-[11px]"
                     style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#4A4A64" }}
                   >
-                    {new Date(interview.scheduledAt).toLocaleDateString()} at{" "}
-                    {new Date(interview.scheduledAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {(() => { try { return new Date(interview.scheduledAt as string).toLocaleDateString(); } catch { return "TBD"; } })()} at{" "}
+                    {(() => { try { return new Date(interview.scheduledAt as string).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); } catch { return "TBD"; } })()}
                   </p>
                 </div>
               ))

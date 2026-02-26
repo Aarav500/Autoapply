@@ -1,8 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
-import { Calendar, CheckCircle2, ExternalLink, Send, Sparkles } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Calendar, CheckCircle2, ExternalLink, Send, Sparkles, RefreshCw } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
 
@@ -13,7 +13,28 @@ export default function CommsPage() {
   const [isGeneratingReply, setIsGeneratingReply] = useState(false);
   const [generateReplyError, setGenerateReplyError] = useState<string | null>(null);
 
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   const queryClient = useQueryClient();
+
+  const handleEmailSync = async () => {
+    setIsSyncing(true);
+    setSyncFeedback(null);
+    try {
+      const res = await apiFetch<{ data: Record<string, unknown> }>("/api/comms/email/sync", { method: "POST" });
+      const inner = (res as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+      const count = (inner?.newEmails as number) || 0;
+      queryClient.invalidateQueries({ queryKey: ["emailThreads"] });
+      setSyncFeedback({ type: "success", text: count > 0 ? `Synced ${count} new email${count > 1 ? "s" : ""}` : "Inbox is up to date" });
+      setTimeout(() => setSyncFeedback(null), 4000);
+    } catch {
+      setSyncFeedback({ type: "error", text: "Sync failed. Make sure Gmail is connected in Settings." });
+      setTimeout(() => setSyncFeedback(null), 5000);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Fetch email threads
   const { data: threadsData, isLoading: threadsLoading, isError: threadsError } = useQuery({
@@ -46,7 +67,10 @@ export default function CommsPage() {
   });
 
   const threadsInner = (threadsData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
-  const threads: Record<string, unknown>[] = (threadsInner?.threads as Record<string, unknown>[]) || [];
+  const threads: Record<string, unknown>[] = useMemo(
+    () => (threadsInner?.threads as Record<string, unknown>[]) || [],
+    [threadsInner]
+  );
   const emailInner = (emailData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
   const selectedEmail = (emailInner?.email || emailInner) as any;
 
@@ -122,6 +146,35 @@ export default function CommsPage() {
 
       {/* LEFT PANEL - EMAIL THREADS */}
       <div className="w-[360px] flex flex-col gap-4">
+        {/* Sync Button */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleEmailSync}
+            disabled={isSyncing}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:bg-white/5 disabled:opacity-50"
+            style={{
+              border: "1px solid rgba(255, 255, 255, 0.06)",
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: "13px",
+              color: "#7E7E98",
+            }}
+          >
+            <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
+            {isSyncing ? "Syncing..." : "Sync Email"}
+          </button>
+          {syncFeedback && (
+            <span
+              className="text-[12px]"
+              style={{
+                fontFamily: "'DM Sans', sans-serif",
+                color: syncFeedback.type === "success" ? "#00E676" : "#FF4757",
+              }}
+            >
+              {syncFeedback.text}
+            </span>
+          )}
+        </div>
+
         {/* Filters */}
         <div className="flex gap-2 overflow-x-auto pb-2">
           {filters.map((filter) => (
@@ -245,7 +298,7 @@ export default function CommsPage() {
                         <span
                           className="inline-block px-2 py-0.5 rounded text-[10px]"
                           style={{
-                            background: `rgba(${badge.color}, 0.1)`,
+                            background: "rgba(255, 255, 255, 0.06)",
                             color: badge.color,
                             fontFamily: "'IBM Plex Mono', monospace",
                           }}
@@ -300,7 +353,7 @@ export default function CommsPage() {
                   <span
                     className="px-3 py-1 rounded-lg text-[11px]"
                     style={{
-                      background: `rgba(${getCategoryBadge(selectedEmail.category).color}, 0.1)`,
+                      background: "rgba(255, 255, 255, 0.06)",
                       color: getCategoryBadge(selectedEmail.category).color,
                       fontFamily: "'IBM Plex Mono', monospace",
                     }}

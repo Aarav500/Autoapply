@@ -1,8 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
-import { FileText, Download, Plus, AlertCircle } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { FileText, Download, Plus, AlertCircle, X, CheckCircle2, ChevronDown } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
 
@@ -10,8 +10,22 @@ export default function DocumentsPage() {
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState("all");
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [generateType, setGenerateType] = useState<"cv" | "cover-letter">("cv");
+  const [selectedJobId, setSelectedJobId] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generateSuccess, setGenerateSuccess] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
+
+  // Fetch jobs for targeting
+  const { data: jobsData } = useQuery({
+    queryKey: ["jobs-for-docs"],
+    queryFn: () => apiFetch<{ data: Record<string, unknown> }>("/api/jobs?status=saved"),
+    retry: false,
+  });
+  const jobsInner = (jobsData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+  const availableJobs: Record<string, unknown>[] = (jobsInner?.jobs as Record<string, unknown>[]) || [];
 
   // Fetch documents
   const { data: documentsData, isLoading, isError: isQueryError, error: queryError } = useQuery({
@@ -30,7 +44,10 @@ export default function DocumentsPage() {
   });
 
   const docsInner = (documentsData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
-  const documents: Record<string, unknown>[] = (docsInner?.documents as Record<string, unknown>[]) || [];
+  const documents: Record<string, unknown>[] = useMemo(
+    () => (docsInner?.documents as Record<string, unknown>[]) || [],
+    [docsInner]
+  );
   const selectedDocument: any = documents.find((doc) => doc.id === selectedDocId) || documents[0];
 
   // Set first document as selected by default
@@ -98,15 +115,7 @@ export default function DocumentsPage() {
 
         {/* Generate Button */}
         <button
-          onClick={async () => {
-            try {
-              setGenerateError(null);
-              await apiFetch("/api/documents/cv/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
-              queryClient.invalidateQueries({ queryKey: ["documents"] });
-            } catch (err) {
-              setGenerateError(err instanceof Error ? err.message : "Failed to generate document");
-            }
-          }}
+          onClick={() => { setShowGenerateModal(true); setGenerateError(null); setGenerateSuccess(null); }}
           className="w-full px-4 py-3 rounded-lg font-semibold transition-all"
           style={{
             background: "#00FFE0",
@@ -117,6 +126,132 @@ export default function DocumentsPage() {
           <Plus size={16} className="inline mr-2" />
           Generate Document
         </button>
+
+        {generateSuccess && (
+          <div
+            className="flex items-center gap-2 px-3 py-2 rounded-lg"
+            style={{
+              background: "rgba(0, 230, 118, 0.08)",
+              border: "1px solid rgba(0, 230, 118, 0.2)",
+            }}
+          >
+            <CheckCircle2 size={14} style={{ color: "#00E676", flexShrink: 0 }} />
+            <span className="text-[12px]" style={{ fontFamily: "'DM Sans', sans-serif", color: "#00E676" }}>
+              {generateSuccess}
+            </span>
+          </div>
+        )}
+
+        {/* Generate Modal */}
+        {showGenerateModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowGenerateModal(false)}>
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="relative w-full max-w-md rounded-xl p-6"
+              style={{ background: "#12121C", border: "1px solid rgba(255, 255, 255, 0.08)" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>Generate Document</h3>
+                <button onClick={() => setShowGenerateModal(false)} className="p-1 hover:bg-white/5 rounded-lg"><X size={20} className="text-[#7E7E98]" /></button>
+              </div>
+
+              {/* Document Type */}
+              <div className="mb-4">
+                <label className="block text-[12px] mb-2" style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}>Document Type</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setGenerateType("cv")}
+                    className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
+                    style={{
+                      background: generateType === "cv" ? "rgba(0, 255, 224, 0.1)" : "rgba(255, 255, 255, 0.04)",
+                      border: `1px solid ${generateType === "cv" ? "rgba(0, 255, 224, 0.3)" : "rgba(255, 255, 255, 0.08)"}`,
+                      color: generateType === "cv" ? "#00FFE0" : "#7E7E98",
+                      fontFamily: "'Outfit', sans-serif",
+                    }}
+                  >
+                    CV / Resume
+                  </button>
+                  <button
+                    onClick={() => setGenerateType("cover-letter")}
+                    className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
+                    style={{
+                      background: generateType === "cover-letter" ? "rgba(0, 255, 224, 0.1)" : "rgba(255, 255, 255, 0.04)",
+                      border: `1px solid ${generateType === "cover-letter" ? "rgba(0, 255, 224, 0.3)" : "rgba(255, 255, 255, 0.08)"}`,
+                      color: generateType === "cover-letter" ? "#00FFE0" : "#7E7E98",
+                      fontFamily: "'Outfit', sans-serif",
+                    }}
+                  >
+                    Cover Letter
+                  </button>
+                </div>
+              </div>
+
+              {/* Job Selection */}
+              <div className="mb-6">
+                <label className="block text-[12px] mb-2" style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}>
+                  Tailor for a specific job (optional)
+                </label>
+                <select
+                  value={selectedJobId}
+                  onChange={(e) => setSelectedJobId(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-lg bg-transparent outline-none text-sm appearance-none cursor-pointer"
+                  style={{
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    fontFamily: "'DM Sans', sans-serif",
+                    color: selectedJobId ? "#E8E8F0" : "#7E7E98",
+                    background: "rgba(255, 255, 255, 0.04)",
+                  }}
+                >
+                  <option value="" style={{ background: "#12121C" }}>General (no specific job)</option>
+                  {availableJobs.map((job: Record<string, unknown>) => (
+                    <option key={job.id as string} value={job.id as string} style={{ background: "#12121C" }}>
+                      {job.title as string} at {job.company as string}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] mt-1" style={{ fontFamily: "'DM Sans', sans-serif", color: "#4A4A64" }}>
+                  {generateType === "cover-letter" && !selectedJobId ? "Selecting a job is recommended for cover letters" : "Tailored documents score higher on ATS systems"}
+                </p>
+              </div>
+
+              {generateError && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg mb-4" style={{ background: "rgba(255, 71, 87, 0.08)", border: "1px solid rgba(255, 71, 87, 0.2)" }}>
+                  <AlertCircle size={14} style={{ color: "#FF4757", flexShrink: 0 }} />
+                  <span className="text-[12px]" style={{ fontFamily: "'DM Sans', sans-serif", color: "#FF4757" }}>{generateError}</span>
+                </div>
+              )}
+
+              <button
+                onClick={async () => {
+                  setIsGenerating(true);
+                  setGenerateError(null);
+                  try {
+                    const endpoint = generateType === "cv" ? "/api/documents/cv/generate" : "/api/documents/cover-letter/generate";
+                    const body: Record<string, string> = {};
+                    if (selectedJobId) body.jobId = selectedJobId;
+                    await apiFetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+                    queryClient.invalidateQueries({ queryKey: ["documents"] });
+                    setShowGenerateModal(false);
+                    setGenerateSuccess(`${generateType === "cv" ? "CV" : "Cover letter"} generated successfully!`);
+                    setTimeout(() => setGenerateSuccess(null), 5000);
+                  } catch (err) {
+                    setGenerateError(err instanceof Error ? err.message : "Failed to generate document");
+                  } finally {
+                    setIsGenerating(false);
+                  }
+                }}
+                disabled={isGenerating}
+                className="w-full px-4 py-3 rounded-lg font-semibold transition-all disabled:opacity-50"
+                style={{ background: "#00FFE0", color: "#050508", fontFamily: "'Outfit', sans-serif" }}
+              >
+                {isGenerating ? "Generating..." : `Generate ${generateType === "cv" ? "CV" : "Cover Letter"}`}
+              </button>
+            </motion.div>
+          </div>
+        )}
 
         {generateError && (
           <div
@@ -277,7 +412,7 @@ export default function DocumentsPage() {
                 <div
                   className="px-4 py-2 rounded-lg"
                   style={{
-                    background: `rgba(${getATSScoreColor(selectedDocument.atsScore)}, 0.1)`,
+                    background: "rgba(255, 255, 255, 0.04)",
                     border: `1px solid ${getATSScoreColor(selectedDocument.atsScore)}`,
                   }}
                 >

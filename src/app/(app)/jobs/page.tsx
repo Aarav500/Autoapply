@@ -1,7 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useMemo } from "react";
 import {
   Search,
   Heart,
@@ -11,26 +11,49 @@ import {
   Check,
   AlertTriangle,
   X,
+  CheckCircle2,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
 
+const STATUS_OPTIONS = [
+  { value: "", label: "All Statuses" },
+  { value: "discovered", label: "Discovered" },
+  { value: "saved", label: "Saved" },
+  { value: "applying", label: "Applying" },
+  { value: "applied", label: "Applied" },
+  { value: "screening", label: "Screening" },
+  { value: "interview", label: "Interview" },
+  { value: "offer", label: "Offer" },
+  { value: "rejected", label: "Rejected" },
+];
+
 export default function JobsPage() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [applyFeedback, setApplyFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const queryClient = useQueryClient();
 
   // Fetch jobs
+  const params = new URLSearchParams();
+  if (searchQuery) params.set("q", searchQuery);
+  if (statusFilter) params.set("status", statusFilter);
   const { data: jobsData, isLoading: jobsLoading, isError, error } = useQuery({
-    queryKey: ["jobs", searchQuery],
-    queryFn: () => apiFetch<{ data: any[] }>(`/api/jobs?${new URLSearchParams({ q: searchQuery })}`),
+    queryKey: ["jobs", searchQuery, statusFilter],
+    queryFn: () => apiFetch<{ data: any[] }>(`/api/jobs?${params.toString()}`),
     retry: false,
   });
 
   const jobsInner = (jobsData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
-  const jobs: Record<string, unknown>[] = (jobsInner?.jobs as Record<string, unknown>[]) || [];
+  const jobs: Record<string, unknown>[] = useMemo(
+    () => (jobsInner?.jobs as Record<string, unknown>[]) || [],
+    [jobsInner]
+  );
   const selectedJob: any = jobs.find((job: any) => job.id === selectedJobId) || (jobs.length > 0 ? jobs[0] : null);
 
   // Set first job as selected by default
@@ -53,6 +76,12 @@ export default function JobsPage() {
     mutationFn: (jobId: string) => apiFetch(`/api/jobs/${jobId}/apply`, { method: "POST" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      setApplyFeedback({ type: "success", text: "Application submitted successfully!" });
+      setTimeout(() => setApplyFeedback(null), 5000);
+    },
+    onError: (err: Error) => {
+      setApplyFeedback({ type: "error", text: err.message || "Failed to submit application." });
+      setTimeout(() => setApplyFeedback(null), 5000);
     },
   });
 
@@ -61,6 +90,14 @@ export default function JobsPage() {
     if (match >= 75) return "#00FFE0";
     if (match >= 60) return "#FFAB00";
     return "#FF4757";
+  };
+
+  // Returns a valid rgba() string for the match score circle background
+  const getMatchBg = (match: number) => {
+    if (match >= 90) return "rgba(0, 230, 118, 0.1)";
+    if (match >= 75) return "rgba(0, 255, 224, 0.1)";
+    if (match >= 60) return "rgba(255, 171, 0, 0.1)";
+    return "rgba(255, 71, 87, 0.1)";
   };
 
   const getMatchStatusIcon = (status: string) => {
@@ -118,19 +155,58 @@ export default function JobsPage() {
             <Search size={16} className="text-[#7E7E98]" />
             <input
               type="text"
-              placeholder="Search jobs..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search jobs... (press Enter)"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") setSearchQuery(searchInput);
+              }}
               className="flex-1 bg-transparent outline-none text-sm text-[#E8E8F0]"
               style={{ fontFamily: "'DM Sans', sans-serif" }}
             />
+            {searchInput && (
+              <button onClick={() => { setSearchInput(""); setSearchQuery(""); }}>
+                <X size={14} className="text-[#7E7E98]" />
+              </button>
+            )}
           </div>
-          <button
-            className="p-2 rounded-lg border transition-colors hover:bg-white/5"
-            style={{ borderColor: "rgba(255, 255, 255, 0.06)" }}
-          >
-            <Filter size={16} className="text-[#7E7E98]" />
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+              className="p-2 rounded-lg border transition-colors hover:bg-white/5"
+              style={{
+                borderColor: statusFilter ? "rgba(0, 255, 224, 0.3)" : "rgba(255, 255, 255, 0.06)",
+                background: statusFilter ? "rgba(0, 255, 224, 0.08)" : "transparent",
+              }}
+            >
+              <Filter size={16} className={statusFilter ? "text-[#00FFE0]" : "text-[#7E7E98]"} />
+            </button>
+            {showFilterDropdown && (
+              <div
+                className="absolute top-full right-0 mt-1 w-48 rounded-lg overflow-hidden z-20"
+                style={{
+                  background: "#12121C",
+                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
+                }}
+              >
+                {STATUS_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => { setStatusFilter(opt.value); setShowFilterDropdown(false); }}
+                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition-colors flex items-center justify-between"
+                    style={{
+                      fontFamily: "'DM Sans', sans-serif",
+                      color: statusFilter === opt.value ? "#00FFE0" : "#E8E8F0",
+                    }}
+                  >
+                    {opt.label}
+                    {statusFilter === opt.value && <Check size={14} className="text-[#00FFE0]" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
             className="p-2 rounded-lg border transition-colors hover:bg-white/5"
@@ -200,8 +276,8 @@ export default function JobsPage() {
                   <div
                     className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
                     style={{
-                      background: `rgba(${getMatchColor(job.matchScore || 0)}, 0.1)`,
-                      border: `2px solid ${getMatchColor(job.matchScore || 0)}`,
+                      background: getMatchBg(job.matchScore as number || 0),
+                      border: `2px solid ${getMatchColor(job.matchScore as number || 0)}`,
                     }}
                   >
                     <span
@@ -347,6 +423,34 @@ export default function JobsPage() {
                   ))}
                 </ul>
               </div>
+            )}
+
+            {/* Apply Feedback */}
+            {applyFeedback && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4 px-4 py-3 rounded-lg flex items-center gap-2"
+                style={{
+                  background: applyFeedback.type === "success" ? "rgba(0, 230, 118, 0.1)" : "rgba(255, 71, 87, 0.1)",
+                  border: `1px solid ${applyFeedback.type === "success" ? "rgba(0, 230, 118, 0.3)" : "rgba(255, 71, 87, 0.3)"}`,
+                }}
+              >
+                {applyFeedback.type === "success" ? (
+                  <CheckCircle2 size={16} className="text-[#00E676] flex-shrink-0" />
+                ) : (
+                  <AlertTriangle size={16} className="text-[#FF4757] flex-shrink-0" />
+                )}
+                <span
+                  className="text-sm"
+                  style={{
+                    fontFamily: "'DM Sans', sans-serif",
+                    color: applyFeedback.type === "success" ? "#00E676" : "#FF4757",
+                  }}
+                >
+                  {applyFeedback.text}
+                </span>
+              </motion.div>
             )}
 
             {/* Actions */}

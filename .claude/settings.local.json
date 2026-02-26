@@ -30,7 +30,16 @@
       "Bash(aws ssm get-command-invocation:*)",
       "Bash(./scripts/diagnose-ec2.sh:*)",
       "Bash(aws:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(cat:*)",
+      "Bash(del .githubworkflowsdeploy-ssm.yml)",
+      "Bash(find src/app -name \"*.tsx\" -exec grep -l \"Html\\|Document\" {} ;)",
+      "Bash(git reset .claude/settings.local.json build-test.log build-test2.log)",
+      "Bash(cd:*)",
+      "Bash(wc:*)",
+      "Bash(head:*)",
+      "Bash(cd /c/AutoApply && npx next build 2>&1)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

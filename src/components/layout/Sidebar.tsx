@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Home,
   User,
@@ -14,6 +14,7 @@ import {
   Github,
   Linkedin,
   Settings,
+  LogOut,
 } from "lucide-react";
 
 interface NavItemProps {
@@ -133,6 +134,25 @@ export function Sidebar({
   userEmail = "aarav@example.com",
 }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("accessToken") || ""}`,
+          "Content-Type": "application/json",
+        },
+      });
+    } catch {
+      // Ignore errors — still clear local storage
+    } finally {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      router.push("/login");
+    }
+  };
 
   // Determine which nav item is active based on pathname
   const isActive = (path: string) => {
@@ -282,22 +302,36 @@ export function Sidebar({
           </div>
 
           {/* Status Indicator */}
-          <div className="flex items-center gap-2">
-            {/* Glowing dot */}
-            <div className="relative">
-              <div
-                className="w-1.5 h-1.5 rounded-full bg-[#00FFE0]"
-                style={{
-                  boxShadow: "0 0 8px rgba(0, 255, 224, 0.6)",
-                }}
-              />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {/* Glowing dot */}
+              <div className="relative">
+                <div
+                  className="w-1.5 h-1.5 rounded-full bg-[#00FFE0]"
+                  style={{
+                    boxShadow: "0 0 8px rgba(0, 255, 224, 0.6)",
+                  }}
+                />
+              </div>
+              <span
+                className="text-[11px] text-[#7E7E98]"
+                style={{ fontFamily: "'DM Sans', sans-serif" }}
+              >
+                System Active
+              </span>
             </div>
-            <span
-              className="text-[11px] text-[#7E7E98]"
-              style={{ fontFamily: "'DM Sans', sans-serif" }}
+
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="p-1.5 rounded-lg hover:bg-white/5 transition-colors group"
+              title="Sign out"
             >
-              System Active
-            </span>
+              <LogOut
+                size={14}
+                className="text-[#4A4A64] group-hover:text-[#FF4757] transition-colors"
+              />
+            </button>
           </div>
         </div>
       </div>

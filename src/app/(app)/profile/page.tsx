@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { Edit2, Trash2, Plus, X, Save, GraduationCap, FolderGit2, ExternalLink } from "lucide-react";
+import { Edit2, Trash2, Plus, X, Save, GraduationCap, FolderGit2, ExternalLink, Upload, CheckCircle2, AlertCircle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
 
@@ -67,8 +67,38 @@ export default function ProfilePage() {
   const [projectForm, setProjectForm] = useState({ name: "", description: "", url: "", technologies: "" });
   const [prefsForm, setPrefsForm] = useState({ targetSalary: "", remoteOnly: false, locations: "" });
   const [prefsEditing, setPrefsEditing] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importFeedback, setImportFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const queryClient = useQueryClient();
+
+  const handleResumeImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowed = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+    if (!allowed.includes(file.type)) {
+      setImportFeedback({ type: "error", text: "Please upload a PDF or DOCX file." });
+      setTimeout(() => setImportFeedback(null), 5000);
+      return;
+    }
+    setIsImporting(true);
+    setImportFeedback(null);
+    try {
+      const formData = new FormData();
+      formData.append("resume", file);
+      await apiFetch("/api/profile/import/resume", { method: "POST", body: formData });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["profileCompleteness"] });
+      setImportFeedback({ type: "success", text: "Resume imported! Your profile has been updated." });
+      setTimeout(() => setImportFeedback(null), 5000);
+    } catch (err) {
+      setImportFeedback({ type: "error", text: err instanceof Error ? err.message : "Failed to import resume." });
+      setTimeout(() => setImportFeedback(null), 5000);
+    } finally {
+      setIsImporting(false);
+      e.target.value = "";
+    }
+  };
 
   const { data: profileData, isLoading: profileLoading } = useQuery({
     queryKey: ["profile"],
@@ -283,9 +313,22 @@ export default function ProfilePage() {
               </p>
             </>
           )}
-          <button onClick={openEditProfile} className="px-4 py-2 rounded-lg border transition-all hover:bg-white/5" style={{ background: "transparent", borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'Outfit', sans-serif", fontSize: "13px", fontWeight: 500, color: "#7E7E98" }}>
-            Edit Profile
-          </button>
+          <div className="flex gap-2 items-center flex-wrap">
+            <button onClick={openEditProfile} className="px-4 py-2 rounded-lg border transition-all hover:bg-white/5" style={{ background: "transparent", borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'Outfit', sans-serif", fontSize: "13px", fontWeight: 500, color: "#7E7E98" }}>
+              Edit Profile
+            </button>
+            <label className="px-4 py-2 rounded-lg border transition-all hover:bg-white/5 cursor-pointer inline-flex items-center gap-1.5" style={{ background: "transparent", borderColor: "rgba(83, 109, 254, 0.3)", fontFamily: "'Outfit', sans-serif", fontSize: "13px", fontWeight: 500, color: "#536DFE" }}>
+              <Upload size={14} />
+              {isImporting ? "Importing..." : "Import Resume"}
+              <input type="file" accept=".pdf,.docx" onChange={handleResumeImport} className="hidden" disabled={isImporting} />
+            </label>
+            {importFeedback && (
+              <span className="flex items-center gap-1.5 text-[12px]" style={{ fontFamily: "'DM Sans', sans-serif", color: importFeedback.type === "success" ? "#00E676" : "#FF4757" }}>
+                {importFeedback.type === "success" ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                {importFeedback.text}
+              </span>
+            )}
+          </div>
         </div>
       </motion.div>
 

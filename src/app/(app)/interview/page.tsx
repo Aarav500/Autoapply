@@ -12,6 +12,8 @@ import {
   Circle,
   AlertTriangle,
   Lightbulb,
+  Send,
+  Mail,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
@@ -459,83 +461,12 @@ export default function InterviewPrepPage() {
 
             {/* MOCK INTERVIEW TAB */}
             {activeTab === "mock" && (
-              <div className="text-center py-12">
-                <MessageSquare size={48} className="mx-auto mb-4 text-[#00FFE0]" />
-                <h3 className="text-xl font-semibold mb-2 text-[#E8E8F0]">Mock Interview Simulator</h3>
-                <p className="text-sm text-[#7E7E98] mb-6">
-                  Practice with AI interviewer and get real-time feedback
-                </p>
-                <div className="flex gap-3 justify-center">
-                  <button
-                    onClick={async () => {
-                      if (!nextInterview) return;
-                      try {
-                        const res = await apiFetch<{ data: any }>(`/api/interview/${nextInterview.id}/mock`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "behavioral" }) });
-                        showFeedback("success", "Mock interview started! Session ID: " + (res.data?.sessionId || "unknown"));
-                      } catch {
-                        showFeedback("error", "Failed to start mock interview. Make sure you have an upcoming interview scheduled.");
-                      }
-                    }}
-                    className="px-5 py-2.5 rounded-lg font-semibold transition-all"
-                    style={{
-                      background: "#00FFE0",
-                      color: "#050508",
-                      fontFamily: "'Outfit', sans-serif",
-                    }}
-                  >
-                    Start Behavioral Mock
-                  </button>
-                  <button
-                    onClick={async () => {
-                      if (!nextInterview) return;
-                      try {
-                        const res = await apiFetch<{ data: any }>(`/api/interview/${nextInterview.id}/mock`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "technical" }) });
-                        showFeedback("success", "Mock interview started! Session ID: " + (res.data?.sessionId || "unknown"));
-                      } catch {
-                        showFeedback("error", "Failed to start mock interview. Make sure you have an upcoming interview scheduled.");
-                      }
-                    }}
-                    className="px-5 py-2.5 rounded-lg font-semibold border transition-all hover:bg-white/5"
-                    style={{
-                      borderColor: "rgba(255, 255, 255, 0.08)",
-                      color: "#E8E8F0",
-                      fontFamily: "'Outfit', sans-serif",
-                    }}
-                  >
-                    Start Technical Mock
-                  </button>
-                </div>
-              </div>
+              <MockInterviewTab interviewId={nextInterview?.id} showFeedback={showFeedback} />
             )}
 
             {/* POST-INTERVIEW TAB */}
             {activeTab === "follow-up" && (
-              <div className="text-center py-12">
-                <CheckCircle2 size={48} className="mx-auto mb-4 text-[#00E676]" />
-                <h3 className="text-xl font-semibold mb-2 text-[#E8E8F0]">Post-Interview Actions</h3>
-                <p className="text-sm text-[#7E7E98] mb-6">
-                  Send thank-you emails and follow up professionally
-                </p>
-                <button
-                  onClick={async () => {
-                    if (!nextInterview) return;
-                    try {
-                      await apiFetch<{ data: any }>(`/api/interview/${nextInterview.id}/thank-you`, { method: "POST" });
-                      showFeedback("success", "Thank you email draft generated! Check the post-interview section.");
-                    } catch {
-                      showFeedback("error", "Failed to generate thank you email.");
-                    }
-                  }}
-                  className="px-5 py-2.5 rounded-lg font-semibold transition-all"
-                  style={{
-                    background: "#00FFE0",
-                    color: "#050508",
-                    fontFamily: "'Outfit', sans-serif",
-                  }}
-                >
-                  Generate Thank You Email
-                </button>
-              </div>
+              <PostInterviewTab interviewId={nextInterview?.id} showFeedback={showFeedback} />
             )}
           </motion.div>
         </>
@@ -546,6 +477,313 @@ export default function InterviewPrepPage() {
           <p className="text-[#7E7E98]">Schedule an interview to access prep materials</p>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ============================================================
+   MOCK INTERVIEW TAB — Conversational Q&A with AI feedback
+   ============================================================ */
+function MockInterviewTab({ interviewId, showFeedback }: { interviewId?: string; showFeedback: (type: "success" | "error", text: string) => void }) {
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Array<{ role: "interviewer" | "candidate"; text: string; score?: number; feedback?: string }>>([]);
+  const [answer, setAnswer] = useState("");
+  const [isStarting, setIsStarting] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [assessment, setAssessment] = useState<Record<string, unknown> | null>(null);
+
+  const startMock = async (mode: "behavioral" | "technical") => {
+    if (!interviewId) return;
+    setIsStarting(true);
+    try {
+      const res = await apiFetch<Record<string, unknown>>(`/api/interview/${interviewId}/mock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode }),
+      });
+      const inner = (res as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+      const sid = (inner?.sessionId as string) || "";
+      const firstQ = (inner?.question as string) || (inner?.message as string) || "Tell me about yourself.";
+      setSessionId(sid);
+      setMessages([{ role: "interviewer", text: firstQ }]);
+      setAssessment(null);
+    } catch {
+      showFeedback("error", "Failed to start mock interview.");
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
+  const sendAnswer = async () => {
+    if (!interviewId || !sessionId || !answer.trim()) return;
+    setIsSending(true);
+    setMessages((prev) => [...prev, { role: "candidate", text: answer }]);
+    const currentAnswer = answer;
+    setAnswer("");
+    try {
+      const res = await apiFetch<Record<string, unknown>>(`/api/interview/${interviewId}/mock/${sessionId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answer: currentAnswer }),
+      });
+      const inner = (res as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+      const score = inner?.score as number | undefined;
+      const fb = inner?.feedback as string | undefined;
+      const nextQ = inner?.nextQuestion as string | undefined;
+      const overall = inner?.overallAssessment as Record<string, unknown> | undefined;
+
+      // Add feedback for the answer
+      if (fb) {
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { ...updated[updated.length - 1], score, feedback: fb };
+          return updated;
+        });
+      }
+
+      // Add next question or show assessment
+      if (overall) {
+        setAssessment(overall);
+      } else if (nextQ) {
+        setMessages((prev) => [...prev, { role: "interviewer", text: nextQ }]);
+      }
+    } catch {
+      showFeedback("error", "Failed to send answer. Try again.");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // Not started yet
+  if (!sessionId) {
+    return (
+      <div className="text-center py-12">
+        <MessageSquare size={48} className="mx-auto mb-4 text-[#00FFE0]" />
+        <h3 className="text-xl font-semibold mb-2 text-[#E8E8F0]" style={{ fontFamily: "'Outfit', sans-serif" }}>Mock Interview Simulator</h3>
+        <p className="text-sm text-[#7E7E98] mb-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+          Practice with an AI interviewer and get real-time scoring and feedback
+        </p>
+        <div className="flex gap-3 justify-center">
+          <button
+            onClick={() => startMock("behavioral")}
+            disabled={isStarting}
+            className="px-5 py-2.5 rounded-lg font-semibold transition-all disabled:opacity-50"
+            style={{ background: "#00FFE0", color: "#050508", fontFamily: "'Outfit', sans-serif" }}
+          >
+            {isStarting ? "Starting..." : "Start Behavioral Mock"}
+          </button>
+          <button
+            onClick={() => startMock("technical")}
+            disabled={isStarting}
+            className="px-5 py-2.5 rounded-lg font-semibold border transition-all hover:bg-white/5 disabled:opacity-50"
+            style={{ borderColor: "rgba(255, 255, 255, 0.08)", color: "#E8E8F0", fontFamily: "'Outfit', sans-serif" }}
+          >
+            {isStarting ? "Starting..." : "Start Technical Mock"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Active session
+  return (
+    <div className="flex flex-col" style={{ minHeight: "400px" }}>
+      {/* Conversation */}
+      <div className="flex-1 space-y-4 mb-4 max-h-[500px] overflow-y-auto">
+        {messages.map((msg, idx) => (
+          <div key={idx} className={`flex ${msg.role === "candidate" ? "justify-end" : "justify-start"}`}>
+            <div
+              className="max-w-[80%] p-4 rounded-lg"
+              style={{
+                background: msg.role === "interviewer" ? "rgba(0, 255, 224, 0.06)" : "rgba(83, 109, 254, 0.08)",
+                border: `1px solid ${msg.role === "interviewer" ? "rgba(0, 255, 224, 0.15)" : "rgba(83, 109, 254, 0.15)"}`,
+              }}
+            >
+              <span className="text-[10px] uppercase font-semibold block mb-1" style={{
+                fontFamily: "'IBM Plex Mono', monospace",
+                color: msg.role === "interviewer" ? "#00FFE0" : "#536DFE",
+              }}>
+                {msg.role === "interviewer" ? "Interviewer" : "You"}
+              </span>
+              <p className="text-sm leading-relaxed" style={{ fontFamily: "'DM Sans', sans-serif", color: "#E8E8F0" }}>
+                {msg.text}
+              </p>
+              {msg.score !== undefined && (
+                <div className="mt-2 pt-2 border-t" style={{ borderColor: "rgba(255, 255, 255, 0.06)" }}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[11px] text-[#7E7E98]">Score:</span>
+                    <span className="text-sm font-bold" style={{
+                      fontFamily: "'IBM Plex Mono', monospace",
+                      color: msg.score >= 7 ? "#00E676" : msg.score >= 5 ? "#FFAB00" : "#FF4757",
+                    }}>
+                      {msg.score}/10
+                    </span>
+                  </div>
+                  {msg.feedback && (
+                    <p className="text-[12px] text-[#7E7E98]" style={{ fontFamily: "'DM Sans', sans-serif" }}>{msg.feedback}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        {isSending && (
+          <div className="flex justify-start">
+            <div className="px-4 py-3 rounded-lg" style={{ background: "rgba(0, 255, 224, 0.06)", border: "1px solid rgba(0, 255, 224, 0.15)" }}>
+              <span className="text-sm text-[#7E7E98] animate-pulse">AI is evaluating...</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Overall Assessment */}
+      {assessment && (
+        <div className="mb-4 p-5 rounded-lg" style={{ background: "rgba(0, 230, 118, 0.06)", border: "1px solid rgba(0, 230, 118, 0.2)" }}>
+          <h4 className="text-sm font-semibold mb-2 text-[#00E676]" style={{ fontFamily: "'Outfit', sans-serif" }}>Overall Assessment</h4>
+          <p className="text-sm text-[#7E7E98] mb-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>{assessment.summary as string}</p>
+          {(assessment.strengths as string[])?.length > 0 && (
+            <div className="mb-1"><span className="text-[11px] text-[#00E676]">Strengths:</span> <span className="text-[12px] text-[#7E7E98]">{(assessment.strengths as string[]).join(", ")}</span></div>
+          )}
+          {(assessment.improvements as string[])?.length > 0 && (
+            <div><span className="text-[11px] text-[#FFAB00]">Improve:</span> <span className="text-[12px] text-[#7E7E98]">{(assessment.improvements as string[]).join(", ")}</span></div>
+          )}
+          <button
+            onClick={() => { setSessionId(null); setMessages([]); setAssessment(null); }}
+            className="mt-3 px-4 py-2 rounded-lg text-sm font-medium transition-all hover:bg-white/5"
+            style={{ border: "1px solid rgba(255, 255, 255, 0.08)", color: "#7E7E98", fontFamily: "'Outfit', sans-serif" }}
+          >
+            Start New Mock
+          </button>
+        </div>
+      )}
+
+      {/* Answer Input */}
+      {!assessment && (
+        <div className="flex gap-2">
+          <textarea
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendAnswer(); } }}
+            placeholder="Type your answer... (Enter to send, Shift+Enter for newline)"
+            rows={3}
+            className="flex-1 px-4 py-3 rounded-lg border bg-transparent outline-none resize-none"
+            style={{ borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'DM Sans', sans-serif", fontSize: "14px", color: "#E8E8F0" }}
+          />
+          <button
+            onClick={sendAnswer}
+            disabled={isSending || !answer.trim()}
+            className="self-end px-4 py-3 rounded-lg font-semibold transition-all disabled:opacity-50"
+            style={{ background: "#00FFE0", color: "#050508", fontFamily: "'Outfit', sans-serif" }}
+          >
+            <Send size={16} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   POST-INTERVIEW TAB — Generate + Send thank-you email
+   ============================================================ */
+function PostInterviewTab({ interviewId, showFeedback }: { interviewId?: string; showFeedback: (type: "success" | "error", text: string) => void }) {
+  const [thankYouDraft, setThankYouDraft] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+
+  const generateThankYou = async () => {
+    if (!interviewId) return;
+    setIsGenerating(true);
+    try {
+      const res = await apiFetch<Record<string, unknown>>(`/api/interview/${interviewId}/thank-you`, { method: "POST" });
+      const inner = (res as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+      const draft = (inner?.draft as string) || (inner?.body as string) || (inner?.email as string) || "";
+      setThankYouDraft(draft || "Thank you for taking the time to interview me...");
+    } catch {
+      showFeedback("error", "Failed to generate thank-you email.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const sendThankYou = async () => {
+    if (!interviewId || !thankYouDraft) return;
+    setIsSending(true);
+    try {
+      await apiFetch(`/api/interview/${interviewId}/thank-you`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: thankYouDraft }),
+      });
+      showFeedback("success", "Thank-you email sent successfully!");
+      setThankYouDraft(null);
+    } catch {
+      showFeedback("error", "Failed to send. Make sure Gmail is connected in Settings.");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  if (!thankYouDraft && !isGenerating) {
+    return (
+      <div className="text-center py-12">
+        <Mail size={48} className="mx-auto mb-4 text-[#00E676]" />
+        <h3 className="text-xl font-semibold mb-2 text-[#E8E8F0]" style={{ fontFamily: "'Outfit', sans-serif" }}>Post-Interview Actions</h3>
+        <p className="text-sm text-[#7E7E98] mb-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+          Generate and send a professional thank-you email
+        </p>
+        <button
+          onClick={generateThankYou}
+          className="px-5 py-2.5 rounded-lg font-semibold transition-all"
+          style={{ background: "#00FFE0", color: "#050508", fontFamily: "'Outfit', sans-serif" }}
+        >
+          Generate Thank You Email
+        </button>
+      </div>
+    );
+  }
+
+  if (isGenerating) {
+    return (
+      <div className="text-center py-12">
+        <div className="w-12 h-12 rounded-full border-2 border-t-transparent animate-spin mx-auto mb-4" style={{ borderColor: "rgba(0, 230, 118, 0.3)", borderTopColor: "transparent" }} />
+        <p className="text-sm text-[#7E7E98]" style={{ fontFamily: "'DM Sans', sans-serif" }}>Generating thank-you email...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>Thank-You Email Draft</h3>
+        <span className="text-[11px] text-[#4A4A64]">Edit before sending</span>
+      </div>
+      <textarea
+        value={thankYouDraft || ""}
+        onChange={(e) => setThankYouDraft(e.target.value)}
+        rows={10}
+        className="w-full px-4 py-3 rounded-lg border bg-transparent outline-none resize-none"
+        style={{ borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'DM Sans', sans-serif", fontSize: "14px", color: "#E8E8F0" }}
+      />
+      <div className="flex gap-3">
+        <button
+          onClick={sendThankYou}
+          disabled={isSending || !thankYouDraft?.trim()}
+          className="flex-1 px-4 py-3 rounded-lg font-semibold transition-all disabled:opacity-50"
+          style={{ background: "#00E676", color: "#050508", fontFamily: "'Outfit', sans-serif" }}
+        >
+          <Send size={16} className="inline mr-2" />
+          {isSending ? "Sending..." : "Send via Gmail"}
+        </button>
+        <button
+          onClick={generateThankYou}
+          disabled={isGenerating}
+          className="px-4 py-3 rounded-lg font-semibold border transition-all hover:bg-white/5"
+          style={{ borderColor: "rgba(255, 255, 255, 0.08)", color: "#7E7E98", fontFamily: "'Outfit', sans-serif" }}
+        >
+          Regenerate
+        </button>
+      </div>
     </div>
   );
 }
