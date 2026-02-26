@@ -144,9 +144,22 @@ export async function login(
       throw new AuthError('Invalid email or password');
     }
 
-    // Load user
+    // Load user (try new key first, fall back to old key for migration)
     const userKey = `users/${emailMapping.userId}/user.json`;
-    const user = await storage.getJSON<User>(userKey);
+    let user = await storage.getJSON<User>(userKey);
+
+    // Backward-compat: if not found, check old profile.json location and migrate
+    if (!user) {
+      const oldKey = `users/${emailMapping.userId}/profile.json`;
+      const candidate = await storage.getJSON<User>(oldKey);
+      // Only treat it as a User record if it has passwordHash (not a Profile)
+      if (candidate && candidate.passwordHash) {
+        user = candidate;
+        // Migrate to the new key
+        await storage.putJSON(userKey, user);
+        logger.info({ userId: emailMapping.userId }, 'Migrated user record from profile.json to user.json');
+      }
+    }
 
     if (!user) {
       throw new AuthError('Invalid email or password');
@@ -280,7 +293,17 @@ export async function logout(refreshToken: string): Promise<void> {
 export async function getUser(userId: string): Promise<UserProfile> {
   try {
     const userKey = `users/${userId}/user.json`;
-    const user = await storage.getJSON<User>(userKey);
+    let user = await storage.getJSON<User>(userKey);
+
+    // Backward-compat: fall back to old profile.json location
+    if (!user) {
+      const oldKey = `users/${userId}/profile.json`;
+      const candidate = await storage.getJSON<User>(oldKey);
+      if (candidate && candidate.passwordHash) {
+        user = candidate;
+        await storage.putJSON(userKey, user);
+      }
+    }
 
     if (!user) {
       throw new AuthError('User not found');

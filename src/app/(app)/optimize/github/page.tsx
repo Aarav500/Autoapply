@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Image from "next/image";
 import { useState } from "react";
 import { Github, Search, Star, GitFork, ExternalLink, AlertCircle, CheckCircle2, ArrowUp } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
@@ -203,11 +204,14 @@ export default function GitHubOptimizerPage() {
             >
               <div className="flex items-center gap-4 mb-4">
                 {profile.avatarUrl && (
-                  <img
+                  <Image
                     src={profile.avatarUrl}
                     alt={profile.username}
+                    width={64}
+                    height={64}
                     className="w-16 h-16 rounded-full"
                     style={{ border: "2px solid rgba(0, 255, 224, 0.2)" }}
+                    unoptimized
                   />
                 )}
                 <div>
