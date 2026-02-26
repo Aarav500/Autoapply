@@ -251,7 +251,7 @@ export class AutoApplicant {
 
     // Check for email application in description
     if (description.match(/send\s+(your\s+)?resume\s+to\s+[\w@.]+/i) ||
-        description.match(/email.*(resume|cv|application)/i)) {
+      description.match(/email.*(resume|cv|application)/i)) {
       return 'email';
     }
 
@@ -325,25 +325,35 @@ I am writing to express my interest in the ${job.title} position at ${job.compan
 
 ${profile.summary || 'I believe my skills and experience make me a strong candidate for this role.'}
 
-Please find my resume attached. I look forward to discussing how I can contribute to your team.
+Please find my resume attached for reference. I look forward to discussing how I can contribute to your team.
 
 Best regards,
 ${profile.name}
 ${profile.email}
 ${profile.phone || ''}`;
 
-      // TODO: Send email via Gmail API
-      // For now, email applications require manual sending
-      // In production, initialize GmailClient with settings.googleRefreshToken
-      // and call gmailClient.sendMessage()
+      // Send email via Gmail API
+      const { GmailClient } = await import('../comms/gmail-client');
+      const { decrypt } = await import('@/lib/encryption');
 
-      logger.warn({ email, jobId: job.id }, 'Email application not yet implemented - requires Gmail client integration');
+      const gmailClient = new GmailClient({
+        clientId: process.env.GOOGLE_CLIENT_ID!,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        redirectUri: process.env.GOOGLE_REDIRECT_URI!,
+      });
+
+      const decryptedToken = decrypt(settings.googleRefreshToken);
+      gmailClient.setCredentials(decryptedToken);
+
+      await gmailClient.sendMessage(email, subject, body);
+
+      logger.info({ email, jobId: job.id }, 'Email application sent via Gmail');
 
       return {
         success: true,
         applicationId: '',
         method: 'email',
-        confirmationMessage: `Application sent to ${email}`,
+        confirmationMessage: `Application emailed to ${email}`,
       };
     } catch (error) {
       logger.error({ error }, 'Email application failed');

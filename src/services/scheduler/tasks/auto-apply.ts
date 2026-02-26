@@ -31,9 +31,9 @@ export async function runAutoApply(): Promise<void> {
         continue;
       }
 
-      // Load jobs index
-      const jobsIndex = await storage.getJSON<{ jobs: Job[] }>(`users/${userId}/jobs/index.json`);
-      if (!jobsIndex || !jobsIndex.jobs || jobsIndex.jobs.length === 0) {
+      // Load jobs index (stored as a flat array of JobSummary)
+      const jobsIndex = await storage.getJSON<Job[]>(`users/${userId}/jobs/index.json`);
+      if (!jobsIndex || jobsIndex.length === 0) {
         logger.debug({ userId }, 'No jobs found for user');
         continue;
       }
@@ -52,7 +52,7 @@ export async function runAutoApply(): Promise<void> {
 
       // Find eligible jobs
       const minMatchScore = (autoApplyRules.minMatchScore as number | undefined) || 70;
-      const eligibleJobs = jobsIndex.jobs.filter(
+      const eligibleJobs = jobsIndex.filter(
         (job) =>
           job.status === 'discovered' &&
           job.matchScore !== undefined &&
@@ -135,13 +135,13 @@ export async function runAutoApply(): Promise<void> {
 
 async function countApplicationsToday(userId: string, today: string): Promise<number> {
   try {
-    const appsIndex = await storage.getJSON<{ applications: Array<{ createdAt: string }> }>(
+    const appsIndex = await storage.getJSON<{ applications: Array<{ createdAt?: string; appliedAt?: string | null }> }>(
       `users/${userId}/applications/index.json`
     );
 
     if (!appsIndex || !appsIndex.applications) return 0;
 
-    return appsIndex.applications.filter((app) => app.createdAt.startsWith(today)).length;
+    return appsIndex.applications.filter((app) => app.appliedAt && app.appliedAt.startsWith(today)).length;
   } catch {
     return 0;
   }

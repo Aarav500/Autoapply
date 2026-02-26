@@ -51,33 +51,39 @@ export async function generateCV(options: GenerateCVOptions): Promise<GenerateCV
     // 3. Prepare input for AI CV generator
     const cvInput: CVGeneratorInput = {
       profile: {
-        name: profile.personalInfo.name,
-        email: profile.personalInfo.email,
-        phone: profile.personalInfo.phone || '',
-        location: profile.personalInfo.location || '',
-        linkedin: profile.socialLinks?.linkedin,
-        github: profile.socialLinks?.github,
-        website: profile.socialLinks?.website,
-        title: profile.professionalInfo?.currentTitle || '',
-        summary: profile.professionalInfo?.summary,
+        name: profile.name,
+        email: profile.email,
+        phone: profile.phone || '',
+        location: profile.location || '',
+        linkedin: profile.socialLinks?.find((s: { platform: string; url: string }) => s.platform === 'LinkedIn')?.url,
+        github: profile.socialLinks?.find((s: { platform: string; url: string }) => s.platform === 'GitHub')?.url,
+        website: profile.socialLinks?.find((s: { platform: string; url: string }) => s.platform === 'Portfolio' || s.platform === 'Website')?.url,
+        title: profile.headline || '',
+        summary: profile.summary,
         experience: profile.experience || [],
         education: profile.education || [],
         skills: {
-          languages: profile.skills?.technical?.filter((s: string) =>
-            ['javascript', 'typescript', 'python', 'java', 'go', 'rust', 'c++', 'c#', 'ruby', 'php', 'swift', 'kotlin'].some(lang =>
-              s.toLowerCase().includes(lang)
+          languages: (profile.skills || [])
+            .filter((s: { name: string }) =>
+              ['javascript', 'typescript', 'python', 'java', 'go', 'rust', 'c++', 'c#', 'ruby', 'php', 'swift', 'kotlin'].some(lang =>
+                s.name.toLowerCase().includes(lang)
+              )
             )
-          ) || [],
-          frameworks: profile.skills?.technical?.filter((s: string) =>
-            ['react', 'vue', 'angular', 'next', 'express', 'django', 'flask', 'spring', 'rails'].some(fw =>
-              s.toLowerCase().includes(fw)
+            .map((s: { name: string }) => s.name),
+          frameworks: (profile.skills || [])
+            .filter((s: { name: string }) =>
+              ['react', 'vue', 'angular', 'next', 'express', 'django', 'flask', 'spring', 'rails'].some(fw =>
+                s.name.toLowerCase().includes(fw)
+              )
             )
-          ) || [],
-          tools: profile.skills?.technical?.filter((s: string) =>
-            !['javascript', 'typescript', 'python', 'java', 'go', 'rust', 'c++', 'c#', 'ruby', 'php', 'swift', 'kotlin', 'react', 'vue', 'angular', 'next', 'express', 'django', 'flask', 'spring', 'rails'].some(term =>
-              s.toLowerCase().includes(term)
+            .map((s: { name: string }) => s.name),
+          tools: (profile.skills || [])
+            .filter((s: { name: string }) =>
+              !['javascript', 'typescript', 'python', 'java', 'go', 'rust', 'c++', 'c#', 'ruby', 'php', 'swift', 'kotlin', 'react', 'vue', 'angular', 'next', 'express', 'django', 'flask', 'spring', 'rails'].some(term =>
+                s.name.toLowerCase().includes(term)
+              )
             )
-          ) || [],
+            .map((s: { name: string }) => s.name),
           methodologies: [],
         },
         certifications: profile.certifications || [],
