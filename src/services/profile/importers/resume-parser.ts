@@ -72,8 +72,7 @@ type ResumeData = z.infer<typeof ResumeDataSchema>;
  */
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const pdfParse = require('pdf-parse') as PdfParseFn;
+    const pdfParse: PdfParseFn = require('pdf-parse');
     const data = await pdfParse(buffer);
     return data.text;
   } catch (error) {
