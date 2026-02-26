@@ -81,8 +81,8 @@ export async function register(
       updatedAt: now,
     };
 
-    // Save user profile to S3
-    const userKey = `users/${userId}/profile.json`;
+    // Save user to S3 (separate key from profile data)
+    const userKey = `users/${userId}/user.json`;
     await storage.putJSON(userKey, user);
 
     // Create email → userId mapping
@@ -145,7 +145,7 @@ export async function login(
     }
 
     // Load user
-    const userKey = `users/${emailMapping.userId}/profile.json`;
+    const userKey = `users/${emailMapping.userId}/user.json`;
     const user = await storage.getJSON<User>(userKey);
 
     if (!user) {
@@ -279,7 +279,7 @@ export async function logout(refreshToken: string): Promise<void> {
  */
 export async function getUser(userId: string): Promise<UserProfile> {
   try {
-    const userKey = `users/${userId}/profile.json`;
+    const userKey = `users/${userId}/user.json`;
     const user = await storage.getJSON<User>(userKey);
 
     if (!user) {

@@ -72,9 +72,8 @@ type ResumeData = z.infer<typeof ResumeDataSchema>;
  */
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    // Dynamic import of CommonJS module
-    const pdfParseModule = await import('pdf-parse');
-    const pdfParse = (pdfParseModule as unknown as { default: PdfParseFn }).default;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfParse = require('pdf-parse') as PdfParseFn;
     const data = await pdfParse(buffer);
     return data.text;
   } catch (error) {

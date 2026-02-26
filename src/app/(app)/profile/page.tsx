@@ -55,17 +55,17 @@ export default function ProfilePage() {
   const tabs = ["Experience", "Education", "Skills", "Projects", "Preferences"];
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [addExpOpen, setAddExpOpen] = useState(false);
-  const [editExpIndex, setEditExpIndex] = useState<number | null>(null);
+  const [editExpId, setEditExpId] = useState<string | null>(null);
   const [addEduOpen, setAddEduOpen] = useState(false);
   const [addProjectOpen, setAddProjectOpen] = useState(false);
   const [skillInput, setSkillInput] = useState("");
 
   // Form states
-  const [profileForm, setProfileForm] = useState({ fullName: "", title: "", location: "", phone: "", summary: "" });
-  const [expForm, setExpForm] = useState({ title: "", company: "", startDate: "", endDate: "", description: "", achievements: "" });
+  const [profileForm, setProfileForm] = useState({ name: "", headline: "", location: "", phone: "", summary: "" });
+  const [expForm, setExpForm] = useState({ role: "", company: "", startDate: "", endDate: "", current: false, description: "", bullets: "" });
   const [eduForm, setEduForm] = useState({ institution: "", degree: "", field: "", startDate: "", endDate: "", gpa: "" });
   const [projectForm, setProjectForm] = useState({ name: "", description: "", url: "", technologies: "" });
-  const [prefsForm, setPrefsForm] = useState({ targetSalary: "", remoteOnly: false, locations: "" });
+  const [prefsForm, setPrefsForm] = useState({ salaryMin: "", salaryMax: "", remotePreference: "any", locations: "" });
   const [prefsEditing, setPrefsEditing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importFeedback, setImportFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -112,99 +112,163 @@ export default function ProfilePage() {
     retry: false,
   });
 
+  // Correctly map backend profile shape: { profile: { name, headline, location, phone, summary, skills, experience, education, projects, preferences, ... } }
   const profileInner = (profileData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
   const profile = (profileInner?.profile || profileInner) as Record<string, unknown> | undefined;
-  const personalInfo = profile?.personalInfo as Record<string, string> | undefined;
-  const jobPreferences = profile?.jobPreferences as Record<string, unknown> | undefined;
+
   const completenessInner = (completenessData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
   const completeness = (completenessInner || {}) as Record<string, unknown>;
-  const profileCompletion = (completeness.percentage as number) || 0;
+  const profileCompletion = (completeness.percentage as number) || (profile?.completenessScore as number) || 0;
   const radius = 60;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (profileCompletion / 100) * circumference;
   const suggestions = (completeness.suggestions as Array<Record<string, unknown>>) || [];
+
+  // Backend field names: name, headline, location, phone, summary, skills, experience, education, projects, preferences
+  const profileName = (profile?.name as string) || "";
+  const profileEmail = (profile?.email as string) || "";
+  const profileHeadline = (profile?.headline as string) || "";
+  const profileLocation = (profile?.location as string) || "";
+  const profilePhone = (profile?.phone as string) || "";
+  const profileSummary = (profile?.summary as string) || "";
+  const preferences = (profile?.preferences as Record<string, unknown>) || {};
+
   const experiences = (profile?.experience as Array<Record<string, unknown>>) || [];
   const education = (profile?.education as Array<Record<string, unknown>>) || [];
   const projects = (profile?.projects as Array<Record<string, unknown>>) || [];
-  const skills = (profile?.skills as Array<Record<string, unknown> | string>) || [];
+  const skills = (profile?.skills as Array<Record<string, string>>) || [];
 
-  const updateProfile = useMutation({
-    mutationFn: (data: Record<string, unknown>) => apiFetch("/api/profile", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["profile"] }); queryClient.invalidateQueries({ queryKey: ["profileCompleteness"] }); },
+  // ===================== Mutations =====================
+
+  // PUT /api/profile — basic fields only (name, headline, location, phone, summary)
+  const updateProfileMutation = useMutation({
+    mutationFn: (data: Record<string, unknown>) =>
+      apiFetch("/api/profile", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["profileCompleteness"] });
+    },
   });
 
-  const updateSkills = useMutation({
-    mutationFn: (data: { skills: Array<Record<string, string>> }) => apiFetch("/api/profile/skills", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["profile"] }); queryClient.invalidateQueries({ queryKey: ["profileCompleteness"] }); },
+  // POST /api/profile/experience — add new experience entry
+  const addExperienceMutation = useMutation({
+    mutationFn: (data: Record<string, unknown>) =>
+      apiFetch("/api/profile/experience", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["profile"] }),
   });
 
-  const updatePreferences = useMutation({
-    mutationFn: (data: Record<string, unknown>) => apiFetch("/api/profile/preferences", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["profile"] }); },
+  // PUT /api/profile/experience/[id] — edit existing experience
+  const updateExperienceMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
+      apiFetch(`/api/profile/experience/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["profile"] }),
   });
+
+  // DELETE /api/profile/experience/[id]
+  const deleteExperienceMutation = useMutation({
+    mutationFn: (id: string) => apiFetch(`/api/profile/experience/${id}`, { method: "DELETE" }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["profile"] }),
+  });
+
+  // POST /api/profile/education
+  const addEducationMutation = useMutation({
+    mutationFn: (data: Record<string, unknown>) =>
+      apiFetch("/api/profile/education", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["profile"] }),
+  });
+
+  // DELETE /api/profile/education/[id]
+  const deleteEducationMutation = useMutation({
+    mutationFn: (id: string) => apiFetch(`/api/profile/education/${id}`, { method: "DELETE" }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["profile"] }),
+  });
+
+  // POST /api/profile/projects — add new project
+  const addProjectMutation = useMutation({
+    mutationFn: (data: Record<string, unknown>) =>
+      apiFetch("/api/profile/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["profile"] }),
+  });
+
+  // PUT /api/profile/skills — replace whole skills array (backend expects [{name, proficiency, years?}])
+  const updateSkillsMutation = useMutation({
+    mutationFn: (data: { skills: Array<{ name: string; proficiency: string }> }) =>
+      apiFetch("/api/profile/skills", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["profile"] }),
+  });
+
+  // PUT /api/profile/preferences
+  const updatePreferencesMutation = useMutation({
+    mutationFn: (data: Record<string, unknown>) =>
+      apiFetch("/api/profile/preferences", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["profile"] }),
+  });
+
+  // ===================== Handlers =====================
 
   const openEditProfile = () => {
     setProfileForm({
-      fullName: personalInfo?.fullName || "",
-      title: personalInfo?.title || "",
-      location: personalInfo?.location || "",
-      phone: personalInfo?.phone || "",
-      summary: (profile?.summary as string) || "",
+      name: profileName,
+      headline: profileHeadline,
+      location: profileLocation,
+      phone: profilePhone,
+      summary: profileSummary,
     });
     setEditProfileOpen(true);
   };
 
   const saveProfile = () => {
-    updateProfile.mutate({
-      personalInfo: { fullName: profileForm.fullName, title: profileForm.title, location: profileForm.location, phone: profileForm.phone, email: personalInfo?.email },
+    updateProfileMutation.mutate({
+      name: profileForm.name,
+      headline: profileForm.headline,
+      location: profileForm.location,
+      phone: profileForm.phone,
       summary: profileForm.summary,
     });
     setEditProfileOpen(false);
   };
 
   const openAddExp = () => {
-    setExpForm({ title: "", company: "", startDate: "", endDate: "", description: "", achievements: "" });
-    setEditExpIndex(null);
+    setExpForm({ role: "", company: "", startDate: "", endDate: "", current: false, description: "", bullets: "" });
+    setEditExpId(null);
     setAddExpOpen(true);
   };
 
-  const openEditExp = (index: number) => {
-    const exp = experiences[index];
+  const openEditExp = (exp: Record<string, unknown>) => {
     setExpForm({
-      title: (exp.title as string) || "",
+      role: (exp.role as string) || "",
       company: (exp.company as string) || "",
       startDate: (exp.startDate as string) || "",
       endDate: (exp.endDate as string) || "",
+      current: (exp.current as boolean) || false,
       description: (exp.description as string) || "",
-      achievements: ((exp.achievements as string[]) || []).join("\n"),
+      bullets: ((exp.bullets as string[]) || []).join("\n"),
     });
-    setEditExpIndex(index);
+    setEditExpId(exp.id as string);
     setAddExpOpen(true);
   };
 
   const saveExp = () => {
-    const newExp = {
-      title: expForm.title,
+    const payload = {
+      role: expForm.role,
       company: expForm.company,
       startDate: expForm.startDate,
-      endDate: expForm.endDate || null,
+      endDate: expForm.current ? null : (expForm.endDate || null),
+      current: expForm.current,
       description: expForm.description,
-      achievements: expForm.achievements.split("\n").filter((a) => a.trim()),
+      bullets: expForm.bullets.split("\n").filter((b) => b.trim()),
     };
-    const updated = [...experiences];
-    if (editExpIndex !== null) {
-      updated[editExpIndex] = newExp;
+    if (editExpId) {
+      updateExperienceMutation.mutate({ id: editExpId, data: payload });
     } else {
-      updated.push(newExp);
+      addExperienceMutation.mutate(payload);
     }
-    updateProfile.mutate({ experience: updated });
     setAddExpOpen(false);
   };
 
-  const deleteExp = (index: number) => {
+  const deleteExp = (id: string) => {
     if (!confirm("Delete this experience?")) return;
-    const updated = experiences.filter((_, i) => i !== index);
-    updateProfile.mutate({ experience: updated });
+    deleteExperienceMutation.mutate(id);
   };
 
   const openAddEdu = () => {
@@ -213,14 +277,20 @@ export default function ProfilePage() {
   };
 
   const saveEdu = () => {
-    const newEdu = { institution: eduForm.institution, degree: eduForm.degree, field: eduForm.field, startDate: eduForm.startDate, endDate: eduForm.endDate, gpa: eduForm.gpa || undefined };
-    updateProfile.mutate({ education: [...education, newEdu] });
+    addEducationMutation.mutate({
+      institution: eduForm.institution,
+      degree: eduForm.degree,
+      field: eduForm.field || undefined,
+      startDate: eduForm.startDate,
+      endDate: eduForm.endDate || null,
+      gpa: eduForm.gpa ? parseFloat(eduForm.gpa) : undefined,
+    });
     setAddEduOpen(false);
   };
 
-  const deleteEdu = (index: number) => {
+  const deleteEdu = (id: string) => {
     if (!confirm("Delete this education entry?")) return;
-    updateProfile.mutate({ education: education.filter((_, i) => i !== index) });
+    deleteEducationMutation.mutate(id);
   };
 
   const openAddProject = () => {
@@ -229,47 +299,66 @@ export default function ProfilePage() {
   };
 
   const saveProject = () => {
-    const newProject = { name: projectForm.name, description: projectForm.description, url: projectForm.url || undefined, technologies: projectForm.technologies.split(",").map((t) => t.trim()).filter(Boolean) };
-    updateProfile.mutate({ projects: [...projects, newProject] });
+    addProjectMutation.mutate({
+      name: projectForm.name,
+      description: projectForm.description,
+      url: projectForm.url || undefined,
+      technologies: projectForm.technologies.split(",").map((t) => t.trim()).filter(Boolean),
+    });
     setAddProjectOpen(false);
   };
 
   const deleteProject = (index: number) => {
     if (!confirm("Delete this project?")) return;
-    updateProfile.mutate({ projects: projects.filter((_, i) => i !== index) });
+    const updated = projects.filter((_, i) => i !== index);
+    updateProfileMutation.mutate({ projects: updated });
   };
 
   const addSkill = () => {
     if (!skillInput.trim()) return;
-    const current = skills.map((s) => typeof s === "string" ? { name: s, level: "intermediate" } : { name: (s.name as string) || "", level: (s.level as string) || "intermediate" });
-    current.push({ name: skillInput.trim(), level: "intermediate" });
-    updateSkills.mutate({ skills: current });
+    // Backend expects: { name: string, proficiency: 'beginner'|'intermediate'|'advanced'|'expert', years?: number }
+    const current = skills.map((s) => ({ name: s.name || "", proficiency: s.proficiency || "intermediate" }));
+    current.push({ name: skillInput.trim(), proficiency: "intermediate" });
+    updateSkillsMutation.mutate({ skills: current });
     setSkillInput("");
   };
 
   const removeSkill = (index: number) => {
-    const current = skills.map((s) => typeof s === "string" ? { name: s, level: "intermediate" } : { name: (s.name as string) || "", level: (s.level as string) || "intermediate" });
+    const current = skills.map((s) => ({ name: s.name || "", proficiency: s.proficiency || "intermediate" }));
     current.splice(index, 1);
-    updateSkills.mutate({ skills: current });
+    updateSkillsMutation.mutate({ skills: current });
   };
 
   const openPrefsEdit = () => {
     setPrefsForm({
-      targetSalary: (jobPreferences?.targetSalary as string) || "",
-      remoteOnly: (jobPreferences?.remoteOnly as boolean) || false,
-      locations: ((jobPreferences?.locations as string[]) || []).join(", "),
+      salaryMin: preferences.salaryMin != null ? String(preferences.salaryMin) : "",
+      salaryMax: preferences.salaryMax != null ? String(preferences.salaryMax) : "",
+      remotePreference: (preferences.remotePreference as string) || "any",
+      locations: ((preferences.locations as string[]) || []).join(", "),
     });
     setPrefsEditing(true);
   };
 
   const savePrefs = () => {
-    updatePreferences.mutate({
-      targetSalary: prefsForm.targetSalary,
-      remoteOnly: prefsForm.remoteOnly,
+    updatePreferencesMutation.mutate({
+      salaryMin: prefsForm.salaryMin ? parseInt(prefsForm.salaryMin, 10) : undefined,
+      salaryMax: prefsForm.salaryMax ? parseInt(prefsForm.salaryMax, 10) : undefined,
+      remotePreference: prefsForm.remotePreference || undefined,
       locations: prefsForm.locations.split(",").map((l) => l.trim()).filter(Boolean),
     });
     setPrefsEditing(false);
   };
+
+  const anyMutationPending =
+    updateProfileMutation.isPending ||
+    addExperienceMutation.isPending ||
+    updateExperienceMutation.isPending ||
+    deleteExperienceMutation.isPending ||
+    addEducationMutation.isPending ||
+    deleteEducationMutation.isPending ||
+    addProjectMutation.isPending ||
+    updateSkillsMutation.isPending ||
+    updatePreferencesMutation.isPending;
 
   return (
     <div className="w-full">
@@ -300,16 +389,16 @@ export default function ProfilePage() {
           ) : (
             <>
               <h1 className="text-[28px] font-bold mb-2" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>
-                {personalInfo?.fullName || "User"}
+                {profileName || "User"}
               </h1>
               <p className="text-[15px] mb-1" style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}>
-                {personalInfo?.title || "Professional"} · {personalInfo?.location || "Location"}
+                {profileHeadline || "Professional"}{profileLocation ? ` · ${profileLocation}` : ""}
               </p>
               <p className="text-[13px] mb-3" style={{ fontFamily: "'DM Sans', sans-serif", color: "#4A4A64" }}>
-                {personalInfo?.email} · {personalInfo?.phone || "+1 (555) 000-0000"}
+                {profileEmail}{profilePhone ? ` · ${profilePhone}` : ""}
               </p>
               <p className="text-sm mb-4 max-w-2xl leading-relaxed" style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}>
-                {(profile?.summary as string) || "Add a professional summary to your profile."}
+                {profileSummary || "Add a professional summary to your profile."}
               </p>
             </>
           )}
@@ -374,25 +463,27 @@ export default function ProfilePage() {
               </div>
             ) : (
               experiences.map((exp, index: number) => (
-                <div key={index} className="p-6 rounded-lg border" style={{ background: "rgba(15, 15, 24, 0.7)", backdropFilter: "blur(12px)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
+                <div key={(exp.id as string) || index} className="p-6 rounded-lg border" style={{ background: "rgba(15, 15, 24, 0.7)", backdropFilter: "blur(12px)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <h3 className="text-lg font-semibold mb-1" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>{exp.title as string}</h3>
+                      <h3 className="text-lg font-semibold mb-1" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>{exp.role as string}</h3>
                       <p className="text-[15px] mb-2" style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}>
-                        {exp.company as string} · {exp.startDate as string} — {(exp.endDate as string) || "Present"}
+                        {exp.company as string} · {exp.startDate as string} — {(exp.current as boolean) ? "Present" : ((exp.endDate as string) || "Present")}
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => openEditExp(index)} className="p-2 hover:bg-white/5 rounded-lg transition-colors"><Edit2 size={16} className="text-[#7E7E98]" /></button>
-                      <button onClick={() => deleteExp(index)} className="p-2 hover:bg-white/5 rounded-lg transition-colors"><Trash2 size={16} className="text-[#7E7E98]" /></button>
+                      <button onClick={() => openEditExp(exp)} className="p-2 hover:bg-white/5 rounded-lg transition-colors"><Edit2 size={16} className="text-[#7E7E98]" /></button>
+                      <button onClick={() => deleteExp(exp.id as string)} className="p-2 hover:bg-white/5 rounded-lg transition-colors"><Trash2 size={16} className="text-[#7E7E98]" /></button>
                     </div>
                   </div>
-                  <p className="text-sm mb-3 leading-relaxed" style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}>{exp.description as string}</p>
-                  {(exp.achievements as string[])?.length > 0 && (
+                  {(exp.description as string) && (
+                    <p className="text-sm mb-3 leading-relaxed" style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}>{exp.description as string}</p>
+                  )}
+                  {(exp.bullets as string[])?.length > 0 && (
                     <ul className="space-y-2">
-                      {(exp.achievements as string[]).map((achievement: string, idx: number) => (
+                      {(exp.bullets as string[]).map((bullet: string, idx: number) => (
                         <li key={idx} className="flex items-start gap-2 text-sm" style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}>
-                          <span className="text-[#00FFE0] mt-1">•</span><span>{achievement}</span>
+                          <span className="text-[#00FFE0] mt-1">•</span><span>{bullet}</span>
                         </li>
                       ))}
                     </ul>
@@ -421,16 +512,16 @@ export default function ProfilePage() {
               </div>
             ) : (
               education.map((edu, index: number) => (
-                <div key={index} className="p-6 rounded-lg border" style={{ background: "rgba(15, 15, 24, 0.7)", backdropFilter: "blur(12px)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
+                <div key={(edu.id as string) || index} className="p-6 rounded-lg border" style={{ background: "rgba(15, 15, 24, 0.7)", backdropFilter: "blur(12px)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold mb-1" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>{edu.degree as string} in {edu.field as string}</h3>
+                      <h3 className="text-lg font-semibold mb-1" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>{edu.degree as string}{edu.field ? ` in ${edu.field}` : ""}</h3>
                       <p className="text-[15px] mb-1" style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}>{edu.institution as string}</p>
                       <p className="text-[13px]" style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#4A4A64" }}>
                         {edu.startDate as string} — {(edu.endDate as string) || "Present"}{edu.gpa ? ` · GPA: ${edu.gpa}` : ""}
                       </p>
                     </div>
-                    <button onClick={() => deleteEdu(index)} className="p-2 hover:bg-white/5 rounded-lg transition-colors"><Trash2 size={16} className="text-[#7E7E98]" /></button>
+                    <button onClick={() => deleteEdu(edu.id as string)} className="p-2 hover:bg-white/5 rounded-lg transition-colors"><Trash2 size={16} className="text-[#7E7E98]" /></button>
                   </div>
                 </div>
               ))
@@ -464,8 +555,8 @@ export default function ProfilePage() {
               <div className="flex flex-wrap gap-2">
                 {skills.map((skill, index: number) => (
                   <div key={index} className="flex items-center gap-2 px-3 py-2 rounded-lg group" style={{ background: "rgba(0, 255, 224, 0.08)", border: "1px solid rgba(0, 255, 224, 0.2)", fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "#00FFE0" }}>
-                    {typeof skill === "string" ? skill : (skill.name as string)}
-                    {typeof skill !== "string" && skill.level ? ` · ${String(skill.level)}` : null}
+                    {skill.name}
+                    {skill.proficiency ? ` · ${skill.proficiency}` : null}
                     <button onClick={() => removeSkill(index)} className="opacity-0 group-hover:opacity-100 transition-opacity"><X size={14} /></button>
                   </div>
                 ))}
@@ -491,7 +582,7 @@ export default function ProfilePage() {
               </div>
             ) : (
               projects.map((proj, index: number) => (
-                <div key={index} className="p-6 rounded-lg border" style={{ background: "rgba(15, 15, 24, 0.7)", backdropFilter: "blur(12px)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
+                <div key={(proj.id as string) || index} className="p-6 rounded-lg border" style={{ background: "rgba(15, 15, 24, 0.7)", backdropFilter: "blur(12px)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <h3 className="text-lg font-semibold mb-1" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>{proj.name as string}</h3>
@@ -535,24 +626,36 @@ export default function ProfilePage() {
             </div>
             {prefsEditing ? (
               <div className="space-y-4 p-6 rounded-lg border" style={{ background: "rgba(15, 15, 24, 0.7)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
-                <div>
-                  <label style={labelStyle}>Target Salary</label>
-                  <input type="text" value={prefsForm.targetSalary} onChange={(e) => setPrefsForm({ ...prefsForm, targetSalary: e.target.value })} placeholder="e.g. $120,000" style={inputStyle} />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label style={labelStyle}>Min Salary ($/year)</label>
+                    <input type="number" value={prefsForm.salaryMin} onChange={(e) => setPrefsForm({ ...prefsForm, salaryMin: e.target.value })} placeholder="e.g. 80000" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Max Salary ($/year)</label>
+                    <input type="number" value={prefsForm.salaryMax} onChange={(e) => setPrefsForm({ ...prefsForm, salaryMax: e.target.value })} placeholder="e.g. 150000" style={inputStyle} />
+                  </div>
                 </div>
                 <div>
-                  <label style={labelStyle}>Remote Only</label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={prefsForm.remoteOnly} onChange={(e) => setPrefsForm({ ...prefsForm, remoteOnly: e.target.checked })} className="accent-[#00FFE0]" />
-                    <span className="text-sm text-[#E8E8F0]">Only show remote positions</span>
-                  </label>
+                  <label style={labelStyle}>Remote Preference</label>
+                  <select
+                    value={prefsForm.remotePreference}
+                    onChange={(e) => setPrefsForm({ ...prefsForm, remotePreference: e.target.value })}
+                    style={{ ...inputStyle, cursor: "pointer" }}
+                  >
+                    <option value="any">Any</option>
+                    <option value="remote">Remote Only</option>
+                    <option value="hybrid">Hybrid</option>
+                    <option value="onsite">On-site Only</option>
+                  </select>
                 </div>
                 <div>
                   <label style={labelStyle}>Preferred Locations (comma separated)</label>
                   <input type="text" value={prefsForm.locations} onChange={(e) => setPrefsForm({ ...prefsForm, locations: e.target.value })} placeholder="e.g. New York, San Francisco, Remote" style={inputStyle} />
                 </div>
                 <div className="flex gap-2 pt-2">
-                  <button onClick={savePrefs} className="px-4 py-2 rounded-lg bg-[#00FFE0] text-[#050508] font-medium" style={{ fontFamily: "'Outfit', sans-serif" }}>
-                    <Save size={16} className="inline mr-1" />Save
+                  <button onClick={savePrefs} disabled={updatePreferencesMutation.isPending} className="px-4 py-2 rounded-lg bg-[#00FFE0] text-[#050508] font-medium disabled:opacity-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    <Save size={16} className="inline mr-1" />{updatePreferencesMutation.isPending ? "Saving..." : "Save"}
                   </button>
                   <button onClick={() => setPrefsEditing(false)} className="px-4 py-2 rounded-lg border hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", color: "#7E7E98", fontFamily: "'Outfit', sans-serif" }}>Cancel</button>
                 </div>
@@ -560,9 +663,13 @@ export default function ProfilePage() {
             ) : (
               <div className="p-6 rounded-lg border" style={{ background: "rgba(15, 15, 24, 0.7)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
                 <div className="space-y-3">
-                  <div className="flex justify-between"><span className="text-sm text-[#7E7E98]">Target Salary</span><span className="text-sm text-[#E8E8F0]">{(jobPreferences?.targetSalary as string) || "Not set"}</span></div>
-                  <div className="flex justify-between"><span className="text-sm text-[#7E7E98]">Remote</span><span className="text-sm text-[#E8E8F0]">{jobPreferences?.remoteOnly ? "Remote Only" : "Flexible"}</span></div>
-                  <div className="flex justify-between"><span className="text-sm text-[#7E7E98]">Locations</span><span className="text-sm text-[#E8E8F0]">{((jobPreferences?.locations as string[]) || []).join(", ") || "Not specified"}</span></div>
+                  <div className="flex justify-between"><span className="text-sm text-[#7E7E98]">Salary Range</span><span className="text-sm text-[#E8E8F0]">
+                    {preferences.salaryMin || preferences.salaryMax
+                      ? `$${preferences.salaryMin || 0} – $${preferences.salaryMax || "∞"}`
+                      : "Not set"}
+                  </span></div>
+                  <div className="flex justify-between"><span className="text-sm text-[#7E7E98]">Remote Preference</span><span className="text-sm text-[#E8E8F0]">{(preferences.remotePreference as string) || "Any"}</span></div>
+                  <div className="flex justify-between"><span className="text-sm text-[#7E7E98]">Locations</span><span className="text-sm text-[#E8E8F0]">{((preferences.locations as string[]) || []).join(", ") || "Not specified"}</span></div>
                 </div>
               </div>
             )}
@@ -573,33 +680,44 @@ export default function ProfilePage() {
       {/* MODALS */}
       <Modal open={editProfileOpen} onClose={() => setEditProfileOpen(false)} title="Edit Profile">
         <div className="space-y-4">
-          <div><label style={labelStyle}>Full Name</label><input type="text" value={profileForm.fullName} onChange={(e) => setProfileForm({ ...profileForm, fullName: e.target.value })} style={inputStyle} /></div>
-          <div><label style={labelStyle}>Job Title</label><input type="text" value={profileForm.title} onChange={(e) => setProfileForm({ ...profileForm, title: e.target.value })} placeholder="e.g. Senior Software Engineer" style={inputStyle} /></div>
+          <div><label style={labelStyle}>Full Name</label><input type="text" value={profileForm.name} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} style={inputStyle} /></div>
+          <div><label style={labelStyle}>Job Title / Headline</label><input type="text" value={profileForm.headline} onChange={(e) => setProfileForm({ ...profileForm, headline: e.target.value })} placeholder="e.g. Senior Software Engineer" style={inputStyle} /></div>
           <div><label style={labelStyle}>Location</label><input type="text" value={profileForm.location} onChange={(e) => setProfileForm({ ...profileForm, location: e.target.value })} placeholder="e.g. New York, NY" style={inputStyle} /></div>
           <div><label style={labelStyle}>Phone</label><input type="text" value={profileForm.phone} onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })} placeholder="e.g. +1 (555) 123-4567" style={inputStyle} /></div>
           <div><label style={labelStyle}>Professional Summary</label><textarea value={profileForm.summary} onChange={(e) => setProfileForm({ ...profileForm, summary: e.target.value })} rows={4} placeholder="Brief professional summary..." style={{ ...inputStyle, resize: "none" as const }} /></div>
           <div className="flex gap-2 pt-2">
-            <button onClick={saveProfile} disabled={updateProfile.isPending} className="flex-1 px-4 py-2.5 rounded-lg bg-[#00FFE0] text-[#050508] font-medium disabled:opacity-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
-              {updateProfile.isPending ? "Saving..." : "Save Changes"}
+            <button onClick={saveProfile} disabled={updateProfileMutation.isPending} className="flex-1 px-4 py-2.5 rounded-lg bg-[#00FFE0] text-[#050508] font-medium disabled:opacity-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
+              {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
             </button>
             <button onClick={() => setEditProfileOpen(false)} className="px-4 py-2.5 rounded-lg border hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", color: "#7E7E98" }}>Cancel</button>
           </div>
         </div>
       </Modal>
 
-      <Modal open={addExpOpen} onClose={() => setAddExpOpen(false)} title={editExpIndex !== null ? "Edit Experience" : "Add Experience"}>
+      <Modal open={addExpOpen} onClose={() => setAddExpOpen(false)} title={editExpId ? "Edit Experience" : "Add Experience"}>
         <div className="space-y-4">
-          <div><label style={labelStyle}>Job Title</label><input type="text" value={expForm.title} onChange={(e) => setExpForm({ ...expForm, title: e.target.value })} placeholder="e.g. Software Engineer" style={inputStyle} /></div>
+          <div><label style={labelStyle}>Job Title / Role</label><input type="text" value={expForm.role} onChange={(e) => setExpForm({ ...expForm, role: e.target.value })} placeholder="e.g. Software Engineer" style={inputStyle} /></div>
           <div><label style={labelStyle}>Company</label><input type="text" value={expForm.company} onChange={(e) => setExpForm({ ...expForm, company: e.target.value })} placeholder="e.g. Google" style={inputStyle} /></div>
           <div className="grid grid-cols-2 gap-3">
-            <div><label style={labelStyle}>Start Date</label><input type="text" value={expForm.startDate} onChange={(e) => setExpForm({ ...expForm, startDate: e.target.value })} placeholder="e.g. Jan 2022" style={inputStyle} /></div>
-            <div><label style={labelStyle}>End Date</label><input type="text" value={expForm.endDate} onChange={(e) => setExpForm({ ...expForm, endDate: e.target.value })} placeholder="Present" style={inputStyle} /></div>
+            <div><label style={labelStyle}>Start Date</label><input type="text" value={expForm.startDate} onChange={(e) => setExpForm({ ...expForm, startDate: e.target.value })} placeholder="e.g. 2022-01-01" style={inputStyle} /></div>
+            <div><label style={labelStyle}>End Date</label><input type="text" value={expForm.endDate} onChange={(e) => setExpForm({ ...expForm, endDate: e.target.value })} placeholder="Leave blank if current" style={inputStyle} disabled={expForm.current} /></div>
+          </div>
+          <div>
+            <label className="flex items-center gap-2 cursor-pointer" style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "#7E7E98" }}>
+              <input type="checkbox" checked={expForm.current} onChange={(e) => setExpForm({ ...expForm, current: e.target.checked, endDate: e.target.checked ? "" : expForm.endDate })} className="accent-[#00FFE0]" />
+              I currently work here
+            </label>
           </div>
           <div><label style={labelStyle}>Description</label><textarea value={expForm.description} onChange={(e) => setExpForm({ ...expForm, description: e.target.value })} rows={3} placeholder="Brief description of your role..." style={{ ...inputStyle, resize: "none" as const }} /></div>
-          <div><label style={labelStyle}>Key Achievements (one per line)</label><textarea value={expForm.achievements} onChange={(e) => setExpForm({ ...expForm, achievements: e.target.value })} rows={3} placeholder="Increased revenue by 20%&#10;Led team of 5 engineers" style={{ ...inputStyle, resize: "none" as const }} /></div>
+          <div><label style={labelStyle}>Key Bullets (one per line)</label><textarea value={expForm.bullets} onChange={(e) => setExpForm({ ...expForm, bullets: e.target.value })} rows={3} placeholder={"Increased revenue by 20%\nLed team of 5 engineers"} style={{ ...inputStyle, resize: "none" as const }} /></div>
           <div className="flex gap-2 pt-2">
-            <button onClick={saveExp} disabled={updateProfile.isPending || !expForm.title || !expForm.company} className="flex-1 px-4 py-2.5 rounded-lg bg-[#00FFE0] text-[#050508] font-medium disabled:opacity-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
-              {updateProfile.isPending ? "Saving..." : editExpIndex !== null ? "Update" : "Add Experience"}
+            <button
+              onClick={saveExp}
+              disabled={anyMutationPending || !expForm.role || !expForm.company}
+              className="flex-1 px-4 py-2.5 rounded-lg bg-[#00FFE0] text-[#050508] font-medium disabled:opacity-50"
+              style={{ fontFamily: "'Outfit', sans-serif" }}
+            >
+              {anyMutationPending ? "Saving..." : editExpId ? "Update" : "Add Experience"}
             </button>
             <button onClick={() => setAddExpOpen(false)} className="px-4 py-2.5 rounded-lg border hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", color: "#7E7E98" }}>Cancel</button>
           </div>
@@ -614,13 +732,13 @@ export default function ProfilePage() {
             <div><label style={labelStyle}>Field of Study</label><input type="text" value={eduForm.field} onChange={(e) => setEduForm({ ...eduForm, field: e.target.value })} placeholder="e.g. Computer Science" style={inputStyle} /></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div><label style={labelStyle}>Start Date</label><input type="text" value={eduForm.startDate} onChange={(e) => setEduForm({ ...eduForm, startDate: e.target.value })} placeholder="e.g. 2018" style={inputStyle} /></div>
-            <div><label style={labelStyle}>End Date</label><input type="text" value={eduForm.endDate} onChange={(e) => setEduForm({ ...eduForm, endDate: e.target.value })} placeholder="e.g. 2022" style={inputStyle} /></div>
+            <div><label style={labelStyle}>Start Date</label><input type="text" value={eduForm.startDate} onChange={(e) => setEduForm({ ...eduForm, startDate: e.target.value })} placeholder="e.g. 2018-09-01" style={inputStyle} /></div>
+            <div><label style={labelStyle}>End Date</label><input type="text" value={eduForm.endDate} onChange={(e) => setEduForm({ ...eduForm, endDate: e.target.value })} placeholder="e.g. 2022-05-01" style={inputStyle} /></div>
           </div>
           <div><label style={labelStyle}>GPA (optional)</label><input type="text" value={eduForm.gpa} onChange={(e) => setEduForm({ ...eduForm, gpa: e.target.value })} placeholder="e.g. 3.8" style={inputStyle} /></div>
           <div className="flex gap-2 pt-2">
-            <button onClick={saveEdu} disabled={updateProfile.isPending || !eduForm.institution || !eduForm.degree} className="flex-1 px-4 py-2.5 rounded-lg bg-[#00FFE0] text-[#050508] font-medium disabled:opacity-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
-              {updateProfile.isPending ? "Saving..." : "Add Education"}
+            <button onClick={saveEdu} disabled={addEducationMutation.isPending || !eduForm.institution || !eduForm.degree} className="flex-1 px-4 py-2.5 rounded-lg bg-[#00FFE0] text-[#050508] font-medium disabled:opacity-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
+              {addEducationMutation.isPending ? "Saving..." : "Add Education"}
             </button>
             <button onClick={() => setAddEduOpen(false)} className="px-4 py-2.5 rounded-lg border hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", color: "#7E7E98" }}>Cancel</button>
           </div>
@@ -634,8 +752,8 @@ export default function ProfilePage() {
           <div><label style={labelStyle}>URL (optional)</label><input type="text" value={projectForm.url} onChange={(e) => setProjectForm({ ...projectForm, url: e.target.value })} placeholder="https://github.com/..." style={inputStyle} /></div>
           <div><label style={labelStyle}>Technologies (comma separated)</label><input type="text" value={projectForm.technologies} onChange={(e) => setProjectForm({ ...projectForm, technologies: e.target.value })} placeholder="e.g. React, TypeScript, Node.js" style={inputStyle} /></div>
           <div className="flex gap-2 pt-2">
-            <button onClick={saveProject} disabled={updateProfile.isPending || !projectForm.name} className="flex-1 px-4 py-2.5 rounded-lg bg-[#00FFE0] text-[#050508] font-medium disabled:opacity-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
-              {updateProfile.isPending ? "Saving..." : "Add Project"}
+            <button onClick={saveProject} disabled={updateProfileMutation.isPending || !projectForm.name} className="flex-1 px-4 py-2.5 rounded-lg bg-[#00FFE0] text-[#050508] font-medium disabled:opacity-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
+              {updateProfileMutation.isPending ? "Saving..." : "Add Project"}
             </button>
             <button onClick={() => setAddProjectOpen(false)} className="px-4 py-2.5 rounded-lg border hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", color: "#7E7E98" }}>Cancel</button>
           </div>

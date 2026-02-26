@@ -9,9 +9,9 @@ import { logger } from '@/lib/logger';
 
 const ACCESS_TOKEN_SECRET = process.env.JWT_ACCESS_SECRET || 'dev-access-secret-change-in-production';
 const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret-change-in-production';
-const ACCESS_TOKEN_EXPIRY = '15m';
-const REFRESH_TOKEN_EXPIRY = '7d';
-const REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+const ACCESS_TOKEN_EXPIRY = '2h';
+const REFRESH_TOKEN_EXPIRY = '30d';
+const REFRESH_TOKEN_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
 
 interface TokenPayload {
   userId: string;
@@ -49,8 +49,8 @@ export function generateTokens(userId: string): {
     // Hash the refresh token for storage
     const refreshTokenHash = hashToken(refreshToken);
 
-    // Access token expires in 15 minutes (900 seconds)
-    const expiresIn = 900;
+    // Access token expires in 2 hours (7200 seconds)
+    const expiresIn = 7200;
 
     logger.info({ userId }, 'Generated auth tokens');
 
