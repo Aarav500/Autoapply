@@ -13,9 +13,9 @@ RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 nextjs -g nodejs
 
 # Install runtime dependencies only (Chromium for Playwright/Puppeteer)
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
-    # Add minimal required libs for native extensions if any
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 

@@ -69,8 +69,8 @@ if sudo docker images autoapply:latest --format "{{.ID}}" | grep -q .; then
 fi
 
 echo ""
-echo "Step 7: Pruning stale Docker cache..."
-sudo docker builder prune -f 2>/dev/null || true
+echo "Step 7: Pruning stale Docker cache and unused images to free disk space..."
+sudo docker system prune -af --volumes 2>/dev/null || true
 
 echo ""
 echo "Step 8: Building Docker image (with progress)..."
