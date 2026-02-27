@@ -72,7 +72,9 @@ type ResumeData = z.infer<typeof ResumeDataSchema>;
  */
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    const pdfParse: PdfParseFn = require('pdf-parse');
+    // Import the internal lib directly — the pdf-parse package index.js reads a
+    // test PDF file from disk at load time which crashes in Next.js server routes.
+    const pdfParse: PdfParseFn = require('pdf-parse/lib/pdf-parse.js');
     const data = await pdfParse(buffer);
     return data.text;
   } catch (error) {
