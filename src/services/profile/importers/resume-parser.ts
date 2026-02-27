@@ -18,14 +18,6 @@ import {
 } from '@/types/profile';
 import { getProfile, updateProfile } from '../profile-service';
 
-// Dynamic import for CommonJS module
-type PdfParseResult = {
-  text: string;
-  numpages: number;
-  info: Record<string, unknown>;
-};
-type PdfParseFn = (buffer: Buffer) => Promise<PdfParseResult>;
-
 // Schema for AI extraction
 const ResumeDataSchema = z.object({
   name: z.string().optional(),
@@ -71,15 +63,18 @@ type ResumeData = z.infer<typeof ResumeDataSchema>;
  * Extract text from PDF buffer
  */
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
+  let parser;
   try {
-    // Import the internal lib directly — the pdf-parse package index.js reads a
-    // test PDF file from disk at load time which crashes in Next.js server routes.
-    const pdfParse: PdfParseFn = require('pdf-parse/lib/pdf-parse.js');
-    const data = await pdfParse(buffer);
-    return data.text;
+    // pdf-parse v2 uses named exports with a class-based API
+    const { PDFParse } = await import('pdf-parse');
+    parser = new PDFParse({ data: new Uint8Array(buffer) });
+    const result = await parser.getText();
+    return result.text;
   } catch (error) {
     logger.error({ error }, 'Failed to extract text from PDF');
     throw new ValidationError('Failed to parse PDF file');
+  } finally {
+    await parser?.destroy();
   }
 }
 
