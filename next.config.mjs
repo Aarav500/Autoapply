@@ -4,7 +4,7 @@ const nextConfig = {
   output: 'standalone',
 
   experimental: {
-    serverComponentsExternalPackages: ['googleapis', 'nodemailer', 'puppeteer', 'playwright', 'pdf-parse'],
+    serverComponentsExternalPackages: ['googleapis', 'nodemailer', 'puppeteer', 'playwright', 'pdf-parse', 'pdfjs-dist'],
     instrumentationHook: true,
   },
 
