@@ -1,7 +1,7 @@
 # Fast deployment Dockerfile - expects pre-built .next folder
 # This skips the slow npm install and build steps
 
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 
 WORKDIR /app
 
@@ -9,17 +9,21 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Create non-root user
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 nextjs -g nodejs
 
-# Install runtime dependencies only
-RUN apk add --no-cache chromium
+# Install runtime dependencies only (Chromium for Playwright/Puppeteer)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
+    # Add minimal required libs for native extensions if any
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set Chromium paths for Playwright/Puppeteer
+# Set Chromium paths for Playwright/Puppeteer (Debian path)
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
 
 # Copy pre-built application
 # The deployment package has standalone output with all dependencies
