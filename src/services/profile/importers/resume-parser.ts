@@ -64,34 +64,13 @@ type ResumeData = z.infer<typeof ResumeDataSchema>;
  */
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    // Use pdfjs-dist directly — pure JS, no native binaries (@napi-rs/canvas not needed)
-    // This avoids pdf-parse v2's dependency on @napi-rs/canvas which fails in some Docker envs
-    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-
-    const loadingTask = pdfjsLib.getDocument({
-      data: new Uint8Array(buffer),
-      // Disable worker in Node.js server context
-      useWorkerFetch: false,
-      isEvalSupported: false,
-      useSystemFonts: true,
-    });
-
-    const pdfDoc = await loadingTask.promise;
-    const numPages = pdfDoc.numPages;
-    const textPages: string[] = [];
-
-    for (let i = 1; i <= numPages; i++) {
-      const page = await pdfDoc.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .filter((item): item is import('pdfjs-dist/types/src/display/api').TextItem => 'str' in item)
-        .map((item) => item.str)
-        .join(' ');
-      textPages.push(pageText);
-    }
-
-    await pdfDoc.destroy();
-    return textPages.join('\n\n');
+    // pdf-parse v1: must require the internal file directly to bypass
+    // the test-PDF loading in index.js which crashes in Next.js server routes.
+    // This is the established workaround for pdf-parse@1.x in Next.js.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfParse = require('pdf-parse/lib/pdf-parse');
+    const data = await pdfParse(buffer);
+    return data.text;
   } catch (error) {
     logger.error({ error }, 'Failed to extract text from PDF');
     throw new ValidationError('Failed to parse PDF file');
