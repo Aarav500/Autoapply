@@ -75,8 +75,8 @@ export default function ProfilePage() {
   const handleResumeImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const allowed = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
-    if (!allowed.includes(file.type)) {
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext !== 'pdf' && ext !== 'docx' && ext !== 'doc') {
       setImportFeedback({ type: "error", text: "Please upload a PDF or DOCX file." });
       setTimeout(() => setImportFeedback(null), 5000);
       return;

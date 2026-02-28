@@ -60,17 +60,37 @@ const ResumeDataSchema = z.object({
 type ResumeData = z.infer<typeof ResumeDataSchema>;
 
 /**
- * Extract text from PDF buffer
+ * Extract text from PDF buffer using pdfjs-dist (modern, pure-JS, no native deps)
  */
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    // pdf-parse v1: must require the internal file directly to bypass
-    // the test-PDF loading in index.js which crashes in Next.js server routes.
-    // This is the established workaround for pdf-parse@1.x in Next.js.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require('pdf-parse/lib/pdf-parse');
-    const data = await pdfParse(buffer);
-    return data.text;
+    // Dynamic import of ESM pdfjs-dist — works from Node.js (CJS or ESM) at runtime.
+    // pdfjs-dist is listed in serverComponentsExternalPackages so webpack leaves it as-is.
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+
+    const loadingTask = pdfjsLib.getDocument({
+      data: new Uint8Array(buffer),
+      useWorkerFetch: false,   // disable fetch-based worker (not available in Node.js)
+      isEvalSupported: false,  // disable eval (safer in server context)
+      useSystemFonts: true,    // use system fonts instead of bundled ones
+    });
+
+    const pdfDoc = await loadingTask.promise;
+    const numPages = pdfDoc.numPages;
+    const textPages: string[] = [];
+
+    for (let i = 1; i <= numPages; i++) {
+      const page = await pdfDoc.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .filter((item) => 'str' in item)
+        .map((item) => (item as { str: string }).str)
+        .join(' ');
+      textPages.push(pageText);
+    }
+
+    await pdfDoc.destroy();
+    return textPages.join('\n\n');
   } catch (error) {
     logger.error({ error }, 'Failed to extract text from PDF');
     throw new ValidationError('Failed to parse PDF file');
