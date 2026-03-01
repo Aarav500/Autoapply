@@ -65,7 +65,6 @@ type ResumeData = z.infer<typeof ResumeDataSchema>;
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
     // Use lib/pdf-parse directly to avoid pdf-parse's test-data check on require
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pdfParse = require('pdf-parse/lib/pdf-parse.js') as (
       buf: Buffer
     ) => Promise<{ text: string; numpages: number }>;
