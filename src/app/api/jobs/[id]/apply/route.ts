@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { apiResponse, apiError, authenticate } from '@/lib/api-utils';
 import { getAutoApplicant } from '@/services/jobs/auto-applicant';
 import { logger } from '@/lib/logger';
-import { z } from 'zod';
 
 /**
  * POST /api/jobs/[id]/apply
@@ -34,13 +33,10 @@ export async function POST(
     }
 
     return apiResponse({
-      success: true,
-      data: {
-        applicationId: result.applicationId,
-        method: result.method,
-        confirmationMessage: result.confirmationMessage,
-        screenshotKey: result.screenshotKey,
-      },
+      applicationId: result.applicationId,
+      method: result.method,
+      confirmationMessage: result.confirmationMessage,
+      screenshotKey: result.screenshotKey,
     });
   } catch (error) {
     logger.error({ error }, 'Auto-apply endpoint error');

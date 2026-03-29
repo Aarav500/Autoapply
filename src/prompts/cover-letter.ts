@@ -21,36 +21,31 @@ export interface CoverLetterInput {
 }
 
 export function coverLetterPrompt(input: CoverLetterInput): { system: string; user: string } {
-  const system = `You are an expert cover letter writer who has helped thousands of candidates land interviews at top companies. You understand that recruiters spend 6-10 seconds scanning a cover letter, so every word must count.
+  const system = `You are a world-class cover letter writer who has helped candidates land roles at Google, Anthropic, Stripe, and other top companies. You understand that a great cover letter is a story, not a list of qualifications.
 
 Your writing philosophy:
-- NEVER open with "I am writing to apply for..." or similar clichés
-- START with a compelling hook: a relevant achievement, insight about the company, or bold statement
-- Make it about THEM (the company) more than YOU
-- Use SPECIFIC examples and quantified achievements
-- Show you've researched the company and understand their challenges
-- Demonstrate clear value proposition: what you bring to solve their problems
-- Be authentic and conversational while maintaining professionalism
-- Keep it concise: 3-4 short paragraphs maximum
+- NEVER open with "I am writing to apply for..." or "I am excited to apply for..." — these are immediately forgettable
+- The HOOK must grab attention in the first 10 words: lead with a surprising insight, a specific achievement with numbers, or a connection to the company's mission
+- Make it about THEM (the company's problems, goals, mission) first — YOU are the solution
+- Every claim must be backed by a specific, quantified example: not "improved performance" but "reduced API latency by 40% serving 2M users"
+- Show you've done real research: reference a specific product, engineering blog post, company decision, or founder quote
+- Sound like a human wrote it: conversational, direct, confident — not corporate speak
+- 3 paragraphs MAX. Recruiters read for 8 seconds. Every sentence must earn its place.
 
 Structure:
-1. Hook paragraph: Grab attention with a relevant achievement or company insight
-2. Experience paragraph: 2-3 specific examples showing relevant skills/achievements
-3. Company-fit paragraph: Why this company specifically (not just any company)
-4. Call-to-action: Express enthusiasm and next steps
+1. HOOK (2-3 sentences): A bold opening that connects YOUR most relevant achievement to THEIR specific challenge. Make them think "this person gets us."
+2. PROOF (3-4 sentences): 2-3 concrete accomplishments directly mapped to the job requirements. Use the STAR-lite format: what you did, the scale, the impact. Name-drop relevant technologies.
+3. FIT + CTA (2-3 sentences): Why THIS company specifically — not just any company. Reference something specific about their product/culture/mission. End with confident next-step invitation.
 
-Writing style:
-- Active voice, strong verbs
-- Specific metrics and outcomes
-- Industry terminology (shows you know the field)
-- Conversational but professional tone
-- No buzzwords or corporate speak ("synergy," "leverage," "dynamic team player")
-- Each paragraph has a clear purpose
+Tone: Direct, confident, specific. Like a top performer who knows their worth and is genuinely excited about this company's work.
 
-Key points to address from job listing:
-- Mirror language from job description (ATS optimization)
-- Address 2-3 key requirements explicitly
-- Show how your experience solves their specific needs`;
+Anti-patterns to avoid:
+- "I am a passionate/motivated/dedicated professional..."
+- "I believe I would be a great fit..."
+- "I am excited about the opportunity to..."
+- Listing skills without context
+- Generic company praise ("innovative culture", "dynamic team")
+- Exceeding 250 words`;
 
   const user = `Write a compelling cover letter for the following job application:
 
@@ -78,19 +73,20 @@ ${input.jobListing.description}
 Key Requirements:
 ${input.jobListing.requirements.map((req, i) => `${i + 1}. ${req}`).join('\n')}
 
-Generate a cover letter that:
-1. Opens with a hook that relates to ${input.jobListing.company} or a standout achievement
-2. Explicitly addresses at least 2-3 key requirements from the job listing
-3. Uses specific examples and metrics from the candidate's experience
-4. Shows genuine interest in ${input.jobListing.company} specifically
-5. Ends with a confident call-to-action
-6. Keeps each paragraph focused and concise
+Generate a cover letter that is:
+1. Under 250 words total
+2. Opens with a hook that would make a ${input.jobListing.company} engineer stop and read
+3. Uses at least 2 specific metrics/numbers from the candidate's achievements
+4. References something specific about ${input.jobListing.company} (their product, mission, tech choices, or recent news)
+5. Addresses the top 2-3 must-have requirements from the job description
+6. Ends with a confident, non-desperate CTA
 
-Output format:
-- greeting: Appropriate salutation (use "Dear Hiring Manager" if name unknown)
-- paragraphs: Array of paragraph objects with content and purpose
-- signoff: Professional closing
-- key_points_addressed: List of specific requirements from job listing that were addressed`;
+Output format — return a JSON object with:
+- greeting: "Dear [Name/Hiring Manager/Engineering Team]" — be specific if we know the team
+- paragraphs: Array of { content: string, purpose: "hook" | "proof" | "fit_cta" }
+- signoff: "Best," or "Looking forward to connecting," — match energy of the letter
+- word_count: approximate word count (aim for 200-250)
+- key_points_addressed: Array of job requirements explicitly addressed in the letter`;
 
   return { system, user };
 }

@@ -22,16 +22,6 @@ export async function GET(req: NextRequest) {
         serverConfigured: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
         userConnected: !!settings?.googleCalendarToken,
       },
-      sms: {
-        serverConfigured: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER),
-        userConnected: !!settings?.twilioConfigured,
-        phoneNumber: settings?.phoneNumber || null,
-      },
-      whatsapp: {
-        serverConfigured: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_NUMBER),
-        userConnected: !!settings?.whatsappEnabled,
-        phoneNumber: settings?.phoneNumber || null,
-      },
       autoReply: {
         enabled: !!settings?.autoReplyEnabled,
       },

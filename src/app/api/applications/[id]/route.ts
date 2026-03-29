@@ -34,11 +34,8 @@ export async function GET(
     logger.info({ userId, applicationId }, 'Application retrieved');
 
     return apiResponse({
-      success: true,
-      data: {
-        application,
-        screenshotUrl,
-      },
+      application,
+      screenshotUrl,
     });
   } catch (error) {
     logger.error({ error }, 'Get application error');
@@ -88,10 +85,7 @@ export async function DELETE(
 
     logger.info({ userId, applicationId }, 'Application deleted');
 
-    return apiResponse({
-      success: true,
-      data: { deleted: true },
-    });
+    return apiResponse({ deleted: true });
   } catch (error) {
     logger.error({ error }, 'Delete application error');
     return apiError(error);

@@ -1,20 +1,20 @@
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#050508] relative overflow-hidden">
+    <div className="min-h-screen w-full flex items-center justify-center bg-[#07070D] relative overflow-hidden">
       {/* Background Gradient Meshes */}
       <div
-        className="absolute bottom-0 left-0 w-[800px] h-[800px] rounded-full"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[600px] rounded-full"
         style={{
           background:
-            "radial-gradient(circle, rgba(0, 255, 224, 0.1) 0%, transparent 70%)",
-          filter: "blur(80px)",
+            "radial-gradient(ellipse, rgba(99, 102, 241, 0.07) 0%, transparent 70%)",
+          filter: "blur(60px)",
         }}
       />
       <div
-        className="absolute top-0 right-0 w-[700px] h-[700px] rounded-full"
+        className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full"
         style={{
           background:
-            "radial-gradient(circle, rgba(83, 109, 254, 0.05) 0%, transparent 70%)",
+            "radial-gradient(circle, rgba(139, 92, 246, 0.04) 0%, transparent 70%)",
           filter: "blur(80px)",
         }}
       />

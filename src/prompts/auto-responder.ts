@@ -9,10 +9,11 @@ export interface AutoResponderInput {
   };
   category:
     | 'interview_invite'
+    | 'screening'
+    | 'offer'
     | 'rejection'
     | 'recruiter_outreach'
     | 'follow_up'
-    | 'offer'
     | 'action_required'
     | 'other';
   extractedData?: {
@@ -48,6 +49,13 @@ INTERVIEW_INVITE:
 - Ask any necessary clarifying questions (format, duration, who you'll meet)
 - Keep it brief (3-4 sentences max)
 - Confirm you'll prepare any requested materials
+
+SCREENING:
+- Confirm receipt of the assessment/take-home request immediately
+- State when you will complete it (be specific: "I'll submit by [date]")
+- Ask one clarifying question if anything is ambiguous (timeline, format, scope)
+- Do NOT over-explain or apologize for anything
+- Keep it to 2-3 sentences
 
 REJECTION:
 - Gracious and brief (2-3 sentences)

@@ -16,13 +16,14 @@ export const NotificationType = z.enum([
   'thank_you_ready',
   'job_match',
   'application_sent',
+  'application_failed',
   'email_response',
   'daily_digest',
   'system',
 ]);
 export type NotificationType = z.infer<typeof NotificationType>;
 
-export const NotificationChannel = z.enum(['in_app', 'sms', 'whatsapp', 'email']);
+export const NotificationChannel = z.enum(['in_app', 'telegram', 'email']);
 export type NotificationChannel = z.infer<typeof NotificationChannel>;
 
 // ==================== Notification Schema ====================
@@ -46,8 +47,7 @@ export type Notification = z.infer<typeof NotificationSchema>;
 // ==================== Notification Preferences ====================
 
 export const NotificationPreferencesSchema = z.object({
-  smsEnabled: z.boolean().default(false),
-  whatsappEnabled: z.boolean().default(false),
+  telegramEnabled: z.boolean().default(false),
   emailDigestEnabled: z.boolean().default(true),
   inAppEnabled: z.boolean().default(true),
   interviewReminders: z.boolean().default(true),
@@ -65,9 +65,6 @@ export type NotificationPreferencesUpdate = z.infer<typeof NotificationPreferenc
 
 export const UserSettingsSchema = z.object({
   userId: z.string(),
-  twilioConfigured: z.boolean().default(false),
-  phoneNumber: z.string().nullable().optional(),
-  whatsappEnabled: z.boolean().default(false),
   googleCalendarToken: z.string().nullable().optional(), // encrypted
   googleRefreshToken: z.string().nullable().optional(), // encrypted Gmail refresh token
   autoReplyEnabled: z.boolean().default(false),
@@ -78,8 +75,7 @@ export const UserSettingsSchema = z.object({
   searchConfigurations: z.array(z.unknown()).default([]), // JobSearchQuery configs
   autoApplyRules: z.record(z.string(), z.unknown()).nullable().optional(),
   notificationPreferences: NotificationPreferencesSchema.default(() => ({
-    smsEnabled: false,
-    whatsappEnabled: false,
+    telegramEnabled: false,
     emailDigestEnabled: true,
     inAppEnabled: true,
     interviewReminders: true,
@@ -97,8 +93,6 @@ export const UserSettingsSchema = z.object({
 export type UserSettings = z.infer<typeof UserSettingsSchema>;
 
 export const UserSettingsUpdateSchema = z.object({
-  phoneNumber: z.string().optional(),
-  whatsappEnabled: z.boolean().optional(),
   quietHoursStart: z.string().optional(),
   quietHoursEnd: z.string().optional(),
   timezone: z.string().optional(),
@@ -111,15 +105,3 @@ export const MarkNotificationsReadSchema = z.object({
   ids: z.array(z.string()),
 });
 export type MarkNotificationsReadRequest = z.infer<typeof MarkNotificationsReadSchema>;
-
-export const ConfigureSMSSchema = z.object({
-  phoneNumber: z.string(),
-  enabled: z.boolean(),
-});
-export type ConfigureSMSRequest = z.infer<typeof ConfigureSMSSchema>;
-
-export const ConfigureWhatsAppSchema = z.object({
-  phoneNumber: z.string(),
-  enabled: z.boolean(),
-});
-export type ConfigureWhatsAppRequest = z.infer<typeof ConfigureWhatsAppSchema>;

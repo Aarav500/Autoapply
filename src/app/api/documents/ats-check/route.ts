@@ -46,57 +46,122 @@ export async function POST(req: NextRequest) {
     // For this API, we'll regenerate from profile (simplified approach)
 
     // Load user profile
-    const profile = await storage.getJSON<any>(`users/${userId}/profile.json`);
+    const profile = await storage.getJSON<Record<string, unknown>>(`users/${userId}/profile.json`);
     if (!profile) {
       return errorResponse('Profile not found', 404, 'PROFILE_NOT_FOUND');
     }
 
     // Reconstruct basic CVContent
+    const socialLinks: Array<{ platform: string; url: string }> = (profile.socialLinks as Array<{ platform: string; url: string }>) || [];
+    const linkedinLink = socialLinks.find((l) => l.platform?.toLowerCase() === 'linkedin');
+    const githubLink = socialLinks.find((l) => l.platform?.toLowerCase() === 'github');
+    const websiteLink = socialLinks.find((l) => l.platform?.toLowerCase() === 'website' || l.platform?.toLowerCase() === 'portfolio');
+
+    const allSkillNames = ((profile.skills as Array<{ name: string }>) || []).map((s) => s.name);
     const cvContent: CVContent = {
       contactInfo: {
-        name: profile.personalInfo.name,
-        email: profile.personalInfo.email,
-        phone: profile.personalInfo.phone,
-        location: profile.personalInfo.location,
-        linkedin: profile.socialLinks?.linkedin,
-        github: profile.socialLinks?.github,
-        website: profile.socialLinks?.website,
+        name: profile.name as string,
+        email: profile.email as string,
+        phone: profile.phone as string,
+        location: profile.location as string,
+        linkedin: linkedinLink?.url,
+        github: githubLink?.url,
+        website: websiteLink?.url,
       },
-      summary: profile.professionalInfo?.summary || '',
-      experience: (profile.experience || []).map((exp: any) => ({
-        company: exp.company,
-        position: exp.role,
-        location: exp.location,
-        startDate: exp.startDate,
-        endDate: exp.endDate,
-        highlights: exp.achievements || exp.responsibilities || [],
+      summary: (profile.summary as string) || '',
+      experience: ((profile.experience as Array<Record<string, unknown>>) || []).map((exp) => ({
+        company: exp.company as string,
+        position: exp.role as string,
+        location: exp.location as string,
+        startDate: exp.startDate as string,
+        endDate: exp.endDate as string | null,
+        highlights: (Array.isArray(exp.bullets) ? exp.bullets : Array.isArray(exp.responsibilities) ? exp.responsibilities : []) as string[],
       })),
-      education: profile.education || [],
+      education: (profile.education as CVContent['education']) || [],
       skills: {
-        technical: profile.skills?.technical || [],
-        soft: profile.skills?.soft || [],
-        languages: profile.skills?.languages,
-        certifications: profile.certifications?.map((c: any) => `${c.name} (${c.issuer})`),
+        technical: allSkillNames,
+        soft: [],
+        certifications: ((profile.certifications as Array<{ name: string; issuer: string }>) || []).map((c) => `${c.name} (${c.issuer})`),
       },
-      projects: profile.projects,
-      awards: profile.awards,
+      projects: profile.projects as CVContent['projects'],
     };
 
     // Load job description if provided
     let jobDescription: string | undefined;
+    let job: Record<string, unknown> | null = null;
     if (jobId) {
-      const job = await storage.getJSON<any>(`users/${userId}/jobs/${jobId}.json`);
+      job = await storage.getJSON<Record<string, unknown>>(`users/${userId}/jobs/${jobId}.json`);
       if (job) {
-        jobDescription = job.description;
+        jobDescription = job.description as string;
       }
     }
 
     // Run ATS check
     const atsResult = checkATS(cvContent, jobDescription);
 
+    // Generate actionable improvement suggestions based on ATS score
+    const improvements: Array<{ priority: 'high' | 'medium' | 'low'; category: string; suggestion: string }> = [];
+
+    if (atsResult.score < 90) {
+      // Keyword gap analysis
+      if (jobId && job?.description) {
+        const jobWords = ((job.description as string).match(/\b[a-zA-Z][a-zA-Z+#.]{2,}\b/g) || [])
+          .map((w: string) => w.toLowerCase())
+          .filter((w: string) => w.length > 3);
+
+        const cvText = [
+          cvContent.summary,
+          ...(cvContent.experience || []).flatMap((e: { highlights?: string[] }) => e.highlights || []),
+          ...(Object.values(cvContent.skills || {}).flat() as string[]),
+        ].join(' ').toLowerCase();
+
+        const STOP_WORDS = new Set(['with', 'this', 'that', 'have', 'will', 'from', 'they', 'what', 'when', 'your', 'more', 'also', 'been', 'were', 'their', 'which', 'about', 'into', 'than']);
+        const missingKeywords = [...new Set(jobWords)]
+          .filter((w: string) => !STOP_WORDS.has(w) && !cvText.includes(w))
+          .slice(0, 8);
+
+        if (missingKeywords.length > 0) {
+          improvements.push({
+            priority: 'high',
+            category: 'Missing Keywords',
+            suggestion: `Add these keywords from the job description: ${missingKeywords.join(', ')}`,
+          });
+        }
+      }
+
+      if (atsResult.score < 70) {
+        improvements.push({
+          priority: 'high',
+          category: 'Achievement Quantification',
+          suggestion: 'Most bullets lack measurable results. Add numbers: team size, % improvement, $ impact, users served, or time saved to at least 80% of bullets.',
+        });
+      }
+
+      if (atsResult.score < 80) {
+        improvements.push({
+          priority: 'medium',
+          category: 'Action Verbs',
+          suggestion: 'Replace weak verbs (helped, assisted, worked on, was responsible for) with strong action verbs: Architected, Led, Delivered, Optimized, Launched, Generated.',
+        });
+
+        improvements.push({
+          priority: 'medium',
+          category: 'Summary Section',
+          suggestion: 'Ensure your professional summary explicitly mentions your target role title and top 3 skills — ATS systems weight summary keywords heavily.',
+        });
+      }
+
+      improvements.push({
+        priority: 'low',
+        category: 'ATS Formatting',
+        suggestion: 'Avoid tables, text boxes, and columns — some ATS systems cannot parse them. Use simple single-column layout with standard section headers.',
+      });
+    }
+
     return successResponse({
       documentId,
       atsResult,
+      improvements,
     });
   } catch (error) {
     logger.error({ error }, 'ATS check API error');

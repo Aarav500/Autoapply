@@ -2,7 +2,7 @@
  * Profile service - handles all profile CRUD operations with S3 storage
  */
 
-import { nanoid } from 'nanoid';
+import { generateId } from '@/lib/utils';
 import { storage } from '@/lib/storage';
 import { logger } from '@/lib/logger';
 import { ValidationError, NotFoundError } from '@/lib/errors';
@@ -77,6 +77,10 @@ export async function initializeProfile(
       locations: [],
       industries: [],
       dealBreakers: [],
+      isStudent: false,
+      openToInternships: true,
+      openToOnCampus: true,
+      openToPartTime: true,
     },
     completenessScore: 0,
     createdAt: now,
@@ -187,7 +191,7 @@ export async function addExperience(
     }
 
     const experience: Experience = {
-      id: nanoid(),
+      id: generateId(),
       ...experienceData,
     };
 
@@ -318,7 +322,7 @@ export async function addEducation(
     }
 
     const education: Education = {
-      id: nanoid(),
+      id: generateId(),
       ...educationData,
     };
 
@@ -403,7 +407,7 @@ export async function addCertification(
     }
 
     const certification: Certification = {
-      id: nanoid(),
+      id: generateId(),
       ...certificationData,
     };
 
@@ -441,7 +445,7 @@ export async function addProject(
     }
 
     const project: Project = {
-      id: nanoid(),
+      id: generateId(),
       ...projectData,
     };
 

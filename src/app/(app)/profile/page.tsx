@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { Edit2, Trash2, Plus, X, Save, GraduationCap, FolderGit2, ExternalLink, Upload, CheckCircle2, AlertCircle } from "lucide-react";
+import { Edit2, Trash2, Plus, X, Save, GraduationCap, FolderGit2, ExternalLink, Upload, CheckCircle2, AlertCircle, Github, Linkedin } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
 
@@ -11,18 +11,18 @@ const inputStyle = {
   border: "1px solid rgba(255, 255, 255, 0.08)",
   borderRadius: "8px",
   padding: "10px 14px",
-  fontFamily: "'DM Sans', sans-serif",
+  fontFamily: "'Inter', sans-serif",
   fontSize: "14px",
-  color: "#E8E8F0",
+  color: "#F0F0FF",
   outline: "none",
   width: "100%",
 };
 
 const labelStyle = {
-  fontFamily: "'DM Sans', sans-serif",
+  fontFamily: "'Inter', sans-serif",
   fontSize: "12px",
   fontWeight: 500 as const,
-  color: "#7E7E98",
+  color: "#9090B8",
   marginBottom: "6px",
   display: "block" as const,
 };
@@ -37,12 +37,12 @@ function Modal({ open, onClose, title, children }: { open: boolean; onClose: () 
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         className="relative w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl p-6"
-        style={{ background: "#12121C", border: "1px solid rgba(255, 255, 255, 0.08)" }}
+        style={{ background: "#111120", border: "1px solid rgba(255, 255, 255, 0.08)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>{title}</h3>
-          <button onClick={onClose} className="p-1 hover:bg-white/5 rounded-lg"><X size={20} className="text-[#7E7E98]" /></button>
+          <h3 className="text-lg font-semibold" style={{ fontFamily: "'Inter', sans-serif", color: "#F0F0FF" }}>{title}</h3>
+          <button onClick={onClose} className="p-1 hover:bg-white/5 rounded-lg"><X size={20} className="text-[#9090B8]" /></button>
         </div>
         {children}
       </motion.div>
@@ -69,6 +69,13 @@ export default function ProfilePage() {
   const [prefsEditing, setPrefsEditing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importFeedback, setImportFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [isGithubScanning, setIsGithubScanning] = useState(false);
+  const [githubFeedback, setGithubFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [linkedinModalOpen, setLinkedinModalOpen] = useState(false);
+  const [linkedinText, setLinkedinText] = useState("");
+  const [linkedinUrl, setLinkedinUrl] = useState("");
+  const [isLinkedinImporting, setIsLinkedinImporting] = useState(false);
+  const [linkedinFeedback, setLinkedinFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -97,6 +104,49 @@ export default function ProfilePage() {
     } finally {
       setIsImporting(false);
       e.target.value = "";
+    }
+  };
+
+  const handleGithubScan = async () => {
+    setIsGithubScanning(true);
+    setGithubFeedback(null);
+    try {
+      const res = await apiFetch<{ data: { newSkillsAdded: number; newProjectsAdded: number; username: string } }>("/api/profile/github-scan", { method: "POST", body: JSON.stringify({}) });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["profileCompleteness"] });
+      const d = res.data;
+      setGithubFeedback({ type: "success", text: `GitHub scanned (${d.username}): +${d.newSkillsAdded} skills, +${d.newProjectsAdded} projects` });
+      setTimeout(() => setGithubFeedback(null), 6000);
+    } catch (err) {
+      setGithubFeedback({ type: "error", text: err instanceof Error ? err.message : "GitHub scan failed. Add your GitHub URL to profile first." });
+      setTimeout(() => setGithubFeedback(null), 6000);
+    } finally {
+      setIsGithubScanning(false);
+    }
+  };
+
+  const handleLinkedinImport = async () => {
+    if (linkedinText.trim().length < 50) {
+      setLinkedinFeedback({ type: "error", text: "Please paste at least 50 characters from your LinkedIn profile." });
+      return;
+    }
+    setIsLinkedinImporting(true);
+    setLinkedinFeedback(null);
+    try {
+      const res = await apiFetch<{ data: { sectionsUpdatedCount: number; sectionsUpdated: string[] } }>("/api/profile/linkedin-import", {
+        method: "POST",
+        body: JSON.stringify({ rawText: linkedinText.trim(), linkedinUrl: linkedinUrl.trim() || undefined }),
+      });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["profileCompleteness"] });
+      setLinkedinFeedback({ type: "success", text: `LinkedIn imported: ${res.data.sectionsUpdated.join(", ")} updated` });
+      setLinkedinText("");
+      setLinkedinUrl("");
+      setTimeout(() => { setLinkedinFeedback(null); setLinkedinModalOpen(false); }, 3000);
+    } catch (err) {
+      setLinkedinFeedback({ type: "error", text: err instanceof Error ? err.message : "LinkedIn import failed." });
+    } finally {
+      setIsLinkedinImporting(false);
     }
   };
 
@@ -370,11 +420,11 @@ export default function ProfilePage() {
           <div className="relative w-[140px] h-[140px]">
             <svg className="w-full h-full -rotate-90">
               <circle cx="70" cy="70" r={radius} stroke="rgba(255, 255, 255, 0.04)" strokeWidth="10" fill="none" />
-              <motion.circle cx="70" cy="70" r={radius} stroke="#00FFE0" strokeWidth="10" fill="none" strokeDasharray={circumference} strokeDashoffset={circumference} animate={{ strokeDashoffset: offset }} transition={{ duration: 1.5, ease: "easeOut" }} strokeLinecap="round" />
+              <motion.circle cx="70" cy="70" r={radius} stroke="#8B5CF6" strokeWidth="10" fill="none" strokeDasharray={circumference} strokeDashoffset={circumference} animate={{ strokeDashoffset: offset }} transition={{ duration: 1.5, ease: "easeOut" }} strokeLinecap="round" />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-4xl font-bold" style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#E8E8F0" }}>{profileCompletion}</span>
-              <span className="text-sm" style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#7E7E98" }}>%</span>
+              <span className="text-4xl font-bold" style={{ fontFamily: "monospace, monospace", color: "#F0F0FF" }}>{profileCompletion}</span>
+              <span className="text-sm" style={{ fontFamily: "monospace, monospace", color: "#9090B8" }}>%</span>
             </div>
           </div>
         </div>
@@ -388,33 +438,56 @@ export default function ProfilePage() {
             </div>
           ) : (
             <>
-              <h1 className="text-[28px] font-bold mb-2" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>
+              <h1 className="text-[28px] font-bold mb-2" style={{ fontFamily: "'Inter', sans-serif", color: "#F0F0FF" }}>
                 {profileName || "User"}
               </h1>
-              <p className="text-[15px] mb-1" style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}>
+              <p className="text-[15px] mb-1" style={{ fontFamily: "'Inter', sans-serif", color: "#9090B8" }}>
                 {profileHeadline || "Professional"}{profileLocation ? ` · ${profileLocation}` : ""}
               </p>
-              <p className="text-[13px] mb-3" style={{ fontFamily: "'DM Sans', sans-serif", color: "#4A4A64" }}>
+              <p className="text-[13px] mb-3" style={{ fontFamily: "'Inter', sans-serif", color: "#3A3A60" }}>
                 {profileEmail}{profilePhone ? ` · ${profilePhone}` : ""}
               </p>
-              <p className="text-sm mb-4 max-w-2xl leading-relaxed" style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}>
+              <p className="text-sm mb-4 max-w-2xl leading-relaxed" style={{ fontFamily: "'Inter', sans-serif", color: "#9090B8" }}>
                 {profileSummary || "Add a professional summary to your profile."}
               </p>
             </>
           )}
           <div className="flex gap-2 items-center flex-wrap">
-            <button onClick={openEditProfile} className="px-4 py-2 rounded-lg border transition-all hover:bg-white/5" style={{ background: "transparent", borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'Outfit', sans-serif", fontSize: "13px", fontWeight: 500, color: "#7E7E98" }}>
+            <button onClick={openEditProfile} className="px-4 py-2 rounded-lg border transition-all hover:bg-white/5" style={{ background: "transparent", borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'Inter', sans-serif", fontSize: "13px", fontWeight: 500, color: "#9090B8" }}>
               Edit Profile
             </button>
-            <label className="px-4 py-2 rounded-lg border transition-all hover:bg-white/5 cursor-pointer inline-flex items-center gap-1.5" style={{ background: "transparent", borderColor: "rgba(83, 109, 254, 0.3)", fontFamily: "'Outfit', sans-serif", fontSize: "13px", fontWeight: 500, color: "#536DFE" }}>
+            <label className="px-4 py-2 rounded-lg border transition-all hover:bg-white/5 cursor-pointer inline-flex items-center gap-1.5" style={{ background: "transparent", borderColor: "rgba(83, 109, 254, 0.3)", fontFamily: "'Inter', sans-serif", fontSize: "13px", fontWeight: 500, color: "#536DFE" }}>
               <Upload size={14} />
               {isImporting ? "Importing..." : "Import Resume"}
               <input type="file" accept=".pdf,.docx" onChange={handleResumeImport} className="hidden" disabled={isImporting} />
             </label>
             {importFeedback && (
-              <span className="flex items-center gap-1.5 text-[12px]" style={{ fontFamily: "'DM Sans', sans-serif", color: importFeedback.type === "success" ? "#00E676" : "#FF4757" }}>
+              <span className="flex items-center gap-1.5 text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: importFeedback.type === "success" ? "#34D399" : "#F87171" }}>
                 {importFeedback.type === "success" ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
                 {importFeedback.text}
+              </span>
+            )}
+            <button
+              onClick={handleGithubScan}
+              disabled={isGithubScanning}
+              className="px-4 py-2 rounded-lg border transition-all hover:bg-white/5 disabled:opacity-50 inline-flex items-center gap-1.5"
+              style={{ background: "transparent", borderColor: "rgba(255,255,255,0.1)", fontFamily: "'Inter', sans-serif", fontSize: "13px", fontWeight: 500, color: "#9090B8" }}
+            >
+              <Github size={14} />
+              {isGithubScanning ? "Scanning…" : "GitHub Scan"}
+            </button>
+            <button
+              onClick={() => setLinkedinModalOpen(true)}
+              className="px-4 py-2 rounded-lg border transition-all hover:bg-white/5 inline-flex items-center gap-1.5"
+              style={{ background: "transparent", borderColor: "rgba(10,102,194,0.4)", fontFamily: "'Inter', sans-serif", fontSize: "13px", fontWeight: 500, color: "#0A66C2" }}
+            >
+              <Linkedin size={14} />
+              LinkedIn Import
+            </button>
+            {githubFeedback && (
+              <span className="flex items-center gap-1.5 text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: githubFeedback.type === "success" ? "#34D399" : "#F87171" }}>
+                {githubFeedback.type === "success" ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                {githubFeedback.text}
               </span>
             )}
           </div>
@@ -426,7 +499,7 @@ export default function ProfilePage() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-8 overflow-x-auto">
           <div className="flex gap-3 pb-2">
             {suggestions.map((suggestion, index: number) => (
-              <button key={index} className="flex-shrink-0 px-4 py-2 rounded-full transition-all hover:bg-[rgba(0,255,224,0.1)]" style={{ background: "rgba(0, 255, 224, 0.06)", border: "1px solid rgba(0, 255, 224, 0.15)", fontFamily: "'DM Sans', sans-serif", fontSize: "12px", color: "#00FFE0" }}>
+              <button key={index} className="flex-shrink-0 px-4 py-2 rounded-full transition-all hover:bg-[rgba(0,255,224,0.1)]" style={{ background: "rgba(124, 58, 237, 0.06)", border: "1px solid rgba(124, 58, 237, 0.15)", fontFamily: "'Inter', sans-serif", fontSize: "12px", color: "#8B5CF6" }}>
                 +{(suggestion.points as number) || 5} pts: {suggestion.message as string}
               </button>
             ))}
@@ -438,9 +511,9 @@ export default function ProfilePage() {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="border-b mb-8" style={{ borderColor: "rgba(255, 255, 255, 0.04)" }}>
         <div className="flex gap-8">
           {tabs.map((tab) => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className="relative pb-3 transition-all" style={{ fontFamily: "'Outfit', sans-serif", fontSize: "14px", fontWeight: 500, color: activeTab === tab ? "#E8E8F0" : "#7E7E98" }}>
+            <button key={tab} onClick={() => setActiveTab(tab)} className="relative pb-3 transition-all" style={{ fontFamily: "'Inter', sans-serif", fontSize: "14px", fontWeight: 500, color: activeTab === tab ? "#F0F0FF" : "#9090B8" }}>
               {tab}
-              {activeTab === tab && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#00FFE0]" />}
+              {activeTab === tab && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#8B5CF6]" />}
             </button>
           ))}
         </div>
@@ -456,34 +529,34 @@ export default function ProfilePage() {
               <div className="animate-pulse space-y-4"><div className="h-32 bg-white/5 rounded-lg" /><div className="h-32 bg-white/5 rounded-lg" /></div>
             ) : experiences.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-[#7E7E98] mb-4">No work experience added yet</p>
-                <button onClick={openAddExp} className="px-4 py-2 rounded-lg bg-[#00FFE0] text-[#050508] font-medium" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                <p className="text-[#9090B8] mb-4">No work experience added yet</p>
+                <button onClick={openAddExp} className="px-4 py-2 rounded-lg bg-[#8B5CF6] text-[#050508] font-medium" style={{ fontFamily: "'Inter', sans-serif" }}>
                   <Plus size={16} className="inline mr-2" />Add Experience
                 </button>
               </div>
             ) : (
               experiences.map((exp, index: number) => (
-                <div key={(exp.id as string) || index} className="p-6 rounded-lg border" style={{ background: "rgba(15, 15, 24, 0.7)", backdropFilter: "blur(12px)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
+                <div key={(exp.id as string) || index} className="p-6 rounded-lg border" style={{ background: "rgba(11, 11, 20, 0.7)", backdropFilter: "blur(12px)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <h3 className="text-lg font-semibold mb-1" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>{exp.role as string}</h3>
-                      <p className="text-[15px] mb-2" style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}>
+                      <h3 className="text-lg font-semibold mb-1" style={{ fontFamily: "'Inter', sans-serif", color: "#F0F0FF" }}>{exp.role as string}</h3>
+                      <p className="text-[15px] mb-2" style={{ fontFamily: "'Inter', sans-serif", color: "#9090B8" }}>
                         {exp.company as string} · {exp.startDate as string} — {(exp.current as boolean) ? "Present" : ((exp.endDate as string) || "Present")}
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => openEditExp(exp)} className="p-2 hover:bg-white/5 rounded-lg transition-colors"><Edit2 size={16} className="text-[#7E7E98]" /></button>
-                      <button onClick={() => deleteExp(exp.id as string)} className="p-2 hover:bg-white/5 rounded-lg transition-colors"><Trash2 size={16} className="text-[#7E7E98]" /></button>
+                      <button onClick={() => openEditExp(exp)} className="p-2 hover:bg-white/5 rounded-lg transition-colors"><Edit2 size={16} className="text-[#9090B8]" /></button>
+                      <button onClick={() => deleteExp(exp.id as string)} className="p-2 hover:bg-white/5 rounded-lg transition-colors"><Trash2 size={16} className="text-[#9090B8]" /></button>
                     </div>
                   </div>
                   {(exp.description as string) && (
-                    <p className="text-sm mb-3 leading-relaxed" style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}>{exp.description as string}</p>
+                    <p className="text-sm mb-3 leading-relaxed" style={{ fontFamily: "'Inter', sans-serif", color: "#9090B8" }}>{exp.description as string}</p>
                   )}
                   {(exp.bullets as string[])?.length > 0 && (
                     <ul className="space-y-2">
                       {(exp.bullets as string[]).map((bullet: string, idx: number) => (
-                        <li key={idx} className="flex items-start gap-2 text-sm" style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}>
-                          <span className="text-[#00FFE0] mt-1">•</span><span>{bullet}</span>
+                        <li key={idx} className="flex items-start gap-2 text-sm" style={{ fontFamily: "'Inter', sans-serif", color: "#9090B8" }}>
+                          <span className="text-[#8B5CF6] mt-1">•</span><span>{bullet}</span>
                         </li>
                       ))}
                     </ul>
@@ -492,7 +565,7 @@ export default function ProfilePage() {
               ))
             )}
             {experiences.length > 0 && (
-              <button onClick={openAddExp} className="w-full p-4 rounded-lg border border-dashed transition-all hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'Outfit', sans-serif", fontSize: "14px", fontWeight: 500, color: "#7E7E98" }}>
+              <button onClick={openAddExp} className="w-full p-4 rounded-lg border border-dashed transition-all hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'Inter', sans-serif", fontSize: "14px", fontWeight: 500, color: "#9090B8" }}>
                 <Plus size={16} className="inline mr-2" />Add Experience
               </button>
             )}
@@ -504,30 +577,30 @@ export default function ProfilePage() {
           <div className="space-y-4">
             {education.length === 0 ? (
               <div className="text-center py-12">
-                <GraduationCap size={48} className="mx-auto mb-4 text-[#4A4A64]" />
-                <p className="text-[#7E7E98] mb-4">No education added yet</p>
-                <button onClick={openAddEdu} className="px-4 py-2 rounded-lg bg-[#00FFE0] text-[#050508] font-medium" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                <GraduationCap size={48} className="mx-auto mb-4 text-[#3A3A60]" />
+                <p className="text-[#9090B8] mb-4">No education added yet</p>
+                <button onClick={openAddEdu} className="px-4 py-2 rounded-lg bg-[#8B5CF6] text-[#050508] font-medium" style={{ fontFamily: "'Inter', sans-serif" }}>
                   <Plus size={16} className="inline mr-2" />Add Education
                 </button>
               </div>
             ) : (
               education.map((edu, index: number) => (
-                <div key={(edu.id as string) || index} className="p-6 rounded-lg border" style={{ background: "rgba(15, 15, 24, 0.7)", backdropFilter: "blur(12px)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
+                <div key={(edu.id as string) || index} className="p-6 rounded-lg border" style={{ background: "rgba(11, 11, 20, 0.7)", backdropFilter: "blur(12px)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold mb-1" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>{edu.degree as string}{edu.field ? ` in ${edu.field}` : ""}</h3>
-                      <p className="text-[15px] mb-1" style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}>{edu.institution as string}</p>
-                      <p className="text-[13px]" style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#4A4A64" }}>
+                      <h3 className="text-lg font-semibold mb-1" style={{ fontFamily: "'Inter', sans-serif", color: "#F0F0FF" }}>{edu.degree as string}{edu.field ? ` in ${edu.field}` : ""}</h3>
+                      <p className="text-[15px] mb-1" style={{ fontFamily: "'Inter', sans-serif", color: "#9090B8" }}>{edu.institution as string}</p>
+                      <p className="text-[13px]" style={{ fontFamily: "monospace, monospace", color: "#3A3A60" }}>
                         {edu.startDate as string} — {(edu.endDate as string) || "Present"}{edu.gpa ? ` · GPA: ${edu.gpa}` : ""}
                       </p>
                     </div>
-                    <button onClick={() => deleteEdu(edu.id as string)} className="p-2 hover:bg-white/5 rounded-lg transition-colors"><Trash2 size={16} className="text-[#7E7E98]" /></button>
+                    <button onClick={() => deleteEdu(edu.id as string)} className="p-2 hover:bg-white/5 rounded-lg transition-colors"><Trash2 size={16} className="text-[#9090B8]" /></button>
                   </div>
                 </div>
               ))
             )}
             {education.length > 0 && (
-              <button onClick={openAddEdu} className="w-full p-4 rounded-lg border border-dashed transition-all hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'Outfit', sans-serif", fontSize: "14px", fontWeight: 500, color: "#7E7E98" }}>
+              <button onClick={openAddEdu} className="w-full p-4 rounded-lg border border-dashed transition-all hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'Inter', sans-serif", fontSize: "14px", fontWeight: 500, color: "#9090B8" }}>
                 <Plus size={16} className="inline mr-2" />Add Education
               </button>
             )}
@@ -547,14 +620,14 @@ export default function ProfilePage() {
                 className="flex-1"
                 style={inputStyle}
               />
-              <button onClick={addSkill} className="px-4 py-2 rounded-lg bg-[#00FFE0] text-[#050508] font-medium flex-shrink-0" style={{ fontFamily: "'Outfit', sans-serif" }}>
+              <button onClick={addSkill} className="px-4 py-2 rounded-lg bg-[#8B5CF6] text-[#050508] font-medium flex-shrink-0" style={{ fontFamily: "'Inter', sans-serif" }}>
                 <Plus size={16} className="inline mr-1" />Add
               </button>
             </div>
             {skills.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {skills.map((skill, index: number) => (
-                  <div key={index} className="flex items-center gap-2 px-3 py-2 rounded-lg group" style={{ background: "rgba(0, 255, 224, 0.08)", border: "1px solid rgba(0, 255, 224, 0.2)", fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "#00FFE0" }}>
+                  <div key={index} className="flex items-center gap-2 px-3 py-2 rounded-lg group" style={{ background: "rgba(124, 58, 237, 0.08)", border: "1px solid rgba(124, 58, 237, 0.2)", fontFamily: "'Inter', sans-serif", fontSize: "13px", color: "#8B5CF6" }}>
                     {skill.name}
                     {skill.proficiency ? ` · ${skill.proficiency}` : null}
                     <button onClick={() => removeSkill(index)} className="opacity-0 group-hover:opacity-100 transition-opacity"><X size={14} /></button>
@@ -563,7 +636,7 @@ export default function ProfilePage() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-[#7E7E98]">No skills added yet. Type above to add skills.</p>
+                <p className="text-[#9090B8]">No skills added yet. Type above to add skills.</p>
               </div>
             )}
           </div>
@@ -574,31 +647,31 @@ export default function ProfilePage() {
           <div className="space-y-4">
             {projects.length === 0 ? (
               <div className="text-center py-12">
-                <FolderGit2 size={48} className="mx-auto mb-4 text-[#4A4A64]" />
-                <p className="text-[#7E7E98] mb-4">No projects added yet</p>
-                <button onClick={openAddProject} className="px-4 py-2 rounded-lg bg-[#00FFE0] text-[#050508] font-medium" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                <FolderGit2 size={48} className="mx-auto mb-4 text-[#3A3A60]" />
+                <p className="text-[#9090B8] mb-4">No projects added yet</p>
+                <button onClick={openAddProject} className="px-4 py-2 rounded-lg bg-[#8B5CF6] text-[#050508] font-medium" style={{ fontFamily: "'Inter', sans-serif" }}>
                   <Plus size={16} className="inline mr-2" />Add Project
                 </button>
               </div>
             ) : (
               projects.map((proj, index: number) => (
-                <div key={(proj.id as string) || index} className="p-6 rounded-lg border" style={{ background: "rgba(15, 15, 24, 0.7)", backdropFilter: "blur(12px)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
+                <div key={(proj.id as string) || index} className="p-6 rounded-lg border" style={{ background: "rgba(11, 11, 20, 0.7)", backdropFilter: "blur(12px)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <h3 className="text-lg font-semibold mb-1" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>{proj.name as string}</h3>
-                      <p className="text-sm leading-relaxed" style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}>{proj.description as string}</p>
+                      <h3 className="text-lg font-semibold mb-1" style={{ fontFamily: "'Inter', sans-serif", color: "#F0F0FF" }}>{proj.name as string}</h3>
+                      <p className="text-sm leading-relaxed" style={{ fontFamily: "'Inter', sans-serif", color: "#9090B8" }}>{proj.description as string}</p>
                     </div>
                     <div className="flex gap-2">
                       {proj.url ? (
-                        <a href={proj.url as string} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-white/5 rounded-lg transition-colors"><ExternalLink size={16} className="text-[#00FFE0]" /></a>
+                        <a href={proj.url as string} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-white/5 rounded-lg transition-colors"><ExternalLink size={16} className="text-[#8B5CF6]" /></a>
                       ) : null}
-                      <button onClick={() => deleteProject(index)} className="p-2 hover:bg-white/5 rounded-lg transition-colors"><Trash2 size={16} className="text-[#7E7E98]" /></button>
+                      <button onClick={() => deleteProject(index)} className="p-2 hover:bg-white/5 rounded-lg transition-colors"><Trash2 size={16} className="text-[#9090B8]" /></button>
                     </div>
                   </div>
                   {(proj.technologies as string[])?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-3">
                       {(proj.technologies as string[]).map((tech: string, idx: number) => (
-                        <span key={idx} className="px-2 py-1 rounded text-[11px]" style={{ background: "rgba(83, 109, 254, 0.1)", color: "#536DFE", fontFamily: "'IBM Plex Mono', monospace" }}>{tech}</span>
+                        <span key={idx} className="px-2 py-1 rounded text-[11px]" style={{ background: "rgba(83, 109, 254, 0.1)", color: "#536DFE", fontFamily: "monospace, monospace" }}>{tech}</span>
                       ))}
                     </div>
                   )}
@@ -606,7 +679,7 @@ export default function ProfilePage() {
               ))
             )}
             {projects.length > 0 && (
-              <button onClick={openAddProject} className="w-full p-4 rounded-lg border border-dashed transition-all hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'Outfit', sans-serif", fontSize: "14px", fontWeight: 500, color: "#7E7E98" }}>
+              <button onClick={openAddProject} className="w-full p-4 rounded-lg border border-dashed transition-all hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'Inter', sans-serif", fontSize: "14px", fontWeight: 500, color: "#9090B8" }}>
                 <Plus size={16} className="inline mr-2" />Add Project
               </button>
             )}
@@ -617,15 +690,15 @@ export default function ProfilePage() {
         {activeTab === "Preferences" && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>Job Search Preferences</h3>
+              <h3 className="text-lg font-semibold" style={{ fontFamily: "'Inter', sans-serif", color: "#F0F0FF" }}>Job Search Preferences</h3>
               {!prefsEditing && (
-                <button onClick={openPrefsEdit} className="px-3 py-1.5 rounded-lg border transition-all hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'Outfit', sans-serif", fontSize: "13px", color: "#7E7E98" }}>
+                <button onClick={openPrefsEdit} className="px-3 py-1.5 rounded-lg border transition-all hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", fontFamily: "'Inter', sans-serif", fontSize: "13px", color: "#9090B8" }}>
                   <Edit2 size={14} className="inline mr-1" />Edit
                 </button>
               )}
             </div>
             {prefsEditing ? (
-              <div className="space-y-4 p-6 rounded-lg border" style={{ background: "rgba(15, 15, 24, 0.7)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
+              <div className="space-y-4 p-6 rounded-lg border" style={{ background: "rgba(11, 11, 20, 0.7)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label style={labelStyle}>Min Salary ($/year)</label>
@@ -654,22 +727,22 @@ export default function ProfilePage() {
                   <input type="text" value={prefsForm.locations} onChange={(e) => setPrefsForm({ ...prefsForm, locations: e.target.value })} placeholder="e.g. New York, San Francisco, Remote" style={inputStyle} />
                 </div>
                 <div className="flex gap-2 pt-2">
-                  <button onClick={savePrefs} disabled={updatePreferencesMutation.isPending} className="px-4 py-2 rounded-lg bg-[#00FFE0] text-[#050508] font-medium disabled:opacity-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                  <button onClick={savePrefs} disabled={updatePreferencesMutation.isPending} className="px-4 py-2 rounded-lg bg-[#8B5CF6] text-[#050508] font-medium disabled:opacity-50" style={{ fontFamily: "'Inter', sans-serif" }}>
                     <Save size={16} className="inline mr-1" />{updatePreferencesMutation.isPending ? "Saving..." : "Save"}
                   </button>
-                  <button onClick={() => setPrefsEditing(false)} className="px-4 py-2 rounded-lg border hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", color: "#7E7E98", fontFamily: "'Outfit', sans-serif" }}>Cancel</button>
+                  <button onClick={() => setPrefsEditing(false)} className="px-4 py-2 rounded-lg border hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", color: "#9090B8", fontFamily: "'Inter', sans-serif" }}>Cancel</button>
                 </div>
               </div>
             ) : (
-              <div className="p-6 rounded-lg border" style={{ background: "rgba(15, 15, 24, 0.7)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
+              <div className="p-6 rounded-lg border" style={{ background: "rgba(11, 11, 20, 0.7)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
                 <div className="space-y-3">
-                  <div className="flex justify-between"><span className="text-sm text-[#7E7E98]">Salary Range</span><span className="text-sm text-[#E8E8F0]">
+                  <div className="flex justify-between"><span className="text-sm text-[#9090B8]">Salary Range</span><span className="text-sm text-[#F0F0FF]">
                     {preferences.salaryMin || preferences.salaryMax
                       ? `$${preferences.salaryMin || 0} – $${preferences.salaryMax || "∞"}`
                       : "Not set"}
                   </span></div>
-                  <div className="flex justify-between"><span className="text-sm text-[#7E7E98]">Remote Preference</span><span className="text-sm text-[#E8E8F0]">{(preferences.remotePreference as string) || "Any"}</span></div>
-                  <div className="flex justify-between"><span className="text-sm text-[#7E7E98]">Locations</span><span className="text-sm text-[#E8E8F0]">{((preferences.locations as string[]) || []).join(", ") || "Not specified"}</span></div>
+                  <div className="flex justify-between"><span className="text-sm text-[#9090B8]">Remote Preference</span><span className="text-sm text-[#F0F0FF]">{(preferences.remotePreference as string) || "Any"}</span></div>
+                  <div className="flex justify-between"><span className="text-sm text-[#9090B8]">Locations</span><span className="text-sm text-[#F0F0FF]">{((preferences.locations as string[]) || []).join(", ") || "Not specified"}</span></div>
                 </div>
               </div>
             )}
@@ -686,10 +759,10 @@ export default function ProfilePage() {
           <div><label style={labelStyle}>Phone</label><input type="text" value={profileForm.phone} onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })} placeholder="e.g. +1 (555) 123-4567" style={inputStyle} /></div>
           <div><label style={labelStyle}>Professional Summary</label><textarea value={profileForm.summary} onChange={(e) => setProfileForm({ ...profileForm, summary: e.target.value })} rows={4} placeholder="Brief professional summary..." style={{ ...inputStyle, resize: "none" as const }} /></div>
           <div className="flex gap-2 pt-2">
-            <button onClick={saveProfile} disabled={updateProfileMutation.isPending} className="flex-1 px-4 py-2.5 rounded-lg bg-[#00FFE0] text-[#050508] font-medium disabled:opacity-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
+            <button onClick={saveProfile} disabled={updateProfileMutation.isPending} className="flex-1 px-4 py-2.5 rounded-lg bg-[#8B5CF6] text-[#050508] font-medium disabled:opacity-50" style={{ fontFamily: "'Inter', sans-serif" }}>
               {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
             </button>
-            <button onClick={() => setEditProfileOpen(false)} className="px-4 py-2.5 rounded-lg border hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", color: "#7E7E98" }}>Cancel</button>
+            <button onClick={() => setEditProfileOpen(false)} className="px-4 py-2.5 rounded-lg border hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", color: "#9090B8" }}>Cancel</button>
           </div>
         </div>
       </Modal>
@@ -703,8 +776,8 @@ export default function ProfilePage() {
             <div><label style={labelStyle}>End Date</label><input type="text" value={expForm.endDate} onChange={(e) => setExpForm({ ...expForm, endDate: e.target.value })} placeholder="Leave blank if current" style={inputStyle} disabled={expForm.current} /></div>
           </div>
           <div>
-            <label className="flex items-center gap-2 cursor-pointer" style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "#7E7E98" }}>
-              <input type="checkbox" checked={expForm.current} onChange={(e) => setExpForm({ ...expForm, current: e.target.checked, endDate: e.target.checked ? "" : expForm.endDate })} className="accent-[#00FFE0]" />
+            <label className="flex items-center gap-2 cursor-pointer" style={{ fontFamily: "'Inter', sans-serif", fontSize: "13px", color: "#9090B8" }}>
+              <input type="checkbox" checked={expForm.current} onChange={(e) => setExpForm({ ...expForm, current: e.target.checked, endDate: e.target.checked ? "" : expForm.endDate })} className="accent-[#8B5CF6]" />
               I currently work here
             </label>
           </div>
@@ -714,12 +787,12 @@ export default function ProfilePage() {
             <button
               onClick={saveExp}
               disabled={anyMutationPending || !expForm.role || !expForm.company}
-              className="flex-1 px-4 py-2.5 rounded-lg bg-[#00FFE0] text-[#050508] font-medium disabled:opacity-50"
-              style={{ fontFamily: "'Outfit', sans-serif" }}
+              className="flex-1 px-4 py-2.5 rounded-lg bg-[#8B5CF6] text-[#050508] font-medium disabled:opacity-50"
+              style={{ fontFamily: "'Inter', sans-serif" }}
             >
               {anyMutationPending ? "Saving..." : editExpId ? "Update" : "Add Experience"}
             </button>
-            <button onClick={() => setAddExpOpen(false)} className="px-4 py-2.5 rounded-lg border hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", color: "#7E7E98" }}>Cancel</button>
+            <button onClick={() => setAddExpOpen(false)} className="px-4 py-2.5 rounded-lg border hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", color: "#9090B8" }}>Cancel</button>
           </div>
         </div>
       </Modal>
@@ -737,10 +810,10 @@ export default function ProfilePage() {
           </div>
           <div><label style={labelStyle}>GPA (optional)</label><input type="text" value={eduForm.gpa} onChange={(e) => setEduForm({ ...eduForm, gpa: e.target.value })} placeholder="e.g. 3.8" style={inputStyle} /></div>
           <div className="flex gap-2 pt-2">
-            <button onClick={saveEdu} disabled={addEducationMutation.isPending || !eduForm.institution || !eduForm.degree} className="flex-1 px-4 py-2.5 rounded-lg bg-[#00FFE0] text-[#050508] font-medium disabled:opacity-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
+            <button onClick={saveEdu} disabled={addEducationMutation.isPending || !eduForm.institution || !eduForm.degree} className="flex-1 px-4 py-2.5 rounded-lg bg-[#8B5CF6] text-[#050508] font-medium disabled:opacity-50" style={{ fontFamily: "'Inter', sans-serif" }}>
               {addEducationMutation.isPending ? "Saving..." : "Add Education"}
             </button>
-            <button onClick={() => setAddEduOpen(false)} className="px-4 py-2.5 rounded-lg border hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", color: "#7E7E98" }}>Cancel</button>
+            <button onClick={() => setAddEduOpen(false)} className="px-4 py-2.5 rounded-lg border hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", color: "#9090B8" }}>Cancel</button>
           </div>
         </div>
       </Modal>
@@ -752,10 +825,61 @@ export default function ProfilePage() {
           <div><label style={labelStyle}>URL (optional)</label><input type="text" value={projectForm.url} onChange={(e) => setProjectForm({ ...projectForm, url: e.target.value })} placeholder="https://github.com/..." style={inputStyle} /></div>
           <div><label style={labelStyle}>Technologies (comma separated)</label><input type="text" value={projectForm.technologies} onChange={(e) => setProjectForm({ ...projectForm, technologies: e.target.value })} placeholder="e.g. React, TypeScript, Node.js" style={inputStyle} /></div>
           <div className="flex gap-2 pt-2">
-            <button onClick={saveProject} disabled={updateProfileMutation.isPending || !projectForm.name} className="flex-1 px-4 py-2.5 rounded-lg bg-[#00FFE0] text-[#050508] font-medium disabled:opacity-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
+            <button onClick={saveProject} disabled={updateProfileMutation.isPending || !projectForm.name} className="flex-1 px-4 py-2.5 rounded-lg bg-[#8B5CF6] text-[#050508] font-medium disabled:opacity-50" style={{ fontFamily: "'Inter', sans-serif" }}>
               {updateProfileMutation.isPending ? "Saving..." : "Add Project"}
             </button>
-            <button onClick={() => setAddProjectOpen(false)} className="px-4 py-2.5 rounded-lg border hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", color: "#7E7E98" }}>Cancel</button>
+            <button onClick={() => setAddProjectOpen(false)} className="px-4 py-2.5 rounded-lg border hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", color: "#9090B8" }}>Cancel</button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* LinkedIn Import Modal */}
+      <Modal open={linkedinModalOpen} onClose={() => { setLinkedinModalOpen(false); setLinkedinFeedback(null); }} title="Import from LinkedIn">
+        <div className="space-y-4">
+          <p className="text-[13px]" style={{ fontFamily: "'Inter', sans-serif", color: "#9090B8" }}>
+            Open your LinkedIn profile, select all text (Ctrl+A), copy (Ctrl+C), and paste below. The AI will extract your experience, education, skills, and certifications.
+          </p>
+          <div>
+            <label style={labelStyle}>LinkedIn Profile URL (optional)</label>
+            <input
+              type="url"
+              value={linkedinUrl}
+              onChange={(e) => setLinkedinUrl(e.target.value)}
+              placeholder="https://www.linkedin.com/in/yourname"
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Paste LinkedIn Profile Text *</label>
+            <textarea
+              value={linkedinText}
+              onChange={(e) => setLinkedinText(e.target.value)}
+              rows={10}
+              placeholder="Paste the full text from your LinkedIn profile page here..."
+              style={{ ...inputStyle, resize: "vertical" as const }}
+            />
+            <span className="text-[11px] mt-1 block" style={{ color: "#3A3A60" }}>{linkedinText.length} characters</span>
+          </div>
+          {linkedinFeedback && (
+            <div className="flex items-center gap-2 text-[13px] p-3 rounded-lg" style={{
+              background: linkedinFeedback.type === "success" ? "rgba(52,211,153,0.08)" : "rgba(248,113,113,0.08)",
+              color: linkedinFeedback.type === "success" ? "#34D399" : "#F87171",
+              border: `1px solid ${linkedinFeedback.type === "success" ? "rgba(52,211,153,0.2)" : "rgba(248,113,113,0.2)"}`,
+            }}>
+              {linkedinFeedback.type === "success" ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+              {linkedinFeedback.text}
+            </div>
+          )}
+          <div className="flex gap-2 pt-2">
+            <button
+              onClick={handleLinkedinImport}
+              disabled={isLinkedinImporting || linkedinText.trim().length < 50}
+              className="flex-1 px-4 py-2.5 rounded-lg bg-[#0A66C2] text-white font-medium disabled:opacity-50"
+              style={{ fontFamily: "'Inter', sans-serif" }}
+            >
+              {isLinkedinImporting ? "Importing…" : "Import Profile"}
+            </button>
+            <button onClick={() => setLinkedinModalOpen(false)} className="px-4 py-2.5 rounded-lg border hover:bg-white/5" style={{ borderColor: "rgba(255, 255, 255, 0.08)", color: "#9090B8" }}>Cancel</button>
           </div>
         </div>
       </Modal>

@@ -6,57 +6,57 @@ import { z } from 'zod';
 
 export const CVHeaderSchema = z.object({
   name: z.string(),
-  title: z.string(),
-  email: z.string().email(),
-  phone: z.string(),
-  location: z.string(),
-  linkedin: z.string().url().optional(),
-  github: z.string().url().optional(),
-  website: z.string().url().optional(),
+  title: z.string().optional().default(''),
+  email: z.string().optional().default(''),
+  phone: z.string().optional().default(''),
+  location: z.string().optional().default(''),
+  linkedin: z.string().optional(),
+  github: z.string().optional(),
+  website: z.string().optional(),
 });
 
 export const CVExperienceSchema = z.object({
   company: z.string(),
   role: z.string(),
-  startDate: z.string(),
-  endDate: z.string().nullable(),
-  location: z.string(),
-  achievements: z.array(z.string()),
+  startDate: z.string().optional().default(''),
+  endDate: z.string().nullable().optional().default(null),
+  location: z.string().optional().default(''),
+  achievements: z.array(z.string()).optional().default([]),
   technologies: z.array(z.string()).optional(),
 });
 
 export const CVEducationSchema = z.object({
   institution: z.string(),
   degree: z.string(),
-  field: z.string(),
-  startDate: z.string(),
-  endDate: z.string().nullable(),
-  location: z.string(),
+  field: z.string().optional().default(''),
+  startDate: z.string().optional().default(''),
+  endDate: z.string().nullable().optional().default(null),
+  location: z.string().optional().default(''),
   gpa: z.string().optional(),
   honors: z.array(z.string()).optional(),
 });
 
 export const CVCertificationSchema = z.object({
   name: z.string(),
-  issuer: z.string(),
-  date: z.string(),
+  issuer: z.string().optional().default(''),
+  date: z.string().optional().default(''),
   expiryDate: z.string().nullable().optional(),
   credentialId: z.string().optional(),
-  url: z.string().url().optional(),
+  url: z.string().optional(),
 });
 
 export const CVProjectSchema = z.object({
   name: z.string(),
-  description: z.string(),
-  technologies: z.array(z.string()),
-  url: z.string().url().optional(),
-  achievements: z.array(z.string()),
+  description: z.string().optional().default(''),
+  technologies: z.array(z.string()).optional().default([]),
+  url: z.string().optional(),
+  achievements: z.array(z.string()).optional().default([]),
 });
 
 export const CVSkillsSchema = z.object({
-  languages: z.array(z.string()),
-  frameworks: z.array(z.string()),
-  tools: z.array(z.string()),
+  languages: z.array(z.string()).optional().default([]),
+  frameworks: z.array(z.string()).optional().default([]),
+  tools: z.array(z.string()).optional().default([]),
   methodologies: z.array(z.string()).optional(),
 });
 
@@ -131,12 +131,12 @@ export const EmailCategorySchema = z.enum([
 export const EmailUrgencySchema = z.enum(['high', 'medium', 'low']);
 
 export const ExtractedEmailDataSchema = z.object({
-  company: z.string().nullable(),
-  role: z.string().nullable(),
-  dates: z.array(z.string()),
-  times: z.array(z.string()),
-  links: z.array(z.string().url()),
-  interviewer: z.string().nullable(),
+  company: z.string().nullable().optional().default(null),
+  role: z.string().nullable().optional().default(null),
+  dates: z.array(z.string()).optional().default([]),
+  times: z.array(z.string()).optional().default([]),
+  links: z.array(z.string()).optional().default([]),
+  interviewer: z.string().nullable().optional().default(null),
 });
 
 export const EmailAnalysisSchema = z.object({
@@ -157,7 +157,7 @@ export type EmailAnalysis = z.infer<typeof EmailAnalysisSchema>;
 
 export const GitHubSectionScoreSchema = z.object({
   score: z.number().min(0).max(100),
-  suggestions: z.array(z.string()),
+  suggestions: z.array(z.string()).optional().default([]),
 });
 
 export const GitHubOptimizationSchema = z.object({
@@ -179,7 +179,7 @@ export type GitHubOptimization = z.infer<typeof GitHubOptimizationSchema>;
 
 export const LinkedInSectionScoreSchema = z.object({
   score: z.number().min(0).max(100),
-  suggestions: z.array(z.string()),
+  suggestions: z.array(z.string()).optional().default([]),
 });
 
 export const LinkedInOptimizationSchema = z.object({

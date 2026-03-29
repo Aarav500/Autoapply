@@ -31,7 +31,7 @@ export class GmailClient {
   // AUTH FLOW
   // ============================================================================
 
-  getAuthUrl(): string {
+  getAuthUrl(state?: string): string {
     const scopes = [
       'https://www.googleapis.com/auth/gmail.readonly',
       'https://www.googleapis.com/auth/gmail.send',
@@ -42,6 +42,7 @@ export class GmailClient {
       access_type: 'offline',
       scope: scopes,
       prompt: 'consent', // Force consent screen to ensure we get refresh token
+      ...(state ? { state } : {}),
     });
   }
 

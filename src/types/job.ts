@@ -1,4 +1,6 @@
-export type JobPlatform = 'remoteok' | 'hackernews' | 'manual';
+export type JobPlatform = 'remoteok' | 'hackernews' | 'indeed' | 'handshake' | 'linkedin' | 'wayup' | 'glassdoor' | 'manual' | 'greenhouse' | 'lever' | 'workday' | 'wellfound' | 'dice';
+
+export type ApplicationUrgency = 'apply-now' | 'soon' | 'normal' | 'stale' | 'expired';
 
 export type PipelineStatus =
   | 'discovered'
@@ -16,7 +18,8 @@ export interface JobSearchQuery {
   remote?: boolean;
   minSalary?: number;
   maxSalary?: number;
-  jobTypes?: ('full-time' | 'part-time' | 'contract' | 'internship')[];
+  jobTypes?: ('full-time' | 'part-time' | 'contract' | 'internship' | 'co-op' | 'on-campus' | 'work-study' | 'fellowship' | 'apprenticeship')[];
+  experienceLevel?: ('entry-level' | 'internship' | 'student' | 'junior' | 'mid' | 'senior')[];
   excludeCompanies?: string[];
 }
 
@@ -52,6 +55,10 @@ export interface ScoredJob extends RawJob {
   jobId: string; // our internal ID
   matchScore: number;
   analysis?: JobMatchAnalysis;
+  isLikelyExpired?: boolean;
+  postingAgeHours?: number;
+  applicationUrgency?: ApplicationUrgency;
+  whyApply?: string;
 }
 
 export interface JobSummary {
@@ -85,6 +92,10 @@ export interface Job extends JobSummary {
   appliedAt?: Date;
   responseAt?: Date;
   applicationId?: string; // ID of the application record if applied
+  isLikelyExpired?: boolean;
+  postingAgeHours?: number;
+  applicationUrgency?: ApplicationUrgency;
+  whyApply?: string;
 }
 
 export interface SearchResult {

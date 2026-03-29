@@ -13,8 +13,8 @@ const MODEL_MAP: Record<AIModel, string> = {
 const DEFAULT_OPTIONS: Required<AIClientOptions> = {
   model: 'balanced',
   temperature: 1,
-  maxTokens: 4096,
-  timeout: 30000,
+  maxTokens: 8192,
+  timeout: 90000,
 };
 
 class AIClient {
@@ -33,7 +33,8 @@ class AIClient {
 
   private getTimeout(options?: AIClientOptions): number {
     if (options?.timeout) return options.timeout;
-    if (options?.model === 'powerful') return 60000;
+    if (options?.model === 'powerful') return 180000;
+    if (options?.model === 'balanced') return 120000;
     return DEFAULT_OPTIONS.timeout;
   }
 
@@ -185,7 +186,64 @@ class AIClient {
           }
         }
 
-        // Validate against schema
+        // Normalize camelCase keys to snake_case recursively so AI responses match schemas
+        const toSnakeCase = (str: string): string =>
+          str.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
+
+        const normalizeKeys = (obj: unknown): unknown => {
+          if (Array.isArray(obj)) return obj.map(normalizeKeys);
+          if (obj && typeof obj === 'object') {
+            const result: Record<string, unknown> = {};
+            for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+              result[toSnakeCase(key)] = normalizeKeys(value);
+            }
+            return result;
+          }
+          return obj;
+        };
+
+        // Normalize the parsed response
+        parsed = normalizeKeys(parsed);
+
+        // Try parsing candidates in order: original, then unwrapped (if single-key wrapper)
+        const candidates: { label: string; data: unknown }[] = [{ label: 'original', data: parsed }];
+
+        // Auto-unwrap if the AI wraps the response in a single key
+        // e.g., { "weekly_action_plan": { ... } } → unwrap to the inner object
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          const keys = Object.keys(parsed as Record<string, unknown>);
+          if (keys.length === 1) {
+            const inner = (parsed as Record<string, unknown>)[keys[0]];
+            if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
+              candidates.push({ label: keys[0], data: inner });
+            }
+          }
+        }
+
+        // Try each candidate; pick the one that validates with most non-default data
+        let bestResult: T | null = null;
+        let bestScore = -1;
+
+        for (const candidate of candidates) {
+          const result = schema.safeParse(candidate.data);
+          if (result.success) {
+            // Score: count non-empty fields to prefer the richer parse
+            const score = JSON.stringify(result.data).length;
+            if (score > bestScore) {
+              bestScore = score;
+              bestResult = result.data;
+              if (candidate.label !== 'original') {
+                logger.info({ unwrappedKey: candidate.label }, 'Auto-unwrapped AI response wrapper');
+              }
+            }
+          }
+        }
+
+        if (bestResult !== null) {
+          return bestResult;
+        }
+
+        // Fall back to strict parse to get proper error
         const validated = schema.parse(parsed);
         return validated;
       } catch (error) {

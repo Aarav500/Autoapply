@@ -26,10 +26,11 @@ export type GmailMessage = z.infer<typeof GmailMessageSchema>;
 
 export const EmailCategorySchema = z.enum([
   'interview_invite',
+  'screening',
+  'offer',
   'rejection',
   'recruiter_outreach',
   'follow_up',
-  'offer',
   'action_required',
   'other',
 ]);

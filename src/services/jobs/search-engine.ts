@@ -6,9 +6,17 @@ import {
   JobSummary,
   Job,
   JobPlatform,
+  ApplicationUrgency,
 } from '@/types/job';
 import { remoteOKPlatform } from './platforms/remoteok';
 import { hackerNewsPlatform } from './platforms/hackernews';
+import { indeedPlatform } from './platforms/indeed';
+import { handshakePlatform } from './platforms/handshake';
+import { greenhousePlatform } from './platforms/greenhouse';
+import { leverPlatform } from './platforms/lever';
+import { workdayPlatform } from './platforms/workday';
+import { wellfoundPlatform } from './platforms/wellfound';
+import { dicePlatform } from './platforms/dice';
 import { jobDeduplicator } from './deduplicator';
 import { jobScorer } from './scorer';
 import { storage } from '@/lib/storage';
@@ -16,7 +24,17 @@ import { logger } from '@/lib/logger';
 import type { Profile } from '@/types/profile';
 
 export class SearchEngine {
-  private platforms = [remoteOKPlatform, hackerNewsPlatform];
+  private platforms = [
+    remoteOKPlatform,
+    hackerNewsPlatform,
+    indeedPlatform,
+    handshakePlatform,
+    greenhousePlatform,
+    leverPlatform,
+    workdayPlatform,
+    wellfoundPlatform,
+    dicePlatform,
+  ];
 
   /**
    * Main search orchestration
@@ -47,25 +65,28 @@ export class SearchEngine {
       const scoredJobs = await jobScorer.batchScore(profile, uniqueJobs);
       logger.info({ count: scoredJobs.length }, 'Scored jobs');
 
+      // 5b. Enrich with posting age / urgency metadata
+      const enrichedJobs = this.enrichWithPostingAge(scoredJobs);
+
       // 6. Sort by match score
-      scoredJobs.sort((a, b) => b.matchScore - a.matchScore);
+      enrichedJobs.sort((a, b) => b.matchScore - a.matchScore);
 
       // 7. Save to S3
-      await this.saveJobs(userId, scoredJobs);
+      await this.saveJobs(userId, enrichedJobs);
 
       const duration = Date.now() - startTime;
-      logger.info({ userId, duration, count: scoredJobs.length }, 'Search completed');
+      logger.info({ userId, duration, count: enrichedJobs.length }, 'Search completed');
 
       return {
         query,
-        totalResults: scoredJobs.length,
-        newJobs: scoredJobs.length,
+        totalResults: enrichedJobs.length,
+        newJobs: enrichedJobs.length,
         platformResults: platformResults.map((pr) => ({
           platform: pr.platform,
           count: pr.jobs?.length || 0,
           error: pr.error,
         })),
-        jobs: scoredJobs,
+        jobs: enrichedJobs,
         searchedAt: new Date(),
       };
     } catch (error) {
@@ -223,6 +244,38 @@ export class SearchEngine {
     };
 
     await storage.putJSON(jobPath, fullJob);
+  }
+
+  /**
+   * Compute posting age fields for all scored jobs
+   */
+  private enrichWithPostingAge(jobs: ScoredJob[]): ScoredJob[] {
+    const now = Date.now();
+    return jobs.map((job) => {
+      if (!job.postedAt) return job;
+
+      const postedMs = new Date(job.postedAt).getTime();
+      const ageMs = now - postedMs;
+      const postingAgeHours = Math.max(0, Math.round(ageMs / (1000 * 60 * 60)));
+      const ageDays = postingAgeHours / 24;
+
+      const isLikelyExpired = ageDays > 30;
+
+      let applicationUrgency: ApplicationUrgency;
+      if (ageDays > 30) {
+        applicationUrgency = 'expired';
+      } else if (ageDays > 7) {
+        applicationUrgency = 'stale';
+      } else if (ageDays > 3) {
+        applicationUrgency = 'normal';
+      } else if (ageDays > 1) {
+        applicationUrgency = 'soon';
+      } else {
+        applicationUrgency = 'apply-now';
+      }
+
+      return { ...job, postingAgeHours, isLikelyExpired, applicationUrgency };
+    });
   }
 
   /**

@@ -53,7 +53,9 @@ export async function POST(request: NextRequest) {
     if (error instanceof AuthError) {
       return apiError(error, 401);
     }
-    logger.error({ error }, 'Registration endpoint error');
-    return apiError(new Error('Internal server error'), 500);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack : undefined;
+    logger.error({ errMsg, errStack }, 'Registration endpoint error');
+    return apiError(new Error(`Internal server error: ${errMsg}`), 500);
   }
 }

@@ -62,6 +62,10 @@ export function apiError(
   error: unknown,
   status?: number
 ): NextResponse<ErrorResponse> {
+  if (status && !(error instanceof AppError)) {
+    const message = error instanceof Error ? error.message : 'An error occurred';
+    return errorResponse(message, status);
+  }
   return handleError(error);
 }
 

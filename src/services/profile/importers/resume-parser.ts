@@ -7,69 +7,87 @@ import { z } from 'zod';
 import { aiClient } from '@/lib/ai-client';
 import { logger } from '@/lib/logger';
 import { ValidationError } from '@/lib/errors';
-import {
-  Profile,
-  SkillSchema,
-  ExperienceSchema,
-  EducationSchema,
-  CertificationSchema,
-  ProjectSchema,
-  LanguageSchema,
-} from '@/types/profile';
+import { Profile, ProficiencyLevel, LanguageProficiency } from '@/types/profile';
 import { getProfile, updateProfile } from '../profile-service';
 
-// Schema for AI extraction
+// ========== Lenient schemas for AI extraction (forgiving of AI output quirks) ==========
+
+const LenientSkillSchema = z.object({
+  name: z.string(),
+  proficiency: z.string().catch('intermediate'),
+  years: z.number().optional().catch(undefined),
+});
+
+const LenientExperienceSchema = z.object({
+  id: z.string().optional(),
+  company: z.string(),
+  role: z.string(),
+  startDate: z.string().catch(''),
+  endDate: z.string().nullable().catch(null),
+  current: z.boolean().catch(false),
+  description: z.string().optional().catch(undefined),
+  bullets: z.array(z.string()).catch([]),
+  technologies: z.array(z.string()).catch([]),
+});
+
+const LenientEducationSchema = z.object({
+  id: z.string().optional(),
+  institution: z.string(),
+  degree: z.string(),
+  field: z.string().optional().catch(undefined),
+  startDate: z.string().catch(''),
+  endDate: z.string().nullable().catch(null),
+  gpa: z.number().nullable().optional().catch(undefined),
+});
+
+const LenientCertificationSchema = z.object({
+  id: z.string().optional(),
+  name: z.string(),
+  issuer: z.string(),
+  date: z.string().catch(''),
+  url: z.string().optional().catch(undefined),
+});
+
+const LenientProjectSchema = z.object({
+  id: z.string().optional(),
+  name: z.string(),
+  description: z.string().optional().catch(undefined),
+  technologies: z.array(z.string()).catch([]),
+  url: z.string().optional().catch(undefined),
+  githubUrl: z.string().optional().catch(undefined),
+});
+
+const LenientLanguageSchema = z.object({
+  language: z.string(),
+  proficiency: z.string().catch('conversational'),
+});
+
+// Schema for AI extraction — intentionally lenient to avoid Zod validation failures
 const ResumeDataSchema = z.object({
   name: z.string().optional(),
   phone: z.string().optional(),
   location: z.string().optional(),
   summary: z.string().optional(),
   headline: z.string().optional(),
-  skills: z.array(SkillSchema).default([]),
-  experience: z
-    .array(
-      ExperienceSchema.omit({ id: true }).extend({
-        id: z.string().optional(),
-      })
-    )
-    .default([]),
-  education: z
-    .array(
-      EducationSchema.omit({ id: true }).extend({
-        id: z.string().optional(),
-      })
-    )
-    .default([]),
-  certifications: z
-    .array(
-      CertificationSchema.omit({ id: true }).extend({
-        id: z.string().optional(),
-      })
-    )
-    .default([]),
-  projects: z
-    .array(
-      ProjectSchema.omit({ id: true }).extend({
-        id: z.string().optional(),
-      })
-    )
-    .default([]),
-  languages: z.array(LanguageSchema).default([]),
+  skills: z.array(LenientSkillSchema).catch([]),
+  experience: z.array(LenientExperienceSchema).catch([]),
+  education: z.array(LenientEducationSchema).catch([]),
+  certifications: z.array(LenientCertificationSchema).catch([]),
+  projects: z.array(LenientProjectSchema).catch([]),
+  languages: z.array(LenientLanguageSchema).catch([]),
 });
 
 type ResumeData = z.infer<typeof ResumeDataSchema>;
 
 /**
- * Extract text from PDF buffer using pdf-parse (pure-JS, no native deps, no worker needed)
+ * Extract text from PDF buffer using pdf-parse (reliable, no native deps, no worker needed)
  */
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    // Use lib/pdf-parse directly to avoid pdf-parse's test-data check on require
-    const pdfParse = require('pdf-parse/lib/pdf-parse.js') as (
-      buf: Buffer
-    ) => Promise<{ text: string; numpages: number }>;
+    // Use the lib/ path to avoid pdf-parse's test-data check on require()
+    const pdfParse = require('pdf-parse/lib/pdf-parse.js') as (buf: Buffer) => Promise<{ text: string }>; // eslint-disable-line
     const data = await pdfParse(buffer);
-    return data.text;
+    return data.text || '';
   } catch (error) {
     logger.error({ error }, 'Failed to extract text from PDF');
     throw new ValidationError('Failed to parse PDF file');
@@ -136,15 +154,17 @@ IMPORTANT:
       {
         model: 'balanced',
         maxTokens: 8000,
-        temperature: 0.3, // Lower temperature for more consistent extraction
+        temperature: 0.3,
+        timeout: 60000, // 60s — resume parsing can be slow
       }
     );
 
     logger.info('Resume data extracted successfully');
     return extractedData;
   } catch (error) {
-    logger.error({ error }, 'Failed to extract structured data from resume');
-    throw new ValidationError('Failed to parse resume content. Please try a different format.');
+    const errMsg = error instanceof Error ? error.message : String(error);
+    logger.error({ error: errMsg, stack: error instanceof Error ? error.stack : undefined }, 'Failed to extract structured data from resume');
+    throw new ValidationError(`Failed to parse resume content: ${errMsg}`);
   }
 }
 
@@ -171,12 +191,20 @@ function mergeResumeData(existingProfile: Profile, resumeData: ResumeData): Part
     updates.headline = resumeData.headline;
   }
 
+  // Valid proficiency values for coercion
+  const validSkillProf = new Set(['beginner', 'intermediate', 'advanced', 'expert']);
+  const validLangProf = new Set(['native', 'fluent', 'conversational', 'basic']);
+
   // Merge arrays (add new items, don't duplicate)
   if (resumeData.skills.length > 0) {
     const existingSkillNames = new Set(existingProfile.skills.map((s) => s.name.toLowerCase()));
-    const newSkills = resumeData.skills.filter(
-      (skill) => !existingSkillNames.has(skill.name.toLowerCase())
-    );
+    const newSkills = resumeData.skills
+      .filter((skill) => !existingSkillNames.has(skill.name.toLowerCase()))
+      .map((skill) => ({
+        name: skill.name,
+        proficiency: (validSkillProf.has(skill.proficiency) ? skill.proficiency : 'intermediate') as ProficiencyLevel,
+        ...(skill.years !== undefined ? { years: skill.years } : {}),
+      }));
     if (newSkills.length > 0) {
       updates.skills = [...existingProfile.skills, ...newSkills];
     }
@@ -219,9 +247,12 @@ function mergeResumeData(existingProfile: Profile, resumeData: ResumeData): Part
     const existingLanguages = new Set(
       existingProfile.languages.map((l) => l.language.toLowerCase())
     );
-    const newLanguages = resumeData.languages.filter(
-      (lang) => !existingLanguages.has(lang.language.toLowerCase())
-    );
+    const newLanguages = resumeData.languages
+      .filter((lang) => !existingLanguages.has(lang.language.toLowerCase()))
+      .map((lang) => ({
+        language: lang.language,
+        proficiency: (validLangProf.has(lang.proficiency) ? lang.proficiency : 'conversational') as LanguageProficiency,
+      }));
     if (newLanguages.length > 0) {
       updates.languages = [...existingProfile.languages, ...newLanguages];
     }

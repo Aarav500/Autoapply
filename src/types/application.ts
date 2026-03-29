@@ -56,6 +56,7 @@ export interface AutoApplyRule {
   requireRemote: boolean;
   minSalary: number | null;
   maxApplicationsPerDay: number;
+  autoApplyInternshipsOnly: boolean;
 }
 
 // Form field for browser automation
@@ -117,6 +118,7 @@ export const autoApplyRuleSchema = z.object({
   requireRemote: z.boolean(),
   minSalary: z.number().nullable(),
   maxApplicationsPerDay: z.number().min(1).max(50),
+  autoApplyInternshipsOnly: z.boolean().default(false),
 });
 
 export const formFieldSchema = z.object({

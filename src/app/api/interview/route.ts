@@ -1,5 +1,6 @@
 /**
  * GET /api/interview - List all interviews
+ * GET /api/interview?action=question-bank&company=Google - Get company question bank
  */
 
 import { NextRequest } from 'next/server';
@@ -7,6 +8,7 @@ import { authenticate } from '@/lib/api-utils';
 import { apiResponse, apiError } from '@/lib/api-utils';
 import { storage } from '@/lib/storage';
 import { InterviewListItem } from '@/types/interview';
+import { getCompanyQuestionBank } from '@/services/interview/mock-interview';
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,6 +16,19 @@ export async function GET(req: NextRequest) {
 
     // Get query params
     const { searchParams } = new URL(req.url);
+    const action = searchParams.get('action');
+
+    // Handle question-bank action
+    if (action === 'question-bank') {
+      const company = searchParams.get('company');
+      if (!company || company.trim().length === 0) {
+        return apiError(new Error('company parameter is required'), 400);
+      }
+
+      const questionBank = await getCompanyQuestionBank(userId, company.trim());
+      return apiResponse(questionBank);
+    }
+
     const statusFilter = searchParams.get('status');
 
     // Load interviews index

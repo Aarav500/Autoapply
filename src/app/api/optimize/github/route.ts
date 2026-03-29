@@ -3,37 +3,56 @@ import { z } from 'zod';
 import { authenticate, successResponse, handleError } from '@/lib/api-utils';
 import { aiClient } from '@/lib/ai-client';
 import { githubOptimizerPrompt } from '@/prompts/github-optimizer';
+import { storage } from '@/lib/storage';
 
 const analyzeSchema = z.object({
   username: z.string().min(1),
   targetRole: z.string().optional(),
 });
 
+const sectionSchema = z.object({
+  score: z.number().default(0),
+  suggestions: z.array(z.string()).default([]),
+});
+
 const resultSchema = z.object({
-  overall_score: z.number(),
+  overall_score: z.number().default(0),
   sections: z.object({
-    bio: z.object({
-      score: z.number(),
-      suggestions: z.array(z.string()),
-    }),
-    readme: z.object({
-      score: z.number(),
-      suggestions: z.array(z.string()),
-    }),
-    repos: z.object({
-      score: z.number(),
-      suggestions: z.array(z.string()),
-    }),
-    contributions: z.object({
-      score: z.number(),
-      suggestions: z.array(z.string()),
-    }),
+    bio: sectionSchema,
+    readme: sectionSchema,
+    repos: sectionSchema,
+    contributions: sectionSchema,
   }),
 });
 
+interface ScoreHistoryEntry {
+  score: number;
+  date: string;
+  username: string;
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const { userId } = await authenticate(request);
+
+    const history = await storage.getJSON<ScoreHistoryEntry[]>(
+      `users/${userId}/optimize/github-scores.json`
+    );
+
+    const historyEntries: ScoreHistoryEntry[] = Array.isArray(history) ? history : [];
+
+    return successResponse({
+      history: historyEntries,
+      latest: historyEntries.length > 0 ? historyEntries[historyEntries.length - 1] : null,
+    });
+  } catch (error) {
+    return handleError(error);
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
-    await authenticate(request);
+    const { userId } = await authenticate(request);
 
     const body = await request.json();
     const { username, targetRole } = analyzeSchema.parse(body);
@@ -107,6 +126,23 @@ export async function POST(request: NextRequest) {
       resultSchema,
       { model: 'balanced', maxTokens: 4096 }
     );
+
+    // Save score history
+    try {
+      const existingRaw = await storage.getJSON<ScoreHistoryEntry[]>(
+        `users/${userId}/optimize/github-scores.json`
+      );
+      const existing: ScoreHistoryEntry[] = Array.isArray(existingRaw) ? existingRaw : [];
+      const newEntry: ScoreHistoryEntry = {
+        score: result.overall_score,
+        date: new Date().toISOString(),
+        username,
+      };
+      const updated = [...existing, newEntry].slice(-12);
+      await storage.putJSON(`users/${userId}/optimize/github-scores.json`, updated);
+    } catch {
+      // Non-critical — do not fail the response
+    }
 
     return successResponse({
       analysis: result,

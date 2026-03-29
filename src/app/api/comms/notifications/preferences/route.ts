@@ -19,8 +19,7 @@ export async function GET(req: NextRequest) {
     if (!settings) {
       return apiResponse({
         notificationPreferences: {
-          smsEnabled: false,
-          whatsappEnabled: false,
+          telegramEnabled: false,
           emailDigestEnabled: true,
           inAppEnabled: true,
           interviewReminders: true,
@@ -67,19 +66,15 @@ export async function PUT(req: NextRequest) {
     if (!settings) {
       settings = {
         userId: userId,
-        twilioConfigured: false,
-      phoneNumber: null,
-      whatsappEnabled: false,
-      googleCalendarToken: null,
-      googleRefreshToken: null,
-      autoReplyEnabled: false,
-      autoReplyRules: {},
-      lastEmailSync: null,
+        googleCalendarToken: null,
+        googleRefreshToken: null,
+        autoReplyEnabled: false,
+        autoReplyRules: {},
+        lastEmailSync: null,
         autoSearchEnabled: false,
         searchConfigurations: [],
         notificationPreferences: {
-          smsEnabled: false,
-          whatsappEnabled: false,
+          telegramEnabled: false,
           emailDigestEnabled: true,
           inAppEnabled: true,
           interviewReminders: true,

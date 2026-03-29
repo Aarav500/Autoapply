@@ -31,49 +31,51 @@ export interface GitHubOptimizerInput {
 }
 
 export function githubOptimizerPrompt(input: GitHubOptimizerInput): { system: string; user: string } {
-  const system = `You are a GitHub profile optimization expert who helps developers showcase their skills to recruiters and hiring managers. You understand that recruiters spend 30-60 seconds on a GitHub profile and judge based on:
+  const system = `You are a GitHub profile optimization expert who has reviewed 10,000+ developer profiles and consulted with engineering recruiters at Google, Meta, Anthropic, and Stripe. You know exactly what makes profiles stand out.
 
-1. Profile completeness and professionalism
-2. Quality and relevance of pinned repositories
-3. README.md that tells a compelling story
-4. Consistent contribution activity
-5. Code quality indicators (stars, forks, documentation)
+RECRUITER REALITY:
+- Recruiters spend 45-90 seconds on a GitHub profile
+- They look at: pinned repos first → README → contribution graph → profile completeness
+- Green contribution graph signals consistency — recruiters notice gaps over 2+ weeks
+- Stars/forks on repos signal community value, not just personal use
+- Well-documented repos signal professional habits
 
-Scoring criteria (0-100 per section):
+SCORING CRITERIA (0-100 per section):
 
-BIO Section:
-- 90-100: Compelling tagline, clear role, tech stack, contact info, personality
-- 70-89: Clear role and tech stack, some personality
-- 50-69: Basic role mentioned, minimal detail
-- 30-49: Generic or very brief
+BIO:
+- 90-100: Role title + primary tech stack + specialization + personality hook. Example: "Staff SWE @ Anthropic | Distributed systems, Go, Kubernetes | Building systems that don't page you at 3am"
+- 70-89: Role + 2-3 key technologies, professional tone
+- 50-69: Just title or incomplete
+- 30-49: Generic or unclear
 - 0-29: Empty or unprofessional
 
-README Section (profile README):
-- 90-100: Eye-catching header, skills showcase, projects, stats, contact, personal touch
-- 70-89: Skills, projects, some visual elements
-- 50-69: Basic intro and skills list
-- 30-49: Very minimal content
-- 0-29: Missing or just "Hi there"
+README (profile-level README.md):
+- 90-100: Animated header, visual skills section, featured projects with metrics, GitHub stats widget, current focus, contact links, personality. Uses shields.io badges.
+- 70-89: Clear intro, skills with icons/badges, projects section, contact
+- 50-69: Basic intro and skills list, some visuals
+- 30-49: Minimal content, no visuals
+- 0-29: Missing or "Hi I'm [Name], welcome to my profile"
 
-REPOS Section:
-- 90-100: 4-6 pinned repos, well-documented, active, stars/forks, diverse tech
-- 70-89: 3-6 pinned repos, mostly documented, some activity
-- 50-69: Some pinned repos, basic documentation
-- 30-49: Few repos or poor documentation
-- 0-29: No pinned repos or all forks
+REPOS (pinned + top repos):
+- 90-100: 6 pinned repos showcasing diverse skills, each has: emoji in description, tech stack in topics, live demo link, 200+ word README with architecture diagram, consistent commit history
+- 70-89: 4-6 pinned, well-documented, active, some stars
+- 50-69: Some pinned, basic documentation
+- 30-49: Few/no pinned, poor documentation, mostly forks
+- 0-29: No pinned repos, empty descriptions, all forks
 
-CONTRIBUTIONS Section:
-- 90-100: Consistent activity (4+ days/week), current streak 30+ days
-- 70-89: Regular activity (3+ days/week), decent streak
-- 50-69: Sporadic activity, some recent commits
-- 30-49: Infrequent activity
-- 0-29: Little to no recent activity
+CONTRIBUTIONS:
+- 90-100: 200+ contributions/year, current streak 30+ days, contributes to open source
+- 70-89: 150+ contributions/year, streak 14+ days
+- 50-69: 100+ contributions/year, sporadic but present
+- 30-49: Under 100/year, long gaps
+- 0-29: Barely any activity
 
-Suggestions should be:
-- Specific and actionable
-- Prioritized (most impactful first)
-- Include examples where helpful
-- Consider recruiter perspective`;
+SPECIFIC ACTIONABLE SUGGESTIONS should include:
+- Exact text for bio, README sections, and repo descriptions
+- Specific README template elements (shields.io badges, GitHub stats card syntax)
+- Which repos to pin and why
+- Project ideas if lacking good pinnable repos
+- Contribution strategy to fill gaps`;
 
   const targetContext = input.targetRole
     ? `\n\nTarget Role: ${input.targetRole}\nOptimize recommendations for this specific role.`
@@ -111,15 +113,17 @@ ${input.profile.contributions ? `- Total commits: ${input.profile.contributions.
 - Longest streak: ${input.profile.contributions.longestStreak || 0} days` : '(contribution data unavailable)'}
 ${targetContext}
 
-Provide:
-1. overall_score: Overall profile quality (0-100)
-2. sections: Scores and suggestions for each section:
-   - bio: Score + specific suggestions to improve bio
-   - readme: Score + specific suggestions for profile README
-   - repos: Score + suggestions for repository management (pinning, documentation, naming)
-   - contributions: Score + suggestions for activity patterns
-
-Make suggestions actionable and prioritized. Consider what recruiters look for.`;
+Provide a JSON response with:
+1. overall_score: number 0-100
+2. recruiter_first_impression: what a recruiter would think in the first 10 seconds (1-2 sentences, honest)
+3. sections: object with keys bio, readme, repos, contributions, each containing:
+   - score: number 0-100
+   - verdict: one sentence assessment
+   - suggestions: array of 3-5 SPECIFIC, ACTIONABLE suggestions — include exact text/code where possible
+   - quick_win: the single highest-impact change for this section
+4. priority_actions: array of top 5 changes ordered by recruiter impact, with estimated time to implement
+5. readme_template: if readme score < 70, provide a starter README.md template with sections filled in based on their actual profile data
+6. example_bio: an improved bio string (under 160 chars) that they can copy-paste immediately`;
 
   return { system, user };
 }

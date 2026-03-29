@@ -27,7 +27,17 @@ export async function GET(req: NextRequest) {
     const byPlatform: Record<JobPlatform, number> = {
       remoteok: 0,
       hackernews: 0,
+      indeed: 0,
+      handshake: 0,
+      linkedin: 0,
+      wayup: 0,
+      glassdoor: 0,
       manual: 0,
+      greenhouse: 0,
+      lever: 0,
+      workday: 0,
+      wellfound: 0,
+      dice: 0,
     };
 
     let totalMatchScore = 0;

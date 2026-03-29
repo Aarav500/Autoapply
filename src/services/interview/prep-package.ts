@@ -55,14 +55,17 @@ export async function generatePrepPackage(
       throw new NotFoundError('Profile not found');
     }
 
-    // Try to find matching job
+    // Try to find matching job (index is saved as flat JobSummary[])
     let jobDetail = null;
     try {
-      const jobsIndex = await storage.getJSON<{ jobs: Array<{ id: string; company: string }> }>(
+      const jobsRaw = await storage.getJSON<any>(
         `users/${userId}/jobs/index.json`
       );
+      const jobsArr: Array<{ id: string; company: string }> = Array.isArray(jobsRaw)
+        ? jobsRaw
+        : (jobsRaw?.jobs || []);
 
-      const matchingJob = jobsIndex?.jobs?.find(
+      const matchingJob = jobsArr.find(
         (j) => j.company.toLowerCase() === interview.company.toLowerCase()
       );
 
@@ -95,7 +98,7 @@ export async function generatePrepPackage(
     const starAnswers = await buildSTARAnswers(questions, profile);
 
     // Generate quick tips, things to avoid, and checklist
-    const tipsResult = await generateInterviewTips(interview.role, interview.company);
+    const tipsResult = await generateInterviewTips(interview.role, interview.company, profile);
 
     // Build prep package
     const prepPackage: PrepPackage = {
@@ -106,9 +109,10 @@ export async function generatePrepPackage(
       companyResearch,
       questions,
       starAnswers,
-      quickTips: tipsResult.quickTips,
-      thingsToAvoid: tipsResult.thingsToAvoid,
+      quickTips: tipsResult.tips,
+      thingsToAvoid: tipsResult.avoidList,
       interviewDayChecklist: tipsResult.checklist,
+      difficulty: tipsResult.difficulty,
       generatedAt: new Date().toISOString(),
     };
 
@@ -127,31 +131,52 @@ export async function generatePrepPackage(
  */
 async function generateInterviewTips(
   role: string,
-  company: string
-): Promise<{
-  quickTips: string[];
-  thingsToAvoid: string[];
-  checklist: string[];
-}> {
-  const systemPrompt = `You are a career coach providing practical interview advice.
-Generate actionable tips that will actually help in an interview.`;
+  company: string,
+  profile: Profile
+): Promise<{ tips: string[]; avoidList: string[]; checklist: string[]; difficulty: string }> {
+  const skillsList = (profile.skills || []).slice(0, 8).map((s) => s.name).join(', ');
+  const yearsExp = (() => {
+    if (!profile.experience || profile.experience.length === 0) return 0;
+    const totalMonths = profile.experience.reduce((acc, exp) => {
+      const start = new Date(exp.startDate || '2020-01-01');
+      const end = exp.endDate ? new Date(exp.endDate) : new Date();
+      return acc + Math.max(0, (end.getFullYear() - start.getFullYear()) * 12 + end.getMonth() - start.getMonth());
+    }, 0);
+    return Math.round(totalMonths / 12);
+  })();
 
-  const userPrompt = `Generate interview preparation advice for a ${role} interview at ${company}.
-
-Provide:
-1. quickTips: 5 specific, actionable tips (not generic advice like "be yourself")
-2. thingsToAvoid: 5 common mistakes to avoid in interviews
-3. checklist: 7 items for interview day (logistics, preparation, materials to bring)
-
-Return JSON: { "quickTips": ["..."], "thingsToAvoid": ["..."], "checklist": ["..."] }`;
-
-  const schema = z.object({
-    quickTips: z.array(z.string()).length(5),
-    thingsToAvoid: z.array(z.string()).length(5),
-    checklist: z.array(z.string()).length(7),
+  const tipsSchema = z.object({
+    tips: z.array(z.string()).default([]),
+    avoid: z.array(z.string()).default([]),
+    checklist: z.array(z.string()).default([]),
+    difficulty: z.string().default('Medium'),
+    interview_format: z.string().default(''),
+    time_to_prepare: z.string().default(''),
   });
 
-  const result = await aiClient.completeJSON(systemPrompt, userPrompt, schema, { model: 'fast' });
+  const result = await aiClient.completeJSON(
+    `You are an expert interview coach with insider knowledge of hiring processes at top tech companies. Generate specific, actionable interview guidance — not generic advice. Every tip must be role and company specific.`,
+    `Generate interview preparation guidance for:
+Role: ${role}
+Company: ${company}
+Candidate Skills: ${skillsList}
+Years of Experience: ${yearsExp}
 
-  return result;
+Return JSON with:
+- tips: 7-10 SPECIFIC tips for THIS role at THIS company (e.g., "${company} uses HackerRank for coding rounds — practice on that platform specifically, not just LeetCode", "For ${role} at ${company}, system design questions focus on X — prepare Y and Z specifically")
+- avoid: 7-10 specific mistakes candidates make at ${company} interviews for ${role} (be specific, not generic)
+- checklist: 10-12 day-of checklist items (mix of logistics and mental prep — be specific to remote vs onsite if you know)
+- difficulty: "Easy|Medium|Hard|Very Hard" — honest assessment of how selective ${company} is for ${role}
+- interview_format: brief description of typical interview format at ${company} for this type of role (rounds, types, timeline)
+- time_to_prepare: recommended preparation time given candidate's ${yearsExp} years of experience`,
+    tipsSchema,
+    { model: 'balanced', maxTokens: 3072 }
+  );
+
+  return {
+    tips: result.tips,
+    avoidList: result.avoid,
+    checklist: result.checklist,
+    difficulty: `${result.difficulty} — ${result.interview_format} — Recommended prep: ${result.time_to_prepare}`,
+  };
 }

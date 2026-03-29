@@ -10,32 +10,46 @@ const analyzeSchema = z.object({
   targetIndustry: z.string().optional(),
 });
 
+const sectionSchema = z.object({
+  score: z.number().default(0),
+  suggestions: z.array(z.string()).default([]),
+});
+
 const resultSchema = z.object({
-  overall_score: z.number(),
-  headline_options: z.array(z.string()),
+  overall_score: z.number().default(0),
+  headline_options: z.array(z.string()).default([]),
   sections: z.object({
-    headline: z.object({
-      score: z.number(),
-      suggestions: z.array(z.string()),
-    }),
-    about: z.object({
-      score: z.number(),
-      suggestions: z.array(z.string()),
-    }),
-    experience: z.object({
-      score: z.number(),
-      suggestions: z.array(z.string()),
-    }),
-    skills: z.object({
-      score: z.number(),
-      suggestions: z.array(z.string()),
-    }),
-    recommendations: z.object({
-      score: z.number(),
-      suggestions: z.array(z.string()),
-    }),
+    headline: sectionSchema,
+    about: sectionSchema,
+    experience: sectionSchema,
+    skills: sectionSchema,
+    recommendations: sectionSchema,
   }),
 });
+
+interface ScoreHistoryEntry {
+  score: number;
+  date: string;
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const { userId } = await authenticate(request);
+
+    const history = await storage.getJSON<ScoreHistoryEntry[]>(
+      `users/${userId}/optimize/linkedin-scores.json`
+    );
+
+    const historyEntries: ScoreHistoryEntry[] = Array.isArray(history) ? history : [];
+
+    return successResponse({
+      history: historyEntries,
+      latest: historyEntries.length > 0 ? historyEntries[historyEntries.length - 1] : null,
+    });
+  } catch (error) {
+    return handleError(error);
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -84,6 +98,22 @@ export async function POST(request: NextRequest) {
       resultSchema,
       { model: 'balanced', maxTokens: 4096 }
     );
+
+    // Save score history
+    try {
+      const existingRaw = await storage.getJSON<ScoreHistoryEntry[]>(
+        `users/${userId}/optimize/linkedin-scores.json`
+      );
+      const existing: ScoreHistoryEntry[] = Array.isArray(existingRaw) ? existingRaw : [];
+      const newEntry: ScoreHistoryEntry = {
+        score: result.overall_score,
+        date: new Date().toISOString(),
+      };
+      const updated = [...existing, newEntry].slice(-12);
+      await storage.putJSON(`users/${userId}/optimize/linkedin-scores.json`, updated);
+    } catch {
+      // Non-critical — do not fail the response
+    }
 
     return successResponse({
       analysis: result,

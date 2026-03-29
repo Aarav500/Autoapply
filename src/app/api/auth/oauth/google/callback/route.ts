@@ -48,9 +48,6 @@ export async function GET(req: NextRequest) {
     if (!settings) {
       settings = {
         userId,
-        twilioConfigured: false,
-        phoneNumber: null,
-        whatsappEnabled: false,
         googleCalendarToken: null,
         googleRefreshToken: null,
         autoReplyEnabled: false,
@@ -59,8 +56,7 @@ export async function GET(req: NextRequest) {
         autoSearchEnabled: false,
         searchConfigurations: [],
         notificationPreferences: {
-          smsEnabled: false,
-          whatsappEnabled: false,
+          telegramEnabled: false,
           emailDigestEnabled: true,
           inAppEnabled: true,
           interviewReminders: true,
@@ -77,8 +73,10 @@ export async function GET(req: NextRequest) {
       };
     }
 
-    // Encrypt and store the refresh token
-    settings.googleCalendarToken = encrypt(tokens.refresh_token);
+    // Encrypt and store the refresh token for both Calendar and Gmail use
+    const encryptedToken = encrypt(tokens.refresh_token);
+    settings.googleCalendarToken = encryptedToken;
+    settings.googleRefreshToken = encryptedToken; // Also used for Gmail access
     settings.updatedAt = new Date().toISOString();
 
     await storage.putJSON(`users/${userId}/settings.json`, settings);

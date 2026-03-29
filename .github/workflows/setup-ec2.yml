@@ -1,5 +1,7 @@
-name: Setup EC2 Instance
+name: Bootstrap EC2 (SSH → install SSM + Docker)
 
+# Run this ONCE on a fresh EC2 instance.
+# After it completes, all future deployments use SSM — SSH is no longer needed.
 on:
   workflow_dispatch:
 
@@ -7,15 +9,46 @@ env:
   AWS_REGION: us-east-1
 
 jobs:
-  setup:
-    name: Install AWS CLI and Docker on EC2
+  bootstrap:
+    name: Install SSM Agent + Docker via SSH
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # ── 1. SSH into the VM and run the bootstrap script ──────────────────────
+      - name: Bootstrap EC2 via SSH
+        env:
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}  # e.g. ubuntu, ec2-user, admin
+        run: |
+          echo "📡 Connecting to $EC2_USER@$EC2_HOST via SSH..."
+
+          # Write SSH key to temp file
+          echo "$SSH_KEY" > /tmp/ec2_key.pem
+          chmod 600 /tmp/ec2_key.pem
+
+          # Copy bootstrap script to VM
+          scp -i /tmp/ec2_key.pem \
+              -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=30 \
+              scripts/setup-ec2.sh \
+              "$EC2_USER@$EC2_HOST:/tmp/setup-ec2.sh"
+
+          # Run bootstrap script on VM
+          ssh -i /tmp/ec2_key.pem \
+              -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=30 \
+              "$EC2_USER@$EC2_HOST" \
+              "chmod +x /tmp/setup-ec2.sh && bash /tmp/setup-ec2.sh"
+
+          # Clean up key
+          rm -f /tmp/ec2_key.pem
+
+      # ── 2. Verify SSM Agent is registered with AWS ───────────────────────────
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -23,134 +56,99 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Setup EC2 via SSM
+      - name: Verify SSM registration
         run: |
-          echo "🚀 Setting up EC2 instance..."
-          echo ""
+          echo "⏳ Waiting for instance to register with SSM (up to 60s)..."
+          for i in {1..12}; do
+            STATUS=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=${{ secrets.EC2_INSTANCE_ID }}" \
+              --query "InstanceInformationList[0].PingStatus" \
+              --output text 2>/dev/null || echo "None")
 
-          # Read the setup script
-          SETUP_SCRIPT=$(cat scripts/setup-ec2.sh | base64 -w 0)
+            echo "  [${i}] SSM ping status: $STATUS"
 
-          # Send setup command via SSM
+            if [ "$STATUS" = "Online" ]; then
+              echo ""
+              echo "✅ Instance is Online in SSM!"
+              break
+            fi
+            sleep 5
+          done
+
+          if [ "$STATUS" != "Online" ]; then
+            echo "⚠️  Instance not yet Online in SSM — it may take a minute more."
+            echo "   Check: AWS Console → Systems Manager → Fleet Manager"
+            echo "   Common causes:"
+            echo "   - EC2 instance role missing AmazonSSMManagedInstanceCore policy"
+            echo "   - VPC has no internet access (SSM needs outbound HTTPS)"
+          fi
+
+      # ── 3. Smoke test: run a command via SSM ─────────────────────────────────
+      - name: Smoke test via SSM
+        run: |
+          echo "🧪 Running smoke test via SSM (no SSH)..."
+
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
             --document-name "AWS-RunShellScript" \
-            --comment "AutoApply EC2 setup - install AWS CLI and Docker" \
-            --timeout-seconds 900 \
-            --parameters commands="[
-              \"echo '$SETUP_SCRIPT' | base64 -d > /tmp/setup-ec2.sh\",
-              \"chmod +x /tmp/setup-ec2.sh\",
-              \"bash /tmp/setup-ec2.sh\"
-            ]" \
+            --comment "AutoApply bootstrap smoke test" \
+            --timeout-seconds 60 \
+            --parameters 'commands=[
+              "echo \"=== SSM Smoke Test ===\"",
+              "echo \"SSM Agent: $(amazon-ssm-agent -version 2>/dev/null || systemctl is-active amazon-ssm-agent)\"",
+              "echo \"Docker: $(docker --version)\"",
+              "echo \"AWS CLI: $(aws --version)\"",
+              "echo \"✅ SSM is working!\""
+            ]' \
             --query "Command.CommandId" \
             --output text)
 
-          echo "SSM Command ID: $COMMAND_ID"
-          echo "Installing AWS CLI and Docker (this may take 5-10 minutes)..."
-          echo ""
+          echo "Command ID: $COMMAND_ID"
 
-          # Wait for command to complete
-          for i in {1..90}; do
+          for i in {1..12}; do
+            sleep 5
             STATUS=$(aws ssm get-command-invocation \
               --command-id "$COMMAND_ID" \
               --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
               --query "Status" \
               --output text 2>/dev/null || echo "Pending")
 
-            echo "[$((i * 5))s] Status: $STATUS"
+            echo "  [${i}] $STATUS"
 
             if [ "$STATUS" = "Success" ]; then
               echo ""
-              echo "✅ Setup completed successfully!"
-              echo ""
-              echo "=== SETUP OUTPUT ==="
+              echo "=== OUTPUT ==="
               aws ssm get-command-invocation \
                 --command-id "$COMMAND_ID" \
                 --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
                 --query "StandardOutputContent" \
                 --output text
-              echo ""
-              echo "=========================================="
-              echo "EC2 instance is now ready for deployment!"
-              echo "=========================================="
-              exit 0
-            elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "TimedOut" ]; then
-              echo ""
-              echo "❌ Setup failed with status: $STATUS"
-              echo ""
-              echo "=== STDOUT ==="
-              aws ssm get-command-invocation \
-                --command-id "$COMMAND_ID" \
-                --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
-                --query "StandardOutputContent" \
-                --output text || echo "(empty)"
-              echo ""
-              echo "=== STDERR ==="
+              break
+            elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "TimedOut" ] || [ "$STATUS" = "Cancelled" ]; then
+              echo "❌ Smoke test failed"
               aws ssm get-command-invocation \
                 --command-id "$COMMAND_ID" \
                 --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
                 --query "StandardErrorContent" \
-                --output text || echo "(empty)"
+                --output text
               exit 1
             fi
-
-            sleep 5
           done
 
-          echo "❌ Timeout waiting for setup"
-          exit 1
-
-      - name: Verify Installation
+      - name: Done
         run: |
           echo ""
-          echo "=== Verifying Installation ==="
-
-          # Test AWS CLI and Docker
-          COMMAND_ID=$(aws ssm send-command \
-            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
-            --document-name "AWS-RunShellScript" \
-            --comment "Verify AWS CLI and Docker installation" \
-            --parameters 'commands=[
-              "echo \"AWS CLI version:\"",
-              "aws --version",
-              "echo \"\"",
-              "echo \"Docker version:\"",
-              "docker --version",
-              "echo \"\"",
-              "echo \"Docker Compose version:\"",
-              "docker compose version || docker-compose --version",
-              "echo \"\"",
-              "echo \"Docker status:\"",
-              "sudo systemctl status docker --no-pager | head -n 10"
-            ]' \
-            --query "Command.CommandId" \
-            --output text)
-
-          echo "Waiting for verification..."
-          sleep 5
-
-          aws ssm get-command-invocation \
-            --command-id "$COMMAND_ID" \
-            --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
-            --query "StandardOutputContent" \
-            --output text
-
-      - name: Summary
-        if: success()
-        run: |
+          echo "================================================"
+          echo "  ✅ EC2 Bootstrap Complete!"
+          echo "================================================"
           echo ""
-          echo "=========================================="
-          echo "✅ EC2 SETUP COMPLETE!"
-          echo "=========================================="
+          echo "  Your VM now has:"
+          echo "    ✅ SSM Agent (registered + online)"
+          echo "    ✅ Docker"
+          echo "    ✅ AWS CLI v2"
           echo ""
-          echo "Your EC2 instance now has:"
-          echo "  ✅ AWS CLI v2"
-          echo "  ✅ Docker"
-          echo "  ✅ Docker Compose"
+          echo "  You can now run: Deploy to EC2"
+          echo "  No SSH access needed from this point on."
           echo ""
-          echo "Next steps:"
-          echo "1. Run the 'Deploy to EC2' workflow"
-          echo "2. It should work now!"
-          echo ""
-          echo "Go to: https://github.com/${{ github.repository }}/actions/workflows/deploy.yml"
-          echo "=========================================="
+          echo "  Next: GitHub → Actions → Deploy to EC2 → Run workflow"
+          echo "================================================"

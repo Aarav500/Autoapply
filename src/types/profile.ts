@@ -88,6 +88,12 @@ export const PreferencesSchema = z.object({
   remotePreference: RemotePreference.optional(),
   industries: z.array(z.string()).default([]),
   dealBreakers: z.array(z.string()).default([]),
+  isStudent: z.boolean().default(false),
+  classYear: z.enum(['freshman', 'sophomore', 'junior', 'senior', 'masters', 'phd']).optional(),
+  openToInternships: z.boolean().default(true),
+  openToOnCampus: z.boolean().default(true),
+  openToPartTime: z.boolean().default(true),
+  maxHoursPerWeek: z.number().min(1).max(40).optional(),
 });
 export type Preferences = z.infer<typeof PreferencesSchema>;
 
@@ -97,6 +103,10 @@ const DEFAULT_PREFERENCES: Preferences = {
   locations: [],
   industries: [],
   dealBreakers: [],
+  isStudent: false,
+  openToInternships: true,
+  openToOnCampus: true,
+  openToPartTime: true,
 };
 
 // ==================== Main Profile Schema ====================
@@ -134,6 +144,7 @@ export const ProfileUpdateSchema = z.object({
   photoUrl: z.string().url().optional(),
   summary: z.string().optional(),
   headline: z.string().optional(),
+  socialLinks: z.array(SocialLinkSchema).optional(),
 });
 export type ProfileUpdate = z.infer<typeof ProfileUpdateSchema>;
 

@@ -1,10 +1,10 @@
 import { storage } from '@/lib/storage';
 import { logger } from '@/lib/logger';
-import { NotFoundError, ValidationError } from '@/lib/errors';
+import { NotFoundError } from '@/lib/errors';
 import { generateId } from '@/lib/utils';
 import { BrowserAutomation } from './browser-automation';
 import { analyzeFormAndFill } from './form-intelligence';
-import type { ApplicationResult, Application, ApplicationMethod } from '@/types/application';
+import type { ApplicationResult, Application, ApplicationMethod, FormField } from '@/types/application';
 import type { Profile } from '@/types/profile';
 import type { Job } from '@/types/job';
 import { promises as fs } from 'fs';
@@ -36,6 +36,21 @@ export class AutoApplicant {
 
       if (!profile || !job) {
         throw new NotFoundError('Profile or job not found');
+      }
+
+      // ── Idempotency: prevent double-applications ──────────────────────────────
+      // Check if we already have an application record for this job
+      try {
+        const applicationsKey = `users/${userId}/applications/index.json`;
+        const appsIndex = await storage.getJSON<{ applications: Array<{ jobId: string; status: string; appliedAt: string }> }>(applicationsKey);
+        const apps = Array.isArray(appsIndex?.applications) ? appsIndex.applications : Array.isArray(appsIndex) ? appsIndex as Array<{ jobId: string; status: string; appliedAt: string }> : [];
+        const existingApp = apps.find((a: { jobId: string }) => a.jobId === jobId);
+        if (existingApp) {
+          logger.info({ userId, jobId, existingStatus: existingApp.status }, 'Idempotency check: already applied, skipping');
+          return { success: false, applicationId: '', method: 'manual_required' as const, error: 'already_applied' };
+        }
+      } catch (err) {
+        logger.debug({ err }, 'Could not check existing applications for idempotency — proceeding');
       }
 
       logger.info({ userId, jobId, jobTitle: job.title, company: job.company }, 'Starting auto-apply');
@@ -173,7 +188,7 @@ export class AutoApplicant {
   private async prepareDocuments(
     userId: string,
     jobId: string,
-    job: Job
+    _job: Job
   ): Promise<{ cvDocumentId: string | null; coverLetterDocumentId: string | null }> {
     const storageClient = storage;
 
@@ -224,12 +239,13 @@ export class AutoApplicant {
       const doc = await storageClient.getJSON<any>(`users/${userId}/documents/index.json`);
       const document = doc?.documents?.find((d: any) => d.id === documentId);
 
-      if (!document || !document.s3Key) {
+      const s3Key = document?.files?.pdf || document?.files?.docx;
+      if (!document || !s3Key) {
         throw new Error('Document not found');
       }
 
-      const buffer = await storageClient.downloadFile(document.s3Key);
-      const extension = document.s3Key.split('.').pop() || 'pdf';
+      const buffer = await storageClient.downloadFile(s3Key);
+      const extension = s3Key.split('.').pop() || 'pdf';
       const tmpPath = join(tmpdir(), `autoapply-${generateId()}.${extension}`);
 
       await fs.writeFile(tmpPath, buffer);
@@ -287,8 +303,8 @@ export class AutoApplicant {
     userId: string,
     job: Job,
     profile: Profile,
-    cvPath: string | null,
-    coverLetterPath: string | null
+    _cvPath: string | null,
+    _coverLetterPath: string | null
   ): Promise<ApplicationResult> {
     try {
       // Extract email address from description
@@ -430,6 +446,18 @@ ${profile.phone || ''}`;
         company: job.company,
         description: job.description || '',
       });
+
+      // If AI returned fewer than 3 fields, supplement with heuristic mapping
+      if (formAnalysis.fields && formAnalysis.fields.length < 3) {
+        const heuristicFields = this.heuristicFieldMapping(formHTML, profile);
+        logger.info({ heuristicCount: heuristicFields.length }, 'Using heuristic field mapping as fallback');
+        // Merge: AI fields take priority, heuristics fill the gaps
+        const aiSelectors = new Set(formAnalysis.fields.map((f: { selector: string }) => f.selector));
+        formAnalysis.fields = [
+          ...formAnalysis.fields,
+          ...heuristicFields.filter((h) => !aiSelectors.has(h.selector)),
+        ];
+      }
 
       logger.info({
         fieldsCount: formAnalysis.fields.length,
@@ -650,6 +678,119 @@ ${profile.phone || ''}`;
     } catch (error) {
       logger.warn({ error, filePath }, 'Failed to cleanup temp file');
     }
+  }
+
+  /**
+   * Heuristic field mapping fallback when AI form analysis returns insufficient results.
+   * Uses regex patterns on field names, IDs, placeholders, and labels to map profile data.
+   */
+  private heuristicFieldMapping(
+    formHtml: string,
+    profile: Profile
+  ): FormField[] {
+    const fields: FormField[] = [];
+
+    type FieldType = FormField['type'];
+
+    // Patterns: [fieldPattern (matches name/id/placeholder/label), profileValue, fieldType]
+    const fieldMappings: Array<[RegExp, string, FieldType]> = [
+      // Name fields
+      [/\b(first[_-]?name|firstname|fname|given[_-]?name)\b/i, (profile.name || '').split(' ')[0] || '', 'text'],
+      [/\b(last[_-]?name|lastname|lname|family[_-]?name|surname)\b/i, (profile.name || '').split(' ').slice(1).join(' ') || '', 'text'],
+      [/\b(full[_-]?name|name|your[_-]?name)\b/i, profile.name || '', 'text'],
+      // Contact
+      [/\b(email|e-mail|email[_-]?address)\b/i, profile.email || '', 'email'],
+      [/\b(phone|tel|mobile|cell|telephone|phone[_-]?number)\b/i, profile.phone || '', 'tel'],
+      // Location
+      [/\b(city|location|city[_-]?state)\b/i, profile.location?.split(',')[0] || profile.location || '', 'text'],
+      [/\b(state|province|region)\b/i, profile.location?.split(',')[1]?.trim() || '', 'text'],
+      [/\b(country)\b/i, 'United States', 'text'],
+      [/\b(zip|postal|zip[_-]?code|postcode)\b/i, '', 'text'],
+      // Professional
+      [/\b(linkedin|linkedin[_-]?url|linkedin[_-]?profile)\b/i,
+        (profile.socialLinks || []).find((s) => s.platform?.toLowerCase() === 'linkedin')?.url || '', 'text'],
+      [/\b(github|github[_-]?url|github[_-]?profile)\b/i,
+        (profile.socialLinks || []).find((s) => s.platform?.toLowerCase() === 'github')?.url || '', 'text'],
+      [/\b(portfolio|website|personal[_-]?site)\b/i,
+        (profile.socialLinks || []).find((s) => ['portfolio', 'website', 'personal'].includes(s.platform?.toLowerCase() || ''))?.url || '', 'text'],
+      [/\b(headline|current[_-]?title|job[_-]?title|position|title)\b/i, profile.headline || '', 'text'],
+      [/\b(summary|about|bio|professional[_-]?summary|cover|introduction)\b/i, profile.summary || '', 'textarea'],
+      // Availability
+      [/\b(start[_-]?date|available|availability|when[_-]?can[_-]?you[_-]?start)\b/i, 'Immediately', 'text'],
+      [/\b(work[_-]?auth|authorized|authorization|eligible[_-]?to[_-]?work)\b/i, 'Yes', 'text'],
+      [/\b(sponsorship|visa[_-]?sponsor|require[_-]?sponsor)\b/i, 'No', 'text'],
+      [/\b(salary|compensation|expected[_-]?salary|desired[_-]?salary)\b/i,
+        profile.preferences?.salaryMin ? `${profile.preferences.salaryMin}` : '', 'text'],
+      // Education
+      [/\b(degree|education[_-]?level|highest[_-]?degree)\b/i,
+        (profile.education || [])[0]?.degree || '', 'text'],
+      [/\b(university|college|school|institution|alma[_-]?mater)\b/i,
+        (profile.education || [])[0]?.institution || '', 'text'],
+      [/\b(major|field[_-]?of[_-]?study|area[_-]?of[_-]?study)\b/i,
+        (profile.education || [])[0]?.field || '', 'text'],
+      [/\b(gpa|grade[_-]?point)\b/i, String((profile.education || [])[0]?.gpa ?? ''), 'text'],
+      // Years of experience
+      [/\b(years[_-]?of[_-]?exp|years[_-]?experience|experience[_-]?years)\b/i, (() => {
+        if (!profile.experience || profile.experience.length === 0) return '0';
+        const totalMonths = profile.experience.reduce((acc, exp) => {
+          const start = new Date(exp.startDate || '2020-01-01');
+          const end = exp.endDate ? new Date(exp.endDate) : new Date();
+          return acc + Math.max(0, (end.getFullYear() - start.getFullYear()) * 12 + end.getMonth() - start.getMonth());
+        }, 0);
+        return String(Math.round(totalMonths / 12));
+      })(), 'text'],
+      // How did you hear
+      [/\b(how[_-]?did[_-]?you[_-]?hear|referral[_-]?source|source)\b/i, 'Job Board', 'text'],
+      [/\b(gender)\b/i, 'Prefer not to say', 'text'],
+      [/\b(veteran|military[_-]?status)\b/i, 'I am not a veteran', 'text'],
+      [/\b(disability|accommodation)\b/i, 'No', 'text'],
+      [/\b(ethnicity|race)\b/i, 'Prefer not to say', 'text'],
+    ];
+
+    // Parse form HTML to find input elements
+    const inputPattern = /<(?:input|textarea|select)[^>]*(?:name|id|placeholder|aria-label)=[^>]*>/gi;
+    const labelPattern = /<label[^>]*for="([^"]+)"[^>]*>([^<]+)<\/label>/gi;
+
+    // Build label→id map
+    const labelMap: Record<string, string> = {};
+    let labelMatch: RegExpExecArray | null;
+    while ((labelMatch = labelPattern.exec(formHtml)) !== null) {
+      labelMap[labelMatch[1]] = labelMatch[2].toLowerCase().trim();
+    }
+
+    let inputMatch: RegExpExecArray | null;
+    while ((inputMatch = inputPattern.exec(formHtml)) !== null) {
+      const tag = inputMatch[0];
+
+      // Extract attributes
+      const nameMatch = tag.match(/\bname="([^"]+)"/i);
+      const idMatch = tag.match(/\bid="([^"]+)"/i);
+      const placeholderMatch = tag.match(/\bplaceholder="([^"]+)"/i);
+      const typeMatch = tag.match(/\btype="([^"]+)"/i);
+
+      const fieldName = nameMatch?.[1] || '';
+      const fieldId = idMatch?.[1] || '';
+      const placeholder = placeholderMatch?.[1] || '';
+      const labelText = (fieldId && labelMap[fieldId]) ? labelMap[fieldId] : '';
+      const combinedText = `${fieldName} ${fieldId} ${placeholder} ${labelText}`.toLowerCase();
+
+      // Skip hidden, submit, file, and button inputs
+      const rawType = typeMatch?.[1]?.toLowerCase() || 'text';
+      if (['hidden', 'submit', 'file', 'button', 'image', 'reset'].includes(rawType)) continue;
+
+      // Try each mapping pattern
+      for (const [pattern, value, fieldType] of fieldMappings) {
+        if (pattern.test(combinedText) && value) {
+          const selector = fieldId ? `#${fieldId}` : fieldName ? `[name="${fieldName}"]` : null;
+          if (selector) {
+            fields.push({ selector, value, type: fieldType, confidence: 0.75 });
+            break;
+          }
+        }
+      }
+    }
+
+    return fields;
   }
 }
 

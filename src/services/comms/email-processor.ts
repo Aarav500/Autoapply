@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { storage } from '@/lib/storage';
 import { aiClient } from '@/lib/ai-client';
 import { GmailClient } from './gmail-client';
+import { NotificationManager } from './notification-manager';
 import { decrypt } from '@/lib/encryption';
 import { logger } from '@/lib/logger';
 import {
@@ -15,9 +16,48 @@ import {
   EmailSettings,
   EmailAnalysisSchema,
 } from '@/types/comms';
-import { AppError, ExternalServiceError } from '@/lib/errors';
+import { AppError } from '@/lib/errors';
 import { emailAnalyzerPrompt } from '@/prompts/email-analyzer';
 import { autoResponderPrompt } from '@/prompts/auto-responder';
+
+// Application status detection patterns
+const APPLICATION_RECEIVED_PATTERNS = [
+  'thank you for applying',
+  'application received',
+  'we received your application',
+  'application has been submitted',
+  'successfully applied',
+  'your application for',
+];
+
+const SCREENING_PATTERNS = [
+  'move forward',
+  'next steps',
+  'schedule a call',
+  'screening call',
+  'phone interview',
+  'preliminary interview',
+  'recruiter call',
+];
+
+const REJECTION_PATTERNS = [
+  'not moving forward',
+  'we will not',
+  'other candidates',
+  'position has been filled',
+  'unfortunately',
+  'not a fit',
+  'decided not to move',
+];
+
+const OFFER_PATTERNS = [
+  'offer letter',
+  'pleased to offer',
+  'job offer',
+  'compensation package',
+  'we would like to offer',
+  'offer of employment',
+];
 
 // Known job-related email domains
 const JOB_DOMAINS = [
@@ -35,25 +75,35 @@ const JOB_DOMAINS = [
   'recruitee.com',
 ];
 
-// Job-related keywords
+// Job-related keywords — deliberately narrow to reduce false positives.
+// Words like "meeting", "schedule", "opportunity", "position" are too generic
+// and match non-job emails (marketing, internal HR newsletters, etc.)
 const JOB_KEYWORDS = [
   'interview',
-  'application',
-  'position',
-  'resume',
-  'offer',
-  'hiring',
-  'recruiter',
-  'recruitment',
-  'job',
-  'opportunity',
-  'candidate',
-  'cv',
-  'screening',
+  'job application',
+  'your application',
+  'we received your application',
+  'thank you for applying',
+  'application status',
+  'resume review',
+  'offer letter',
+  'job offer',
+  'offer of employment',
+  'hiring decision',
+  'recruiter outreach',
+  'recruitment team',
+  'moving forward with your application',
+  'next steps in your application',
   'phone screen',
-  'video call',
-  'meeting',
-  'schedule',
+  'technical screen',
+  'coding challenge',
+  'take-home assignment',
+  'onsite interview',
+  'virtual interview',
+  'background check',
+  'reference check',
+  'compensation package',
+  'start date',
 ];
 
 export class EmailProcessor {
@@ -169,6 +219,19 @@ export class EmailProcessor {
             logger.error({ emailId, error }, 'Failed to analyze email with AI');
             // Continue processing even if AI fails
           }
+
+          // Auto-detect and update job pipeline status from email content
+          try {
+            const statusUpdate = await this.detectJobStatusUpdate(message, userId);
+            if (statusUpdate) {
+              logger.info(
+                { userId, jobId: statusUpdate.jobId, status: statusUpdate.status, company: statusUpdate.company },
+                'Auto-updating job status from email'
+              );
+            }
+          } catch (error) {
+            logger.error({ emailId, error }, 'Failed to detect job status update from email');
+          }
         }
 
         // 8. Auto-reply if configured
@@ -199,6 +262,63 @@ export class EmailProcessor {
           }
         }
 
+        // 8b. Send urgency-aware in-app notification for job-related emails
+        if (analysis && isJobRelated) {
+          try {
+            const notificationManager = new NotificationManager();
+            const company = analysis.extractedData?.company || 'a company';
+            const deadline = analysis.extractedData?.dates?.[0] || null;
+            const deadlineClause = deadline ? ` by ${deadline}` : '';
+
+            let notifTitle = 'Job Email Received';
+            let notifMessage = `New job-related email from ${company}`;
+            let notifPriority: 'critical' | 'high' | 'medium' | 'low' = 'medium';
+
+            switch (analysis.category) {
+              case 'interview_invite':
+                notifTitle = 'Interview Invitation';
+                notifMessage = `Interview invitation from ${company} — respond within 24h to secure your slot`;
+                notifPriority = 'high';
+                break;
+              case 'offer':
+                notifTitle = 'Job Offer Received!';
+                notifMessage = `JOB OFFER received from ${company} — review and respond${deadlineClause}`;
+                notifPriority = 'critical';
+                break;
+              case 'rejection':
+                notifTitle = 'Application Update';
+                notifMessage = `Application update from ${company} — keep momentum, 3 more applications queued`;
+                notifPriority = 'low';
+                break;
+              case 'action_required':
+                notifTitle = 'Assessment Request';
+                notifMessage = `Assessment request from ${company} — complete before${deadlineClause || ' the deadline'}`;
+                notifPriority = 'high';
+                break;
+              default:
+                notifTitle = 'Job Email';
+                notifMessage = `New email from ${company} regarding your application`;
+                notifPriority = 'medium';
+                break;
+            }
+
+            await notificationManager.send(userId, {
+              type: 'email_response',
+              priority: notifPriority,
+              title: notifTitle,
+              message: notifMessage,
+              data: {
+                emailId,
+                company,
+                category: analysis.category,
+              },
+            });
+          } catch (notifError) {
+            logger.error({ emailId, notifError }, 'Failed to send email notification');
+            // Non-critical — do not block email processing
+          }
+        }
+
         // 9. Save full email to S3
         const processedEmail: ProcessedEmail = {
           ...message,
@@ -213,7 +333,7 @@ export class EmailProcessor {
             confidence: 0,
           },
           suggestedReply,
-          autoReplied: stats.autoReplied > 0,
+          autoReplied: suggestedReply !== null,
         };
 
         const emailKey = `users/${userId}/emails/${emailId}.json`;
@@ -362,7 +482,7 @@ export class EmailProcessor {
       const profileKey = `users/${userId}/profile.json`;
       const profile = await storage.getJSON<any>(profileKey);
 
-      const userName = profile?.personalInfo?.fullName || 'the candidate';
+      const userName = profile?.name || 'the candidate';
 
       // Generate reply using auto-responder prompt
       const prompt = autoResponderPrompt({
@@ -398,6 +518,37 @@ export class EmailProcessor {
     const subject = message.subject.toLowerCase();
     const body = (message.snippet || message.body).toLowerCase();
 
+    // Exclusion patterns — marketing, newsletters, receipts: skip these
+    const NON_JOB_EXCLUSIONS = [
+      'unsubscribe',
+      'newsletter',
+      'marketing@',
+      'noreply@mailchimp',
+      'no-reply@mailchimp',
+      'promo@',
+      'deals@',
+      'updates@',
+      'news@',
+      'digest@',
+      'weekly@',
+      'monthly@',
+      'notification@',
+      'billing@',
+      'invoice@',
+      'receipt@',
+      'payment@',
+      'policy@',
+      'legal@',
+      'compliance@',
+      'security@',
+      'alert@',
+      'system@',
+    ];
+    const senderAndSubject = `${fromEmail} ${subject}`;
+    if (NON_JOB_EXCLUSIONS.some((excl) => senderAndSubject.includes(excl))) {
+      return false;
+    }
+
     // Check domain
     if (JOB_DOMAINS.some((domain) => fromEmail.includes(domain))) {
       return true;
@@ -416,20 +567,7 @@ export class EmailProcessor {
     return false;
   }
 
-  private async analyzeEmail(message: GmailMessage, userId: string): Promise<EmailAnalysis> {
-    // Load user profile for context
-    const profileKey = `users/${userId}/profile.json`;
-    let profile: any = {};
-
-    try {
-      const result = await storage.getJSON(profileKey);
-      if (result) {
-        profile = result;
-      }
-    } catch (error) {
-      // Profile may not exist yet
-    }
-
+  private async analyzeEmail(message: GmailMessage, _userId: string): Promise<EmailAnalysis> {
     const prompt = emailAnalyzerPrompt({
       subject: message.subject,
       body: message.body,
@@ -480,7 +618,7 @@ export class EmailProcessor {
     const profileKey = `users/${userId}/profile.json`;
     const profile = await storage.getJSON<any>(profileKey);
 
-    const userName = profile?.personalInfo?.fullName || 'the candidate';
+    const userName = profile?.name || 'the candidate';
 
     const prompt = autoResponderPrompt({
       originalEmail: {
@@ -542,6 +680,97 @@ export class EmailProcessor {
     } catch (error) {
       logger.error({ userId, error }, 'Failed to create interview record');
       // Don't throw - this is not critical
+    }
+  }
+
+  /**
+   * Detect whether an email signals a job application status change.
+   * Returns the detected status and the matching job id if found.
+   */
+  async detectJobStatusUpdate(
+    message: GmailMessage,
+    userId: string
+  ): Promise<{ status: string; company: string; jobId: string } | null> {
+    const subject = message.subject.toLowerCase();
+    const body = (message.body || message.snippet || '').toLowerCase();
+    const combined = `${subject} ${body}`;
+
+    // Determine new status from pattern matching
+    let detectedStatus: string | null = null;
+
+    if (OFFER_PATTERNS.some((p) => combined.includes(p))) {
+      detectedStatus = 'offer';
+    } else if (REJECTION_PATTERNS.some((p) => combined.includes(p))) {
+      detectedStatus = 'rejected';
+    } else if (SCREENING_PATTERNS.some((p) => combined.includes(p))) {
+      detectedStatus = 'screening';
+    } else if (APPLICATION_RECEIVED_PATTERNS.some((p) => combined.includes(p))) {
+      detectedStatus = 'applied';
+    }
+
+    if (!detectedStatus) return null;
+
+    // Extract company name: prefer AI-extracted data, then fall back to email domain
+    let company = '';
+    const fromDomain = message.from.split('@')[1] || '';
+    const domainParts = fromDomain.split('.');
+    // Use second-to-last part as company slug (e.g., "stripe" from "no-reply@stripe.com")
+    company = domainParts.length >= 2 ? domainParts[domainParts.length - 2] : domainParts[0] || '';
+
+    if (!company) return null;
+
+    // Find a matching job in the user's jobs index
+    try {
+      const jobsRaw = await storage.getJSON<unknown>(`users/${userId}/jobs/index.json`);
+      const jobsArr: Array<{ id: string; company: string; status: string }> = Array.isArray(jobsRaw)
+        ? (jobsRaw as Array<{ id: string; company: string; status: string }>)
+        : ((jobsRaw as { jobs?: Array<{ id: string; company: string; status: string }> })?.jobs || []);
+
+      const match = jobsArr.find((j) =>
+        j.company.toLowerCase().includes(company.toLowerCase()) ||
+        company.toLowerCase().includes(j.company.toLowerCase().split(' ')[0])
+      );
+
+      if (!match) return null;
+
+      // Only advance status — never move backwards
+      const STATUS_ORDER: string[] = ['discovered', 'saved', 'applying', 'applied', 'screening', 'interview', 'offer', 'rejected'];
+      const currentIdx = STATUS_ORDER.indexOf(match.status);
+      const detectedIdx = STATUS_ORDER.indexOf(detectedStatus);
+
+      // Allow rejected at any point, but otherwise only advance
+      if (detectedStatus !== 'rejected' && detectedIdx <= currentIdx) {
+        return null;
+      }
+
+      // Update the job status in S3
+      await storage.updateJSON<unknown>(`users/${userId}/jobs/index.json`, (raw) => {
+        const arr: Array<{ id: string; company: string; status: string; updatedAt: string }> = Array.isArray(raw)
+          ? (raw as Array<{ id: string; company: string; status: string; updatedAt: string }>)
+          : ((raw as { jobs?: Array<{ id: string; company: string; status: string; updatedAt: string }> })?.jobs || []);
+        return arr.map((j) =>
+          j.id === match.id ? { ...j, status: detectedStatus as string, updatedAt: new Date().toISOString() } : j
+        );
+      });
+
+      // Also update the full job record if it exists
+      try {
+        await storage.updateJSON<unknown>(`users/${userId}/jobs/${match.id}.json`, (raw) => {
+          return { ...(raw as object), status: detectedStatus, updatedAt: new Date().toISOString() };
+        });
+      } catch {
+        // Full record may not exist — index update is sufficient
+      }
+
+      logger.info(
+        { userId, jobId: match.id, company: match.company, oldStatus: match.status, newStatus: detectedStatus },
+        'Job status auto-updated from email'
+      );
+
+      return { status: detectedStatus, company: match.company, jobId: match.id };
+    } catch (error) {
+      logger.error({ userId, error }, 'Error looking up jobs for status update');
+      return null;
     }
   }
 

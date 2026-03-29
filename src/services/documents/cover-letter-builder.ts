@@ -1,4 +1,4 @@
-import { nanoid } from 'nanoid';
+import { generateId } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import { AppError } from '@/lib/errors';
 import { storage } from '@/lib/storage';
@@ -157,19 +157,16 @@ export async function generateCoverLetter(options: GenerateCoverLetterOptions): 
     // 3. Prepare input for AI cover letter generator
     const coverLetterInput: CoverLetterInput = {
       profile: {
-        name: profile.personalInfo.name,
-        currentTitle: profile.professionalInfo?.currentTitle || '',
+        name: profile.name,
+        currentTitle: profile.headline || '',
         experience: (profile.experience || []).slice(0, 3).map((exp: any) => ({
           company: exp.company,
           role: exp.role,
-          achievements: exp.achievements || exp.responsibilities?.slice(0, 3) || [],
+          achievements: exp.bullets || exp.responsibilities?.slice(0, 3) || [],
           technologies: exp.technologies,
         })),
-        skills: [
-          ...(profile.skills?.technical || []).slice(0, 10),
-          ...(profile.skills?.soft || []).slice(0, 5),
-        ],
-        achievements: profile.achievements?.map((a: any) => a.description || a.title).slice(0, 3),
+        skills: (profile.skills || []).slice(0, 15).map((s: any) => s.name),
+        achievements: [],
       },
       jobListing: {
         title: jobListing.title,
@@ -206,12 +203,12 @@ export async function generateCoverLetter(options: GenerateCoverLetterOptions): 
       opening: generatedLetter.paragraphs[0]?.content || '',
       body: generatedLetter.paragraphs.slice(1).map(p => p.content),
       closing: generatedLetter.signoff,
-      signature: profile.personalInfo.name,
+      signature: profile.name,
       senderInfo: {
-        name: profile.personalInfo.name,
-        email: profile.personalInfo.email,
-        phone: profile.personalInfo.phone,
-        address: profile.personalInfo.location,
+        name: profile.name,
+        email: profile.email,
+        phone: profile.phone,
+        address: profile.location,
       },
     };
 
@@ -223,7 +220,7 @@ export async function generateCoverLetter(options: GenerateCoverLetterOptions): 
     const pdfBuffer = await htmlToPdf(html);
 
     // 8. Upload to S3
-    const documentId = nanoid();
+    const documentId = generateId();
     const pdfKey = `users/${userId}/documents/cover-letters/${documentId}.pdf`;
     await storage.uploadFile(pdfKey, pdfBuffer, 'application/pdf');
 

@@ -166,10 +166,14 @@ export const MockOverallAssessmentSchema = z.object({
 });
 export type MockOverallAssessment = z.infer<typeof MockOverallAssessmentSchema>;
 
+export const MockDifficultyLevel = z.enum(['warm-up', 'standard', 'challenging', 'intense']);
+export type MockDifficultyLevel = z.infer<typeof MockDifficultyLevel>;
+
 export const MockSessionSchema = z.object({
   id: z.string(),
   interviewId: z.string(),
   mode: MockInterviewMode,
+  difficulty: MockDifficultyLevel.default('warm-up'),
   messages: z.array(MockMessageSchema),
   scores: z.array(MockScoreSchema),
   isComplete: z.boolean(),
@@ -192,19 +196,45 @@ export const PrepPackageSchema = z.object({
   quickTips: z.array(z.string()),
   thingsToAvoid: z.array(z.string()),
   interviewDayChecklist: z.array(z.string()),
+  difficulty: z.string().optional(),
   generatedAt: z.string(),
 });
 export type PrepPackage = z.infer<typeof PrepPackageSchema>;
 
 // ==================== Request/Response Schemas ====================
 
+// ==================== Question Bank ====================
+
+export const QuestionBankCategory = z.enum(['behavioral', 'technical', 'culture-fit', 'situational']);
+export type QuestionBankCategory = z.infer<typeof QuestionBankCategory>;
+
+export const QuestionBankItemSchema = z.object({
+  question: z.string(),
+  category: QuestionBankCategory,
+  difficulty: QuestionDifficulty,
+  tips: z.string(),
+});
+export type QuestionBankItem = z.infer<typeof QuestionBankItemSchema>;
+
+export const QuestionBankSchema = z.object({
+  company: z.string(),
+  companySlug: z.string(),
+  questions: z.array(QuestionBankItemSchema),
+  generatedAt: z.string(),
+});
+export type QuestionBank = z.infer<typeof QuestionBankSchema>;
+
+// ==================== Request/Response Schemas ====================
+
 export const MockInterviewStartSchema = z.object({
   mode: MockInterviewMode,
+  difficulty: MockDifficultyLevel.optional(),
 });
 export type MockInterviewStartRequest = z.infer<typeof MockInterviewStartSchema>;
 
 export const MockAnswerSchema = z.object({
   answer: z.string().min(1),
+  difficulty: MockDifficultyLevel.optional(),
 });
 export type MockAnswerRequest = z.infer<typeof MockAnswerSchema>;
 
@@ -216,5 +246,6 @@ export const MockAnswerResponseSchema = z.object({
   nextQuestion: z.string().nullable(),
   isComplete: z.boolean(),
   overallAssessment: MockOverallAssessmentSchema.nullable(),
+  nextDifficulty: MockDifficultyLevel.optional(),
 });
 export type MockAnswerResponse = z.infer<typeof MockAnswerResponseSchema>;

@@ -4,7 +4,7 @@
 
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { nanoid } from 'nanoid';
+import { generateId } from '@/lib/utils';
 import { storage } from '@/lib/storage';
 import { logger } from '@/lib/logger';
 import { AuthError, ValidationError } from '@/lib/errors';
@@ -67,7 +67,7 @@ export async function register(
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     // Create user
-    const userId = nanoid();
+    const userId = generateId();
     const now = new Date().toISOString();
 
     const user: User = {

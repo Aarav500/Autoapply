@@ -27,59 +27,39 @@ export interface LinkedInOptimizerInput {
 export function linkedinOptimizerPrompt(
   input: LinkedInOptimizerInput
 ): { system: string; user: string } {
-  const system = `You are a LinkedIn profile optimization expert who has helped thousands of professionals improve their visibility to recruiters and hiring managers. You understand LinkedIn's algorithm and what makes profiles stand out.
+  const system = `You are a LinkedIn optimization expert who has helped 5,000+ professionals increase their recruiter inbound by 3-10x. You understand LinkedIn's algorithm and know what makes profiles rank in recruiter searches.
 
-LinkedIn profile hierarchy (what recruiters see first):
-1. Headline (appears in search results - critical for keywords)
-2. About section (tells your story, shows personality)
-3. Featured section (showcase work, articles, projects)
-4. Experience (quantified achievements, keywords)
-5. Skills (top 3 shown in profile, rest collapsed)
-6. Recommendations (social proof)
+LINKEDIN ALGORITHM FACTS (2024):
+- Headline is the #1 factor in recruiter search ranking — keyword density matters enormously
+- Profiles with 200+ connections get shown more in searches
+- "Open to Work" visibility to recruiters (not publicly) increases inbound by 40%
+- About section first 3 lines show without clicking "See more" — make them count
+- Skills with 5+ endorsements rank higher in search
+- Activity (posts, comments) boosts profile visibility by 2-3x in that week's searches
 
-Scoring criteria (0-100 per section):
+HEADLINE FORMULA (proven to maximize recruiter clicks):
+[Primary Role] | [Tech 1] • [Tech 2] • [Tech 3] | [Unique Value Prop or Company Type]
+Examples:
+- "Staff Backend Engineer | Go • Kubernetes • Distributed Systems | Scaling fintech to 10M+ users"
+- "ML Engineer | PyTorch • LLMs • MLflow | Ex-OpenAI | Building production AI systems"
+- "Full-Stack SWE Intern @ Google | React • Python • TypeScript | CS @ MIT '25"
 
-HEADLINE (most important for searchability):
-- 90-100: Role + key skills + value prop, keyword-rich, compelling (e.g., "Senior Full-Stack Engineer | React, Node.js, AWS | Building scalable fintech solutions")
-- 70-89: Role + some skills, decent keywords
-- 50-69: Just role title, minimal keywords
-- 30-49: Generic title (e.g., "Software Engineer")
-- 0-29: Empty or unprofessional
+ABOUT SECTION FORMULA:
+Para 1 (2 sentences): Bold opening hook — a metric-backed claim or insight about your niche
+Para 2 (3 sentences): What you do + how you do it + proof points with numbers
+Para 3 (2 sentences): What excites you about your next chapter + specific type of work you're seeking
+CTA: "I'm currently [open to / exploring / looking for] roles in [X]. Let's connect: [email or calendly]"
 
-ABOUT Section:
-- 90-100: Compelling story, specific achievements, personality, clear value prop, CTA, 3-4 paragraphs
-- 70-89: Clear background, some achievements, professional
-- 50-69: Basic background, list of skills
-- 30-49: Very brief or generic
-- 0-29: Empty or single sentence
+EXPERIENCE BULLET FORMULA:
+Action verb + what you did + scope/scale + measurable outcome
+Example: "Redesigned the checkout API serving 2M daily transactions, reducing p99 latency from 800ms → 120ms and saving $400k/year in cloud costs"
 
-EXPERIENCE Section:
-- 90-100: Quantified achievements, strong action verbs, keywords, consistent formatting
-- 70-89: Some quantification, decent descriptions
-- 50-69: Basic job descriptions, minimal metrics
-- 30-49: Just titles and companies, no descriptions
-- 0-29: Incomplete or very sparse
-
-SKILLS Section:
-- 90-100: 30+ skills, top skills highly endorsed (30+ each), relevant to role
-- 70-89: 20+ skills, some endorsements, mostly relevant
-- 50-69: 10-20 skills, few endorsements
-- 30-49: <10 skills or irrelevant skills
-- 0-29: No skills listed
-
-RECOMMENDATIONS Section:
-- 90-100: 10+ recommendations from managers/colleagues
-- 70-89: 5-9 recommendations
-- 50-69: 2-4 recommendations
-- 30-49: 1 recommendation
-- 0-29: No recommendations
-
-Headline options should:
-- Be exactly under 220 characters
-- Include primary role + 2-3 key skills/technologies
-- Add unique value proposition or specialization
-- Use keywords from target job descriptions
-- Avoid buzzwords ("passionate," "innovative," "guru")`;
+SCORING CRITERIA (0-100):
+- HEADLINE: keyword richness, role clarity, unique value
+- ABOUT: hook quality, specificity, CTA presence
+- EXPERIENCE: bullet quality, quantification, STAR structure
+- SKILLS: count (30+ ideal), endorsement levels, relevance to target role
+- RECOMMENDATIONS: count (10+ excellent), quality and diversity of recommenders`;
 
   const targetContext =
     input.targetRole || input.targetIndustry
@@ -113,17 +93,19 @@ ${input.profile.recommendations ? `Recommendations: ${input.profile.recommendati
 ${input.profile.posts ? `Posts in last 90 days: ${input.profile.posts}` : ''}
 ${targetContext}
 
-Provide:
-1. overall_score: Overall profile strength (0-100)
-2. headline_options: 5 compelling headline alternatives (each under 220 chars)
-3. sections: Detailed scores and suggestions:
-   - headline: Score + why current headline is/isn't working
-   - about: Score + specific suggestions (structure, content, tone)
-   - experience: Score + suggestions for improving experience descriptions
-   - skills: Score + suggestions (skills to add/remove, endorsement strategy)
-   - recommendations: Score + advice on getting more recommendations
-
-Prioritize high-impact changes. Be specific with examples.`;
+Provide a JSON response with:
+1. overall_score: number 0-100
+2. seo_score: how well this profile would rank in recruiter searches (0-100)
+3. headline_options: array of 5 headlines, each: { text: string (under 220 chars), rationale: string }
+4. about_rewrite: a complete rewritten About section (300-400 chars) they can copy-paste
+5. sections: object with keys headline, about, experience, skills, recommendations — each with:
+   - score: number 0-100
+   - verdict: one honest sentence
+   - suggestions: array of 3-5 specific, actionable improvements
+   - quick_win: highest-impact single change
+6. skill_gaps: array of skills to add based on their target role that they likely have but haven't listed
+7. priority_actions: top 5 changes ranked by recruiter impact
+8. connection_strategy: 2-3 specific tips for growing their network for job searching`;
 
   return { system, user };
 }

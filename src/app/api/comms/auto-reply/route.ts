@@ -14,13 +14,7 @@ export async function GET(request: NextRequest) {
 
     // Load settings
     const settingsKey = `users/${userId}/settings.json`;
-    let settings: any = {};
-
-    try {
-      settings = await storage.getJSON(settingsKey);
-    } catch (error) {
-      // Settings don't exist yet
-    }
+    const settings = await storage.getJSON<any>(settingsKey).catch(() => null);
 
     const autoReplyEnabled = settings?.autoReplyEnabled || false;
     const autoReplyRules: AutoReplyRule[] = settings?.autoReplyRules || [];
@@ -49,13 +43,8 @@ export async function PUT(request: NextRequest) {
 
     // Load existing settings
     const settingsKey = `users/${userId}/settings.json`;
-    let settings: any = {};
-
-    try {
-      settings = await storage.getJSON(settingsKey);
-    } catch (error) {
-      // Settings don't exist yet
-    }
+    const existing = await storage.getJSON<any>(settingsKey).catch(() => null);
+    const settings: any = existing || {};
 
     // Update auto-reply settings
     settings.autoReplyEnabled = enabled;

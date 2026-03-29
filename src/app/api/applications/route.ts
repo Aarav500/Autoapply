@@ -40,11 +40,8 @@ export async function GET(req: NextRequest) {
     logger.info({ userId, count: applications.length, statusFilter }, 'Applications listed');
 
     return apiResponse({
-      success: true,
-      data: {
-        applications,
-        total: applications.length,
-      },
+      applications,
+      total: applications.length,
     });
   } catch (error) {
     logger.error({ error }, 'List applications error');

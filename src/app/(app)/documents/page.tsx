@@ -1,8 +1,8 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useMemo } from "react";
-import { FileText, Download, Plus, AlertCircle, X, CheckCircle2, ChevronDown } from "lucide-react";
+import { FileText, Download, Plus, AlertCircle, X, CheckCircle2, ChevronDown, ShieldCheck, ChevronUp, History, ExternalLink, Loader2, Clock } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
 
@@ -15,6 +15,16 @@ export default function DocumentsPage() {
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateSuccess, setGenerateSuccess] = useState<string | null>(null);
+  const [atsResult, setAtsResult] = useState<{ score: number; improvements: Array<{ priority: string; category: string; suggestion: string }> } | null>(null);
+  const [atsExpanded, setAtsExpanded] = useState(false);
+  const [showVersionModal, setShowVersionModal] = useState(false);
+  const [versionName, setVersionName] = useState("");
+  const [versionTargetRole, setVersionTargetRole] = useState("");
+  const [versionTargetIndustry, setVersionTargetIndustry] = useState("");
+  const [versionJobDescription, setVersionJobDescription] = useState("");
+  const [versionError, setVersionError] = useState<string | null>(null);
+  const [isCreatingVersion, setIsCreatingVersion] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -34,6 +44,20 @@ export default function DocumentsPage() {
     retry: false,
   });
 
+  // ATS check mutation
+  const atsMutation = useMutation({
+    mutationFn: (documentId: string) =>
+      apiFetch<{ data: { atsResult: { score: number }; improvements: Array<{ priority: string; category: string; suggestion: string }> } }>("/api/documents/ats-check", {
+        method: "POST",
+        body: JSON.stringify({ documentId }),
+      }),
+    onSuccess: (data) => {
+      const d = (data as { data: { atsResult: { score: number }; improvements: Array<{ priority: string; category: string; suggestion: string }> } }).data;
+      setAtsResult({ score: d.atsResult.score, improvements: d.improvements });
+      setAtsExpanded(true);
+    },
+  });
+
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiFetch(`/api/documents/${id}`, { method: "DELETE" }),
@@ -42,6 +66,43 @@ export default function DocumentsPage() {
       setSelectedDocId(null);
     },
   });
+
+  // CV Versions
+  interface CVVersion { id: string; name: string; description: string; targetRole?: string; atsScore?: number; createdAt: string; downloadUrl?: string | null; }
+  const { data: versionsData, refetch: refetchVersions } = useQuery({
+    queryKey: ["cvVersions"],
+    queryFn: () => apiFetch<{ data: { versions: CVVersion[] } }>("/api/documents/versions"),
+    retry: false,
+  });
+  const cvVersions: CVVersion[] =
+    ((versionsData as Record<string, unknown>)?.data as Record<string, unknown>)?.versions as CVVersion[] || [];
+
+  const handleCreateVersion = async () => {
+    if (!versionName.trim()) { setVersionError("Name is required"); return; }
+    setIsCreatingVersion(true);
+    setVersionError(null);
+    try {
+      await apiFetch("/api/documents/versions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create-version",
+          name: versionName.trim(),
+          description: "",
+          targetRole: versionTargetRole.trim() || undefined,
+          targetIndustry: versionTargetIndustry.trim() || undefined,
+          jobDescription: versionJobDescription.trim() || undefined,
+        }),
+      });
+      refetchVersions();
+      setShowVersionModal(false);
+      setVersionName(""); setVersionTargetRole(""); setVersionTargetIndustry(""); setVersionJobDescription("");
+    } catch (err) {
+      setVersionError(err instanceof Error ? err.message : "Failed to create version");
+    } finally {
+      setIsCreatingVersion(false);
+    }
+  };
 
   const docsInner = (documentsData as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
   const documents: Record<string, unknown>[] = useMemo(
@@ -74,10 +135,10 @@ export default function DocumentsPage() {
       });
 
   const getATSScoreColor = (score: number) => {
-    if (score >= 90) return "#00E676";
-    if (score >= 75) return "#00FFE0";
-    if (score >= 60) return "#FFAB00";
-    return "#FF4757";
+    if (score >= 90) return "#34D399";
+    if (score >= 75) return "#8B5CF6";
+    if (score >= 60) return "#FBBF24";
+    return "#F87171";
   };
 
   return (
@@ -100,12 +161,12 @@ export default function DocumentsPage() {
               onClick={() => setActiveCategory(cat.id)}
               className="flex-shrink-0 px-4 py-2 rounded-lg transition-all"
               style={{
-                background: activeCategory === cat.id ? "rgba(0, 255, 224, 0.08)" : "transparent",
-                border: `1px solid ${activeCategory === cat.id ? "rgba(0, 255, 224, 0.2)" : "rgba(255, 255, 255, 0.06)"}`,
-                fontFamily: "'Outfit', sans-serif",
+                background: activeCategory === cat.id ? "rgba(124, 58, 237, 0.08)" : "transparent",
+                border: `1px solid ${activeCategory === cat.id ? "rgba(124, 58, 237, 0.2)" : "rgba(255, 255, 255, 0.06)"}`,
+                fontFamily: "'Inter', sans-serif",
                 fontSize: "13px",
                 fontWeight: 500,
-                color: activeCategory === cat.id ? "#00FFE0" : "#7E7E98",
+                color: activeCategory === cat.id ? "#8B5CF6" : "#9090B8",
               }}
             >
               {cat.label} ({cat.count})
@@ -118,9 +179,9 @@ export default function DocumentsPage() {
           onClick={() => { setShowGenerateModal(true); setGenerateError(null); setGenerateSuccess(null); }}
           className="w-full px-4 py-3 rounded-lg font-semibold transition-all"
           style={{
-            background: "#00FFE0",
+            background: "#8B5CF6",
             color: "#050508",
-            fontFamily: "'Outfit', sans-serif",
+            fontFamily: "'Inter', sans-serif",
           }}
         >
           <Plus size={16} className="inline mr-2" />
@@ -131,12 +192,12 @@ export default function DocumentsPage() {
           <div
             className="flex items-center gap-2 px-3 py-2 rounded-lg"
             style={{
-              background: "rgba(0, 230, 118, 0.08)",
-              border: "1px solid rgba(0, 230, 118, 0.2)",
+              background: "rgba(74, 222, 128, 0.08)",
+              border: "1px solid rgba(74, 222, 128, 0.2)",
             }}
           >
-            <CheckCircle2 size={14} style={{ color: "#00E676", flexShrink: 0 }} />
-            <span className="text-[12px]" style={{ fontFamily: "'DM Sans', sans-serif", color: "#00E676" }}>
+            <CheckCircle2 size={14} style={{ color: "#34D399", flexShrink: 0 }} />
+            <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: "#34D399" }}>
               {generateSuccess}
             </span>
           </div>
@@ -150,26 +211,26 @@ export default function DocumentsPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               className="relative w-full max-w-md rounded-xl p-6"
-              style={{ background: "#12121C", border: "1px solid rgba(255, 255, 255, 0.08)" }}
+              style={{ background: "#111120", border: "1px solid rgba(255, 255, 255, 0.08)" }}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold" style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}>Generate Document</h3>
-                <button onClick={() => setShowGenerateModal(false)} className="p-1 hover:bg-white/5 rounded-lg"><X size={20} className="text-[#7E7E98]" /></button>
+                <h3 className="text-lg font-semibold" style={{ fontFamily: "'Inter', sans-serif", color: "#F0F0FF" }}>Generate Document</h3>
+                <button onClick={() => setShowGenerateModal(false)} className="p-1 hover:bg-white/5 rounded-lg"><X size={20} className="text-[#9090B8]" /></button>
               </div>
 
               {/* Document Type */}
               <div className="mb-4">
-                <label className="block text-[12px] mb-2" style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}>Document Type</label>
+                <label className="block text-[12px] mb-2" style={{ fontFamily: "'Inter', sans-serif", color: "#9090B8" }}>Document Type</label>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setGenerateType("cv")}
                     className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
                     style={{
-                      background: generateType === "cv" ? "rgba(0, 255, 224, 0.1)" : "rgba(255, 255, 255, 0.04)",
-                      border: `1px solid ${generateType === "cv" ? "rgba(0, 255, 224, 0.3)" : "rgba(255, 255, 255, 0.08)"}`,
-                      color: generateType === "cv" ? "#00FFE0" : "#7E7E98",
-                      fontFamily: "'Outfit', sans-serif",
+                      background: generateType === "cv" ? "rgba(124, 58, 237, 0.1)" : "rgba(255, 255, 255, 0.04)",
+                      border: `1px solid ${generateType === "cv" ? "rgba(124, 58, 237, 0.3)" : "rgba(255, 255, 255, 0.08)"}`,
+                      color: generateType === "cv" ? "#8B5CF6" : "#9090B8",
+                      fontFamily: "'Inter', sans-serif",
                     }}
                   >
                     CV / Resume
@@ -178,10 +239,10 @@ export default function DocumentsPage() {
                     onClick={() => setGenerateType("cover-letter")}
                     className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
                     style={{
-                      background: generateType === "cover-letter" ? "rgba(0, 255, 224, 0.1)" : "rgba(255, 255, 255, 0.04)",
-                      border: `1px solid ${generateType === "cover-letter" ? "rgba(0, 255, 224, 0.3)" : "rgba(255, 255, 255, 0.08)"}`,
-                      color: generateType === "cover-letter" ? "#00FFE0" : "#7E7E98",
-                      fontFamily: "'Outfit', sans-serif",
+                      background: generateType === "cover-letter" ? "rgba(124, 58, 237, 0.1)" : "rgba(255, 255, 255, 0.04)",
+                      border: `1px solid ${generateType === "cover-letter" ? "rgba(124, 58, 237, 0.3)" : "rgba(255, 255, 255, 0.08)"}`,
+                      color: generateType === "cover-letter" ? "#8B5CF6" : "#9090B8",
+                      fontFamily: "'Inter', sans-serif",
                     }}
                   >
                     Cover Letter
@@ -191,7 +252,7 @@ export default function DocumentsPage() {
 
               {/* Job Selection */}
               <div className="mb-6">
-                <label className="block text-[12px] mb-2" style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}>
+                <label className="block text-[12px] mb-2" style={{ fontFamily: "'Inter', sans-serif", color: "#9090B8" }}>
                   Tailor for a specific job (optional)
                 </label>
                 <select
@@ -200,27 +261,27 @@ export default function DocumentsPage() {
                   className="w-full px-4 py-2.5 rounded-lg bg-transparent outline-none text-sm appearance-none cursor-pointer"
                   style={{
                     border: "1px solid rgba(255, 255, 255, 0.08)",
-                    fontFamily: "'DM Sans', sans-serif",
-                    color: selectedJobId ? "#E8E8F0" : "#7E7E98",
+                    fontFamily: "'Inter', sans-serif",
+                    color: selectedJobId ? "#F0F0FF" : "#9090B8",
                     background: "rgba(255, 255, 255, 0.04)",
                   }}
                 >
-                  <option value="" style={{ background: "#12121C" }}>General (no specific job)</option>
+                  <option value="" style={{ background: "#111120" }}>General (no specific job)</option>
                   {availableJobs.map((job: Record<string, unknown>) => (
-                    <option key={job.id as string} value={job.id as string} style={{ background: "#12121C" }}>
+                    <option key={job.id as string} value={job.id as string} style={{ background: "#111120" }}>
                       {job.title as string} at {job.company as string}
                     </option>
                   ))}
                 </select>
-                <p className="text-[11px] mt-1" style={{ fontFamily: "'DM Sans', sans-serif", color: "#4A4A64" }}>
+                <p className="text-[11px] mt-1" style={{ fontFamily: "'Inter', sans-serif", color: "#3A3A60" }}>
                   {generateType === "cover-letter" && !selectedJobId ? "Selecting a job is recommended for cover letters" : "Tailored documents score higher on ATS systems"}
                 </p>
               </div>
 
               {generateError && (
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg mb-4" style={{ background: "rgba(255, 71, 87, 0.08)", border: "1px solid rgba(255, 71, 87, 0.2)" }}>
-                  <AlertCircle size={14} style={{ color: "#FF4757", flexShrink: 0 }} />
-                  <span className="text-[12px]" style={{ fontFamily: "'DM Sans', sans-serif", color: "#FF4757" }}>{generateError}</span>
+                  <AlertCircle size={14} style={{ color: "#F87171", flexShrink: 0 }} />
+                  <span className="text-[12px]" style={{ fontFamily: "'Inter', sans-serif", color: "#F87171" }}>{generateError}</span>
                 </div>
               )}
 
@@ -245,7 +306,7 @@ export default function DocumentsPage() {
                 }}
                 disabled={isGenerating}
                 className="w-full px-4 py-3 rounded-lg font-semibold transition-all disabled:opacity-50"
-                style={{ background: "#00FFE0", color: "#050508", fontFamily: "'Outfit', sans-serif" }}
+                style={{ background: "#8B5CF6", color: "#050508", fontFamily: "'Inter', sans-serif" }}
               >
                 {isGenerating ? "Generating..." : `Generate ${generateType === "cv" ? "CV" : "Cover Letter"}`}
               </button>
@@ -261,10 +322,10 @@ export default function DocumentsPage() {
               border: "1px solid rgba(255, 71, 87, 0.2)",
             }}
           >
-            <AlertCircle size={14} style={{ color: "#FF4757", flexShrink: 0 }} />
+            <AlertCircle size={14} style={{ color: "#F87171", flexShrink: 0 }} />
             <span
               className="text-[12px]"
-              style={{ fontFamily: "'DM Sans', sans-serif", color: "#FF4757" }}
+              style={{ fontFamily: "'Inter', sans-serif", color: "#F87171" }}
             >
               {generateError}
             </span>
@@ -279,10 +340,10 @@ export default function DocumentsPage() {
               border: "1px solid rgba(255, 71, 87, 0.2)",
             }}
           >
-            <AlertCircle size={14} style={{ color: "#FF4757", flexShrink: 0 }} />
+            <AlertCircle size={14} style={{ color: "#F87171", flexShrink: 0 }} />
             <span
               className="text-[12px]"
-              style={{ fontFamily: "'DM Sans', sans-serif", color: "#FF4757" }}
+              style={{ fontFamily: "'Inter', sans-serif", color: "#F87171" }}
             >
               {deleteMutation.error instanceof Error ? deleteMutation.error.message : "Failed to delete document"}
             </span>
@@ -293,16 +354,16 @@ export default function DocumentsPage() {
         <div className="flex-1 overflow-y-auto space-y-3">
           {isQueryError ? (
             <div className="text-center py-12">
-              <AlertCircle size={48} className="mx-auto mb-4" style={{ color: "#FF4757" }} />
+              <AlertCircle size={48} className="mx-auto mb-4" style={{ color: "#F87171" }} />
               <p
                 className="text-[14px] font-semibold mb-2"
-                style={{ fontFamily: "'Outfit', sans-serif", color: "#FF4757" }}
+                style={{ fontFamily: "'Inter', sans-serif", color: "#F87171" }}
               >
                 Failed to load documents
               </p>
               <p
                 className="text-[12px]"
-                style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}
+                style={{ fontFamily: "'Inter', sans-serif", color: "#9090B8" }}
               >
                 {queryError instanceof Error ? queryError.message : "An unexpected error occurred"}
               </p>
@@ -319,9 +380,9 @@ export default function DocumentsPage() {
             </div>
           ) : filteredDocuments.length === 0 ? (
             <div className="text-center py-12">
-              <FileText size={48} className="mx-auto mb-4 text-[#4A4A64]" />
-              <p className="text-[#7E7E98]">No documents yet</p>
-              <p className="text-sm text-[#4A4A64] mt-2">
+              <FileText size={48} className="mx-auto mb-4 text-[#3A3A60]" />
+              <p className="text-[#9090B8]">No documents yet</p>
+              <p className="text-sm text-[#3A3A60] mt-2">
                 Generate your first CV or cover letter
               </p>
             </div>
@@ -334,38 +395,62 @@ export default function DocumentsPage() {
                 style={{
                   background:
                     selectedDocId === doc.id
-                      ? "rgba(0, 255, 224, 0.08)"
-                      : "rgba(15, 15, 24, 0.7)",
+                      ? "rgba(124, 58, 237, 0.08)"
+                      : "rgba(11, 11, 20, 0.7)",
                   backdropFilter: "blur(12px)",
                   borderColor:
                     selectedDocId === doc.id
-                      ? "rgba(0, 255, 224, 0.2)"
+                      ? "rgba(124, 58, 237, 0.2)"
                       : "rgba(255, 255, 255, 0.04)",
                 }}
                 whileHover={{ scale: 1.02 }}
               >
                 <div className="flex items-start gap-3">
-                  <FileText size={20} className="text-[#00FFE0] flex-shrink-0 mt-1" />
+                  <FileText size={20} className="text-[#8B5CF6] flex-shrink-0 mt-1" />
                   <div className="flex-1 min-w-0">
                     <h3
                       className="text-[14px] font-semibold mb-1 truncate"
-                      style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}
+                      style={{ fontFamily: "'Inter', sans-serif", color: "#F0F0FF" }}
                     >
                       {doc.title || doc.name}
                     </h3>
                     <p
-                      className="text-[12px] text-[#7E7E98] mb-2"
-                      style={{ fontFamily: "'DM Sans', sans-serif" }}
+                      className="text-[12px] text-[#9090B8] mb-2"
+                      style={{ fontFamily: "'Inter', sans-serif" }}
                     >
                       {doc.template || doc.type} · Generated {doc.createdAt || "recently"}
                     </p>
+                    {/* CV Freshness indicator */}
+                    {doc.createdAt && (() => {
+                      const daysSince = Math.floor((Date.now() - new Date(doc.createdAt).getTime()) / 86_400_000);
+                      const isStale = daysSince >= 30;
+                      const isOld = daysSince >= 14;
+                      if (!isOld) return null;
+                      return (
+                        <div
+                          className="flex items-center gap-1 mb-2"
+                          style={{
+                            display: "inline-flex",
+                            padding: "2px 7px",
+                            borderRadius: 20,
+                            background: isStale ? "rgba(248,113,113,0.10)" : "rgba(251,191,36,0.10)",
+                            border: `1px solid ${isStale ? "rgba(248,113,113,0.25)" : "rgba(251,191,36,0.25)"}`,
+                          }}
+                        >
+                          <Clock size={9} color={isStale ? "#F87171" : "#FBBF24"} />
+                          <span style={{ fontSize: 10, color: isStale ? "#F87171" : "#FBBF24", fontFamily: "'Inter', sans-serif", marginLeft: 3 }}>
+                            {daysSince}d old{isStale ? " — consider refreshing" : ""}
+                          </span>
+                        </div>
+                      );
+                    })()}
                     {doc.atsScore !== undefined && (
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-[#7E7E98]">ATS Score:</span>
+                        <span className="text-[11px] text-[#9090B8]">ATS Score:</span>
                         <span
                           className="text-[11px] font-bold"
                           style={{
-                            fontFamily: "'IBM Plex Mono', monospace",
+                            fontFamily: "monospace, monospace",
                             color: getATSScoreColor(doc.atsScore),
                           }}
                         >
@@ -379,7 +464,106 @@ export default function DocumentsPage() {
             ))
           )}
         </div>
+        {/* CV Versions section */}
+        <div className="mt-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+          <button
+            onClick={() => setShowVersions(!showVersions)}
+            className="flex items-center justify-between w-full mb-2 hover:opacity-80 transition-opacity"
+          >
+            <div className="flex items-center gap-2">
+              <History size={13} style={{ color: "#8B5CF6" }} />
+              <span className="text-[12px] font-semibold" style={{ color: "#9090B8" }}>Named CV Versions</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(139,92,246,0.15)", color: "#8B5CF6" }}>{cvVersions.length}</span>
+            </div>
+            {showVersions ? <ChevronUp size={13} style={{ color: "#5A5A80" }} /> : <ChevronDown size={13} style={{ color: "#5A5A80" }} />}
+          </button>
+
+          <AnimatePresence>
+            {showVersions && (
+              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                <button
+                  onClick={() => { setShowVersionModal(true); setVersionError(null); }}
+                  className="w-full mb-2 px-3 py-2 rounded-lg text-[12px] font-semibold transition-all hover:bg-white/5"
+                  style={{ border: "1px dashed rgba(139,92,246,0.3)", color: "#8B5CF6" }}
+                >
+                  + Save Current CV as Version
+                </button>
+                {cvVersions.length === 0 ? (
+                  <p className="text-[11px] text-center py-3" style={{ color: "#3A3A60" }}>No versions yet</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {cvVersions.map((v) => (
+                      <div key={v.id} className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[12px] font-medium truncate" style={{ color: "#F0F0FF" }}>{v.name}</p>
+                          {v.targetRole && <p className="text-[10px] truncate" style={{ color: "#5A5A80" }}>{v.targetRole}</p>}
+                        </div>
+                        <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                          {v.atsScore !== undefined && (
+                            <span className="text-[10px] font-semibold" style={{ color: v.atsScore >= 75 ? "#34D399" : v.atsScore >= 60 ? "#FBBF24" : "#F87171", fontFamily: "monospace" }}>{v.atsScore}%</span>
+                          )}
+                          {v.downloadUrl && (
+                            <a href={v.downloadUrl} download target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-white/5 transition-all" title="Download">
+                              <ExternalLink size={11} style={{ color: "#5A5A80" }} />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
+
+      {/* Create Version Modal */}
+      {showVersionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowVersionModal(false)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative w-full max-w-md rounded-xl p-6"
+            style={{ background: "#111120", border: "1px solid rgba(255, 255, 255, 0.08)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-[16px] font-semibold" style={{ color: "#F0F0FF" }}>Save CV Version</h3>
+              <button onClick={() => setShowVersionModal(false)} className="p-1 hover:bg-white/5 rounded-lg"><X size={18} className="text-[#9090B8]" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[12px] mb-1.5" style={{ color: "#9090B8" }}>Version Name *</label>
+                <input value={versionName} onChange={(e) => setVersionName(e.target.value)} placeholder="e.g. ML Engineer - Google 2026" className="w-full px-3 py-2.5 rounded-lg bg-transparent outline-none text-[13px]" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "#F0F0FF" }} />
+              </div>
+              <div>
+                <label className="block text-[12px] mb-1.5" style={{ color: "#9090B8" }}>Target Role (optional)</label>
+                <input value={versionTargetRole} onChange={(e) => setVersionTargetRole(e.target.value)} placeholder="e.g. Senior ML Engineer" className="w-full px-3 py-2.5 rounded-lg bg-transparent outline-none text-[13px]" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "#F0F0FF" }} />
+              </div>
+              <div>
+                <label className="block text-[12px] mb-1.5" style={{ color: "#9090B8" }}>Target Industry (optional)</label>
+                <input value={versionTargetIndustry} onChange={(e) => setVersionTargetIndustry(e.target.value)} placeholder="e.g. AI / Machine Learning" className="w-full px-3 py-2.5 rounded-lg bg-transparent outline-none text-[13px]" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "#F0F0FF" }} />
+              </div>
+              <div>
+                <label className="block text-[12px] mb-1.5" style={{ color: "#9090B8" }}>Job Description (optional — improves ATS tailoring)</label>
+                <textarea value={versionJobDescription} onChange={(e) => setVersionJobDescription(e.target.value)} placeholder="Paste the job description to get an ATS-tailored version..." rows={3} className="w-full px-3 py-2.5 rounded-lg bg-transparent outline-none text-[13px] resize-none" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "#F0F0FF" }} />
+              </div>
+              {versionError && <p className="text-[12px]" style={{ color: "#F87171" }}>{versionError}</p>}
+              <button
+                onClick={handleCreateVersion}
+                disabled={isCreatingVersion}
+                className="w-full py-2.5 rounded-lg font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{ background: "#8B5CF6", color: "#050508" }}
+              >
+                {isCreatingVersion ? <><Loader2 size={14} className="animate-spin" /> Generating…</> : "Generate & Save Version"}
+              </button>
+              <p className="text-[11px] text-center" style={{ color: "#3A3A60" }}>AI will tailor your CV to the role and compute an ATS score</p>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* RIGHT PANEL - DOCUMENT PREVIEW */}
       <div className="flex-1">
@@ -387,7 +571,7 @@ export default function DocumentsPage() {
           <div
             className="h-full p-6 rounded-lg border overflow-y-auto"
             style={{
-              background: "rgba(15, 15, 24, 0.7)",
+              background: "rgba(11, 11, 20, 0.7)",
               backdropFilter: "blur(12px)",
               borderColor: "rgba(255, 255, 255, 0.04)",
             }}
@@ -397,13 +581,13 @@ export default function DocumentsPage() {
               <div className="flex-1">
                 <h2
                   className="text-2xl font-bold mb-2"
-                  style={{ fontFamily: "'Outfit', sans-serif", color: "#E8E8F0" }}
+                  style={{ fontFamily: "'Inter', sans-serif", color: "#F0F0FF" }}
                 >
                   {selectedDocument.title || selectedDocument.name}
                 </h2>
                 <p
                   className="text-[13px]"
-                  style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}
+                  style={{ fontFamily: "'Inter', sans-serif", color: "#9090B8" }}
                 >
                   {selectedDocument.template || selectedDocument.type} · Generated {selectedDocument.createdAt || "recently"}
                 </p>
@@ -420,13 +604,13 @@ export default function DocumentsPage() {
                     <span
                       className="text-2xl font-bold block"
                       style={{
-                        fontFamily: "'IBM Plex Mono', monospace",
+                        fontFamily: "monospace, monospace",
                         color: getATSScoreColor(selectedDocument.atsScore),
                       }}
                     >
                       {selectedDocument.atsScore}
                     </span>
-                    <span className="text-[10px] text-[#7E7E98]">ATS Score</span>
+                    <span className="text-[10px] text-[#9090B8]">ATS Score</span>
                   </div>
                 </div>
               )}
@@ -442,11 +626,51 @@ export default function DocumentsPage() {
             >
               <p
                 className="text-sm leading-relaxed whitespace-pre-wrap"
-                style={{ fontFamily: "'DM Sans', sans-serif", color: "#7E7E98" }}
+                style={{ fontFamily: "'Inter', sans-serif", color: "#9090B8" }}
               >
                 {selectedDocument.content || "Document preview not available. Download to view full content."}
               </p>
             </div>
+
+            {/* ATS Check Results */}
+            <AnimatePresence>
+              {atsResult && atsExpanded && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mb-4 rounded-lg overflow-hidden"
+                  style={{ border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.05)" }}
+                >
+                  <div className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck size={14} style={{ color: "#8B5CF6" }} />
+                        <span className="text-[13px] font-semibold" style={{ color: "#F0F0FF", fontFamily: "'Inter', sans-serif" }}>ATS Analysis</span>
+                        <span className="text-[13px] font-bold" style={{ color: getATSScoreColor(atsResult.score), fontFamily: "monospace, monospace" }}>{atsResult.score}/100</span>
+                      </div>
+                      <button onClick={() => setAtsExpanded(false)}><X size={14} style={{ color: "#9090B8" }} /></button>
+                    </div>
+                    {atsResult.improvements.length > 0 && (
+                      <div className="space-y-2">
+                        {atsResult.improvements.map((imp, i) => (
+                          <div key={i} className="flex items-start gap-2">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5 font-semibold uppercase" style={{
+                              background: imp.priority === "high" ? "rgba(248,113,113,0.12)" : imp.priority === "medium" ? "rgba(251,191,36,0.12)" : "rgba(139,92,246,0.12)",
+                              color: imp.priority === "high" ? "#F87171" : imp.priority === "medium" ? "#FBBF24" : "#8B5CF6",
+                            }}>{imp.priority}</span>
+                            <div>
+                              <span className="text-[11px] font-semibold" style={{ color: "#9090B8", fontFamily: "'Inter', sans-serif" }}>{imp.category}: </span>
+                              <span className="text-[11px]" style={{ color: "#6060A0", fontFamily: "'Inter', sans-serif" }}>{imp.suggestion}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Actions */}
             <div className="flex gap-3 pt-4 border-t" style={{ borderColor: "rgba(255, 255, 255, 0.04)" }}>
@@ -455,14 +679,31 @@ export default function DocumentsPage() {
                 download
                 className="flex-1 px-4 py-3 rounded-lg font-semibold text-center transition-all"
                 style={{
-                  background: "#00FFE0",
+                  background: "#8B5CF6",
                   color: "#050508",
-                  fontFamily: "'Outfit', sans-serif",
+                  fontFamily: "'Inter', sans-serif",
                 }}
               >
                 <Download size={16} className="inline mr-2" />
                 Download PDF
               </a>
+              <button
+                onClick={() => {
+                  setAtsResult(null);
+                  atsMutation.mutate(selectedDocument.id);
+                }}
+                disabled={atsMutation.isPending}
+                className="px-4 py-3 rounded-lg font-semibold border hover:bg-white/5 transition-all disabled:opacity-50 inline-flex items-center gap-1.5"
+                style={{
+                  borderColor: "rgba(139,92,246,0.3)",
+                  color: "#8B5CF6",
+                  fontFamily: "'Inter', sans-serif",
+                }}
+              >
+                <ShieldCheck size={14} />
+                {atsMutation.isPending ? "Checking…" : atsResult ? `${atsResult.score}% ATS` : "Check ATS"}
+                {atsResult && <ChevronDown size={12} onClick={(e) => { e.stopPropagation(); setAtsExpanded(!atsExpanded); }} />}
+              </button>
               {selectedDocument.docxUrl && (
                 <a
                   href={selectedDocument.docxUrl}
@@ -470,11 +711,11 @@ export default function DocumentsPage() {
                   className="px-4 py-3 rounded-lg font-semibold border hover:bg-white/5 transition-all"
                   style={{
                     borderColor: "rgba(255, 255, 255, 0.08)",
-                    color: "#7E7E98",
-                    fontFamily: "'Outfit', sans-serif",
+                    color: "#9090B8",
+                    fontFamily: "'Inter', sans-serif",
                   }}
                 >
-                  Download DOCX
+                  DOCX
                 </a>
               )}
               <button
@@ -486,8 +727,8 @@ export default function DocumentsPage() {
                 className="px-4 py-3 rounded-lg font-semibold border hover:bg-white/5 transition-all"
                 style={{
                   borderColor: "rgba(255, 71, 87, 0.2)",
-                  color: "#FF4757",
-                  fontFamily: "'Outfit', sans-serif",
+                  color: "#F87171",
+                  fontFamily: "'Inter', sans-serif",
                 }}
               >
                 Delete
@@ -495,7 +736,7 @@ export default function DocumentsPage() {
             </div>
           </div>
         ) : (
-          <div className="h-full flex items-center justify-center text-[#7E7E98]">
+          <div className="h-full flex items-center justify-center text-[#9090B8]">
             Select a document to preview
           </div>
         )}

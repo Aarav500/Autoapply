@@ -3,32 +3,27 @@ import { GmailClient } from '@/services/comms/gmail-client';
 import { storage } from '@/lib/storage';
 import { encrypt } from '@/lib/encryption';
 import { logger } from '@/lib/logger';
-import { verifyAccessToken } from '@/services/auth/jwt';
-import { cookies } from 'next/headers';
 
 /**
  * GET /api/comms/email/callback
  * Handle Gmail OAuth callback
+ * userId is passed via the OAuth state parameter (set in /api/comms/email/connect)
  */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get('code');
+    const state = searchParams.get('state'); // userId passed from connect route
 
     if (!code) {
       return NextResponse.redirect(new URL('/comms?error=oauth_failed', request.url));
     }
 
-    // Get user ID from auth token
-    const cookieStore = await cookies();
-    const token = cookieStore.get('auth_token')?.value;
-
-    if (!token) {
+    if (!state) {
       return NextResponse.redirect(new URL('/login?error=not_authenticated', request.url));
     }
 
-    const payload = verifyAccessToken(token);
-    const userId = payload.userId;
+    const userId = state;
 
     // Exchange code for tokens
     const gmailClient = new GmailClient({

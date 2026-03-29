@@ -2,7 +2,6 @@ import { NextRequest } from 'next/server';
 import { apiResponse, apiError, authenticate } from '@/lib/api-utils';
 import { storage } from '@/lib/storage';
 import { logger } from '@/lib/logger';
-import { autoApplyRuleSchema } from '@/types/application';
 import type { AutoApplyRule } from '@/types/application';
 import { z } from 'zod';
 
@@ -14,6 +13,7 @@ const updateAutoApplySchema = z.object({
   requireRemote: z.boolean().optional(),
   minSalary: z.number().nullable().optional(),
   maxApplicationsPerDay: z.number().min(1).max(50).optional(),
+  autoApplyInternshipsOnly: z.boolean().optional(),
 });
 
 /**
@@ -36,16 +36,14 @@ export async function GET(req: NextRequest) {
       requireRemote: false,
       minSalary: null,
       maxApplicationsPerDay: 10,
+      autoApplyInternshipsOnly: false,
     };
 
     const autoApplyRules = settings?.autoApplyRules || defaultRules;
 
     logger.info({ userId }, 'Auto-apply rules retrieved');
 
-    return apiResponse({
-      success: true,
-      data: { autoApplyRules },
-    });
+    return apiResponse({ autoApplyRules });
   } catch (error) {
     logger.error({ error }, 'Get auto-apply rules error');
     return apiError(error);
@@ -76,6 +74,7 @@ export async function PUT(req: NextRequest) {
         requireRemote: false,
         minSalary: null,
         maxApplicationsPerDay: 10,
+        autoApplyInternshipsOnly: false,
       };
 
       return {
@@ -93,10 +92,7 @@ export async function PUT(req: NextRequest) {
     const settings = await storage.getJSON<any>(`users/${userId}/settings.json`);
     const autoApplyRules = settings?.autoApplyRules;
 
-    return apiResponse({
-      success: true,
-      data: { autoApplyRules },
-    });
+    return apiResponse({ autoApplyRules });
   } catch (error) {
     logger.error({ error }, 'Update auto-apply rules error');
     return apiError(error);
