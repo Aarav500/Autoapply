@@ -1,7 +1,21 @@
 import { createLogger } from '@/lib/logger';
 import { storage } from '@/lib/storage';
 import { generateId } from '@/lib/utils';
-import type { JobAlert } from '@/app/api/job-alerts/route';
+
+interface JobAlert {
+  id: string;
+  name: string;
+  keywords: string;
+  location: string;
+  remote: boolean;
+  minMatchScore: number;
+  minSalary: number;
+  active: boolean;
+  seenJobIds: string[];
+  matchCount: number;
+  lastRunAt: string | null;
+  createdAt: string;
+}
 
 const logger = createLogger('task:job-alerts');
 
