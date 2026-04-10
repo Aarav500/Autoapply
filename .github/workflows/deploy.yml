@@ -134,6 +134,9 @@ jobs:
       - name: Upload deploy script to S3
         run: |
           aws s3 cp scripts/deploy-ec2.sh "s3://${{ secrets.S3_BUCKET_NAME }}/deployments/deploy-ec2.sh"
+          # Generate a pre-signed URL so EC2 can download the script without AWS CLI
+          SCRIPT_URL=$(aws s3 presign "s3://${{ secrets.S3_BUCKET_NAME }}/deployments/deploy-ec2.sh" --expires-in 3600)
+          echo "SCRIPT_URL=$SCRIPT_URL" >> $GITHUB_ENV
 
       - name: Deploy via AWS Systems Manager
         run: |
@@ -151,8 +154,7 @@ jobs:
             --parameters commands="[
               \"export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin\",
               \"export S3_DEPLOY_PATH='${{ env.S3_PATH }}'\",
-              \"if ! command -v aws &>/dev/null; then curl -s https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip && cd /tmp && unzip -qo awscliv2.zip && sudo ./aws/install && cd -; fi\",
-              \"aws s3 cp 's3://${{ secrets.S3_BUCKET_NAME }}/deployments/deploy-ec2.sh' /tmp/deploy-ec2.sh\",
+              \"curl -fsSL '${{ env.SCRIPT_URL }}' -o /tmp/deploy-ec2.sh\",
               \"chmod +x /tmp/deploy-ec2.sh\",
               \"bash /tmp/deploy-ec2.sh\"
             ]" \
