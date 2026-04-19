@@ -4,41 +4,30 @@
  * DELETE THIS FILE after debugging.
  */
 import { NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const keys = [
-    'ANTHROPIC_API_KEY',
-    'JWT_SECRET',
-    'JWT_ACCESS_SECRET',
-    'JWT_REFRESH_SECRET',
-    'ENCRYPTION_KEY',
-    'S3_BUCKET_NAME',
-    'S3_REGION',
-    'AWS_REGION',
-    'NODE_ENV',
-    'PORT',
-    'APP_URL',
-    'NEXT_PUBLIC_APP_URL',
-  ];
-
-  const status: Record<string, string> = {};
-  for (const key of keys) {
-    const val = process.env[key];
-    if (!val) {
-      status[key] = '❌ NOT SET';
-    } else if (val.length > 4) {
-      status[key] = `✅ SET (${val.slice(0, 4)}...${val.slice(-4)}, len=${val.length})`;
-    } else {
-      status[key] = `✅ SET (len=${val.length})`;
+  try {
+    const envPath = path.join(process.cwd(), '.env');
+    let envContent = 'File not found';
+    if (fs.existsSync(envPath)) {
+      envContent = fs.readFileSync(envPath, 'utf-8');
+      // Redact sensitive parts to be safe
+      envContent = envContent.replace(/(sk-ant-[a-zA-Z0-9]+-)[a-zA-Z0-9_-]+(AAA)/g, '$1...$2');
+      envContent = envContent.replace(/=[a-zA-Z0-9_-]{10,}/g, '=[REDACTED]');
     }
-  }
 
-  return NextResponse.json({
-    envStatus: status,
-    nodeVersion: process.version,
-    platform: process.platform,
-    cwd: process.cwd(),
-  });
+    return NextResponse.json({
+      envContent,
+      nodeVersion: process.version,
+      platform: process.platform,
+      cwd: process.cwd(),
+      anthropicInProcessEnv: !!process.env.ANTHROPIC_API_KEY,
+    });
+  } catch (error) {
+    return NextResponse.json({ error: String(error) });
+  }
 }
