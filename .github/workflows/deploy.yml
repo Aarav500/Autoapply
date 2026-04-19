@@ -82,8 +82,8 @@ jobs:
             echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}"
             echo "S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}"
             echo "S3_REGION=${{ env.AWS_REGION }}"
-            echo "NEXT_PUBLIC_APP_URL=https://aarav-shah.com"
-            echo "APP_URL=https://aarav-shah.com"
+            echo "NEXT_PUBLIC_APP_URL=https://autoapply.aarav-shah.com"
+            echo "APP_URL=https://autoapply.aarav-shah.com"
             echo "JWT_SECRET=${{ secrets.JWT_SECRET }}"
             echo "JWT_ACCESS_SECRET=${{ secrets.JWT_SECRET }}"
             echo "JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}"
@@ -91,7 +91,7 @@ jobs:
             echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}"
             echo "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}"
             echo "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}"
-            echo "GOOGLE_REDIRECT_URI=https://aarav-shah.com/api/auth/oauth/google/callback"
+            echo "GOOGLE_REDIRECT_URI=https://autoapply.aarav-shah.com/api/auth/oauth/google/callback"
             echo "LOG_LEVEL=info"
           } > deploy/.env
 
