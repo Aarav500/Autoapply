@@ -1023,7 +1023,7 @@ function SchedulerTab() {
   });
 
   const tasks: TaskStatus[] =
-    ((schedulerData as Record<string, unknown>)?.data as Record<string, unknown>)?.tasks as TaskStatus[] ?? [];
+    (schedulerData as Record<string, unknown>)?.tasks as TaskStatus[] ?? [];
 
   const triggerTask = async (taskName: string, action: "run-now" | "enable" | "disable") => {
     if (action === "run-now") setTriggeringTask(taskName);
@@ -1242,7 +1242,7 @@ function TemplatesTab() {
 
   const { data, isLoading } = useQuery<{ templates: AppTemplate[] }>({
     queryKey: ["appTemplates"],
-    queryFn: () => apiFetch<{ success: boolean; data: { templates: AppTemplate[] } }>("/api/application-templates").then((r) => r.data),
+    queryFn: () => apiFetch<{ templates: AppTemplate[] }>("/api/application-templates"),
   });
 
   const saveMutation = useMutation({
@@ -1276,12 +1276,12 @@ function TemplatesTab() {
     if (!question.trim()) return;
     setIsGenerating(true);
     try {
-      const res = await apiFetch<{ success: boolean; data: { answer: string; category: string } }>(
+      const res = await apiFetch<{ answer: string; category: string }>(
         "/api/application-templates?action=generate",
         { method: "POST", body: JSON.stringify({ question, context: genContext, tone: "professional" }) }
       );
-      setAnswer(res.data.answer);
-      setCategory(res.data.category as AppTemplate["category"]);
+      setAnswer(res.answer);
+      setCategory(res.category as AppTemplate["category"]);
     } catch {
       // best-effort
     } finally {
@@ -1553,7 +1553,7 @@ function BlacklistTab() {
     queryFn: () => apiFetch<{ data: { companies: string[] } }>("/api/settings/blacklist"),
     retry: false,
   });
-  const companies: string[] = (blData as { data?: { companies?: string[] } } | undefined)?.data?.companies ?? [];
+  const companies: string[] = (blData as { companies?: string[] } | undefined)?.companies ?? [];
 
   const addMutation = useMutation({
     mutationFn: (company: string) =>

@@ -317,12 +317,12 @@ function DailyHeatmap({ daily }: { daily: DailyEntry[] }) {
 export default function AnalyticsPage() {
   const { data: raw, isLoading, isError } = useQuery({
     queryKey: ["applicationAnalytics"],
-    queryFn: () => apiFetch<{ success: boolean; data: Analytics }>("/api/analytics/applications"),
+    queryFn: () => apiFetch<Analytics>("/api/analytics/applications"),
     refetchInterval: 120000,
     retry: false,
   });
 
-  const analytics: Analytics | null = (raw as { data?: Analytics } | undefined)?.data ?? null;
+  const analytics: Analytics | null = (raw as Analytics) ?? null;
 
   return (
     <div className="space-y-6 page-enter">

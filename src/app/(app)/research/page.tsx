@@ -82,8 +82,8 @@ function SubmitPaperTab() {
       }),
   });
 
-  const result = submitMutation.data as { data?: SubmitApiResponse } | undefined;
-  const pkg = result?.data?.submission;
+  const result = submitMutation.data as SubmitApiResponse | undefined;
+  const pkg = result?.submission;
 
   const handleCopySection = (text: string, key: string) => {
     navigator.clipboard.writeText(text).catch(() => {
@@ -663,8 +663,7 @@ export default function ResearchPage() {
       }),
     onSuccess: (res) => {
       const result = res as Record<string, unknown> | undefined;
-      const resultData = result?.data as Record<string, unknown> | undefined;
-      const paper = resultData?.paper as Record<string, unknown> | undefined;
+      const paper = result?.paper as Record<string, unknown> | undefined;
       if (paper?.id) {
         setSavedPaperId(paper.id as string);
         setTimeout(() => setSavedPaperId(null), 3000);
@@ -681,21 +680,17 @@ export default function ResearchPage() {
 
   // Extract results
   const analyzeResult = analyzeMutation.data as Record<string, unknown> | undefined;
-  const analyzeData = analyzeResult?.data as Record<string, unknown> | undefined;
-  const analysis = analyzeData?.analysis as Record<string, unknown> | undefined;
+  const analysis = analyzeResult?.analysis as Record<string, unknown> | undefined;
 
   const matchResult = matchMutation.data as Record<string, unknown> | undefined;
-  const matchData = matchResult?.data as Record<string, unknown> | undefined;
-  const matches = matchData?.matches as Record<string, unknown> | undefined;
+  const matches = matchResult?.matches as Record<string, unknown> | undefined;
   const venues = (matches?.venues as Record<string, unknown>[]) || [];
 
   const generateResult = generateMutation.data as Record<string, unknown> | undefined;
-  const generateData = generateResult?.data as Record<string, unknown> | undefined;
-  const paper = generateData?.paper as Record<string, unknown> | undefined;
+  const paper = generateResult?.paper as Record<string, unknown> | undefined;
 
   const listResult = listMutation.data as Record<string, unknown> | undefined;
-  const listData = listResult?.data as Record<string, unknown> | undefined;
-  const savedPapers = (listData?.papers as Record<string, unknown>[]) || [];
+  const savedPapers = (listResult?.papers as Record<string, unknown>[]) || [];
 
   const inputStyle = {
     background: "rgba(255, 255, 255, 0.04)",

@@ -65,7 +65,7 @@ export default function FlashcardsPage() {
     retry: false,
   });
 
-  const inner = (data as { data?: { cards?: Flashcard[]; dueCount?: number; totalCards?: number } } | undefined)?.data;
+  const inner = data as { cards?: Flashcard[]; dueCount?: number; totalCards?: number } | undefined;
   const cards: Flashcard[] = inner?.cards ?? [];
   const dueCount = inner?.dueCount ?? 0;
 

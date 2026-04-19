@@ -72,7 +72,7 @@ export default function TrendsPage() {
     }),
   });
 
-  const data = (trendsMutation.data as { data?: TrendsData } | undefined)?.data;
+  const data = trendsMutation.data as TrendsData | undefined;
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6">

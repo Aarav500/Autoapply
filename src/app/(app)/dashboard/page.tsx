@@ -662,19 +662,19 @@ export default function DashboardPage() {
   });
   const dailyTip = (tipData as Record<string, unknown>)?.tip as string | undefined;
 
-  const statsPayload = (statsData as { data?: StatsResponseData } | undefined)?.data;
+  const statsPayload = statsData as StatsResponseData | undefined;
   const stats: Array<{ label: string; number: string }> = statsPayload?.stats ?? [];
 
   const getStat = (label: string): string => stats.find((s) => s.label === label)?.number ?? "—";
 
-  const rawJobs = (jobsData as Record<string, unknown>)?.data;
+  const rawJobs = jobsData as Record<string, unknown> | undefined;
   const jobs: Array<Record<string, unknown>> = Array.isArray(rawJobs)
     ? rawJobs
     : Array.isArray((rawJobs as Record<string, unknown>)?.jobs)
     ? (rawJobs as Record<string, Array<Record<string, unknown>>>).jobs
     : [];
 
-  const rawInterviews = (interviewsData as Record<string, unknown>)?.data;
+  const rawInterviews = interviewsData as Record<string, unknown> | undefined;
   const interviews: Array<Record<string, unknown>> = Array.isArray(rawInterviews)
     ? rawInterviews
     : Array.isArray((rawInterviews as Record<string, unknown>)?.interviews)
@@ -720,7 +720,7 @@ export default function DashboardPage() {
 
   const TEMP_COLOR: Record<string, string> = { hot: "#34D399", warm: "#FBBF24", cooling: "#F87171" };
 
-  const rawActivity = (activityData as { data?: unknown } | undefined)?.data;
+  const rawActivity = activityData as unknown;
   const activities: ActivityEntry[] = Array.isArray(rawActivity)
     ? (rawActivity as ActivityEntry[])
     : [];

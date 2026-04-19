@@ -64,7 +64,13 @@ export async function apiFetch<T = unknown>(
           ...options?.headers,
         };
         const retryResponse = await fetch(url, { ...options, headers: retryHeaders });
-        if (retryResponse.ok) return retryResponse.json();
+        if (retryResponse.ok) {
+          const retryJson = await retryResponse.json();
+          if (retryJson && typeof retryJson === 'object' && 'success' in retryJson && 'data' in retryJson) {
+            return retryJson.data as T;
+          }
+          return retryJson as T;
+        }
       }
       // Refresh failed — redirect to login
       localStorage.removeItem('accessToken');
@@ -79,5 +85,10 @@ export async function apiFetch<T = unknown>(
     throw new Error(data?.error?.message || `Request failed: ${response.status}`);
   }
 
-  return response.json();
+  const json = await response.json();
+  // Auto-unwrap the { success, data } envelope from API responses
+  if (json && typeof json === 'object' && 'success' in json && 'data' in json) {
+    return json.data as T;
+  }
+  return json as T;
 }

@@ -64,7 +64,7 @@ export default function RelocatePage() {
     }),
   });
 
-  const result = (calcMutation.data as { data?: ReloResult } | undefined)?.data;
+  const result = calcMutation.data as ReloResult | undefined;
   const isHigher = (result?.adjustmentPercent ?? 0) > 0;
 
   const breakdownItems = result ? [
